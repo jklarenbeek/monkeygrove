@@ -76,6 +76,7 @@ class Game {
     this.hubWelcomed = false; // the hub greeting page shows once per session
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
     this.gestureHintDone = false; // pinch/pan hint shows at most once per session
+    this.userZoom = null; // player's retained pinch/wheel zoom (null = comfort default)
   }
 
   // ---------- boot ----------
@@ -356,7 +357,7 @@ class Game {
     const spawn = (this.place.markers.P || [{ x: 11, z: 11 }])[0];
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.spawnPet(spawn);
-    this.world.defaultZoom = this.mobileZoom('hub');
+    this.world.defaultZoom = this.sceneZoom('hub');
     this.world.follow(this.player.mesh, 13, { x: this.place.size.w * 0.5, z: this.place.size.d * 0.5 });
     this.player.onArrive = (x, z) => this.hubArrive(x, z);
     this.player.onBump = (x, z) => this.hubBump(x, z);
@@ -548,7 +549,7 @@ class Game {
     // full number line) stays on screen at any window aspect. Passing the player
     // lets the camera trail them — on mobile it opens at a comfortable zoom that
     // already trails them; the number line stays fit so both ends show.
-    this.world.defaultZoom = this.mobileZoom(kind);
+    this.world.defaultZoom = this.sceneZoom(kind);
     this.world.frameBoard(new THREE.Vector3(0, 0, 0), this.place.size.w, this.place.size.d, this.player.mesh);
     this.player.onArrive = (x, z) => {
       this.pet?.notePlayerAt(x, z);
@@ -1200,6 +1201,7 @@ class Game {
         const c = centroid();
         this.world.panByPixels(c.x - pinch.cx, c.y - pinch.cy);
         pinch.cx = c.x; pinch.cy = c.y;
+        this.userZoom = this.world.zoom; // remember the level they settled on
       } else if (pointers.size === 1 && downPos) {
         const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
         if (Math.hypot(dx, dy) > 14) dragging = true;
@@ -1245,6 +1247,7 @@ class Game {
       if (this.mode === 'title') return;
       e.preventDefault();
       this.world.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+      this.userZoom = this.world.zoom; // remember the level they settled on
     }, { passive: false });
   }
 
@@ -1268,6 +1271,16 @@ class Game {
     if (kind === 'hub') return MOBILE_DEFAULT_ZOOM.hub;
     if (kind === 'numberline') return 1;
     return MOBILE_DEFAULT_ZOOM.chamber;
+  }
+
+  // Default zoom for the next gameplay scene: once the player has pinched/wheeled
+  // to a level they like, keep it across hub and chambers; until then, fall back
+  // to the per-device comfort default. The number line never opens zoomed IN
+  // past fit, so both ends stay visible for magnitude estimation. The title is
+  // not routed through here — it stays pinned to its full-island framing.
+  sceneZoom(kind) {
+    const z = this.userZoom ?? this.mobileZoom(kind);
+    return kind === 'numberline' ? Math.min(z, 1) : z;
   }
 
   pickCell(cx, cy) {
