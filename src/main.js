@@ -282,8 +282,13 @@ class Game {
     this.maybeGestureHint();
     // daily streak
     const res = touchDailyStreak(this.profile);
-    if (res.kind === 'extended') hud.toast(t('hub.streak_extended', { n: this.profile.streak.count }));
-    else if (res.kind === 'frozen') hud.toast(t('hub.streak_frozen', { n: this.profile.streak.count }));
+    if (res.kind === 'extended') {
+      hud.toast(t('hub.streak_extended', { n: this.profile.streak.count }));
+      audio.sfx('streak');
+    } else if (res.kind === 'frozen') {
+      hud.toast(t('hub.streak_frozen', { n: this.profile.streak.count }));
+      audio.sfx('streak', { pitch: 0.86 }); // gentler, lower chime — the streak was rescued, not grown
+    }
     if (res.gift) {
       delay(800, () => {
         const g = 6 + Math.min(14, this.profile.streak.count * 2);
@@ -518,7 +523,7 @@ class Game {
     hud.showHud(true);
     hud.showHintButton(true);
     this.presentProblem(problem);
-    audio.music('chamber');
+    audio.music(problem.world ? `chamber:${problem.world}` : 'chamber');
     this.maybeGestureHint();
     if (this.isEcho) hud.toast('✨ ' + t('play.echo_door'));
   }
@@ -1120,6 +1125,7 @@ class Game {
     hud.showHud(true);
     hud.showHintButton(true);
     this.presentProblem(p);
+    audio.music(p.world ? `chamber:${p.world}` : 'chamber');
     return { kind: p.kind, eq: p.equation, skill: p.skillId };
   }
 

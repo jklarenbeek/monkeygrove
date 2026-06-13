@@ -103,6 +103,7 @@ export function showAttract({ onStart, onParents, onDuel }) {
     audio.init();
     audio.setSfx(settings().sfx);
     audio.setMusic(settings().music);
+    audio.music('title'); // intro theme; carries through player-select + story until the hub
     audio.sfx('correct');
     onStart();
   };

@@ -202,7 +202,220 @@ const CHAMBER_MELODIES = [
   { 0: 72, 4: 74, 6: 76, 12: 79, 16: 76, 20: 74, 28: 72, 32: 76, 36: 79, 38: 81, 44: 84, 48: 81, 52: 79, 60: 74 },
 ];
 
+// Per-world music identity, one entry per chamber. Each holds a POOL of sparse
+// pentatonic motifs (sparse {step: midi} maps over a 64-step / 8-bar loop) plus
+// a chord palette, register, tempo and a signature ambience. The shared engine
+// (makeChamberTrack) rotates the pool and breathes a slow "energy" envelope so
+// the track keeps changing organically across a long session while staying
+// relaxing. Every melody note is in the world's scale, so any motif sounds fine
+// over any chord and octave shifts can never go off-key.
+const CHAMBER_MUSIC = {
+  // Tide Pools (add/subtract) — calm tidal water, C-pentatonic, mid register,
+  // soft water-trickle texture.
+  tide: {
+    bpm: 68, lowpass: 3000, voice: 'kal', accentNote: 88,
+    padGain: 0.046, bassGain: 0.28, bassDur: 1.8, bassEvery: 16, melGain: 0.25,
+    chords: [[45, 52, 57, 60], [48, 52, 55, 60], [43, 50, 55, 62], [38, 45, 50, 57], [40, 52, 55, 60]],
+    melodies: [
+      { 0: 60, 10: 62, 20: 64, 34: 62, 44: 60, 56: 64 },
+      { 0: 67, 12: 69, 22: 72, 32: 69, 42: 67, 52: 64, 60: 67 },
+      { 4: 72, 16: 74, 26: 76, 40: 74, 50: 72, 62: 69 },
+      { 0: 64, 14: 72, 24: 69, 36: 76, 46: 72, 56: 69, 62: 64 },
+      { 0: 76, 12: 74, 24: 72, 36: 69, 48: 67, 58: 64 },
+      { 2: 69, 12: 67, 20: 69, 30: 72, 40: 69, 50: 67, 60: 64 },
+      { 0: 79, 14: 81, 26: 84, 38: 81, 48: 79, 58: 76, 62: 79 },
+      { 0: 60, 12: 64, 24: 67, 36: 69, 48: 67, 60: 64 },
+    ],
+    texture(tr, i, t, d, e) {
+      if (i % 16 === 6) noise({ t, dur: 0.42, gain: 0.02 + 0.014 * e, type: 'bandpass', freq: 820 + Math.random() * 260, q: 0.55, sweepTo: 540, dest: d });
+    },
+  },
+  // Banana Garden (multiply) — sunny + bright, C-pentatonic up high, airy
+  // high-leaf sparkle, kalimba that sometimes brightens to a pluck.
+  garden: {
+    bpm: 74, lowpass: 3600, voice: 'kal', altVoice: 'pluck', accentNote: 88,
+    padGain: 0.043, bassGain: 0.24, bassDur: 1.15, bassEvery: 8, melGain: 0.26,
+    chords: [[48, 52, 55, 60], [50, 57, 62, 69], [55, 62, 67, 74], [45, 52, 57, 60], [48, 55, 60, 64]],
+    melodies: [
+      { 0: 72, 12: 74, 24: 76, 40: 79, 56: 76 },
+      { 0: 79, 16: 76, 28: 74, 44: 72, 60: 69 },
+      { 4: 84, 20: 81, 36: 84, 52: 86, 60: 84 },
+      { 0: 67, 14: 72, 26: 74, 38: 76, 50: 74, 62: 72 },
+      { 2: 76, 18: 79, 34: 81, 48: 79, 58: 76 },
+      { 0: 69, 16: 72, 32: 74, 48: 72, 60: 69 },
+      { 6: 72, 22: 76, 30: 79, 46: 81, 54: 79, 62: 76 },
+      { 8: 81, 24: 84, 40: 86, 52: 84, 60: 81 },
+    ],
+    texture(tr, i, t, d, e) {
+      if (i % 16 === 10) noise({ t, dur: 0.08, gain: 0.02 + 0.01 * e, type: 'highpass', freq: 4200, q: 0.8, dest: d });
+    },
+  },
+  // Sharing Stump (divide) — earthy A-minor pentatonic, the lowest/darkest/
+  // slowest world, soft wood-knock texture.
+  stump: {
+    bpm: 64, lowpass: 2600, voice: 'kal', accentNote: 81,
+    padGain: 0.048, bassGain: 0.25, bassDur: 1.25, bassEvery: 8, melGain: 0.25,
+    chords: [[45, 52, 57, 60], [45, 48, 55, 60], [48, 55, 60, 64], [43, 50, 55, 57], [38, 45, 50, 57]],
+    melodies: [
+      { 0: 57, 8: 60, 20: 57, 32: 55, 44: 57, 52: 60, 60: 57 },
+      { 0: 69, 10: 72, 18: 74, 30: 72, 40: 69, 48: 67, 56: 69 },
+      { 2: 60, 14: 64, 26: 67, 38: 69, 48: 67, 58: 64 },
+      { 0: 72, 16: 76, 24: 74, 36: 72, 48: 74, 60: 69 },
+      { 0: 55, 12: 57, 24: 60, 36: 57, 44: 55, 56: 57 },
+      { 0: 64, 16: 67, 28: 69, 40: 67, 52: 64 },
+      { 0: 67, 12: 69, 20: 72, 34: 76, 44: 72, 54: 69, 62: 67 },
+      { 4: 74, 16: 72, 28: 69, 40: 72, 50: 69, 60: 57 },
+    ],
+    texture(tr, i, t, d, e) {
+      if (i % 16 === 8) noise({ t, dur: 0.055, gain: 0.035 + 0.015 * e, type: 'lowpass', freq: 360, q: 0.7, dest: d });
+    },
+  },
+  // Vine Heights (fractions) — airy D-major pentatonic, the highest/brightest
+  // world, bright pluck lead, high sustained wind tone, kalimba alt voice.
+  vines: {
+    bpm: 70, lowpass: 4100, voice: 'pluck', altVoice: 'kal', accentNote: 93,
+    padGain: 0.04, bassGain: 0.2, bassDur: 1.5, bassEvery: 16, melGain: 0.23,
+    chords: [[38, 45, 50, 54], [43, 50, 55, 59], [45, 52, 57, 61], [47, 54, 59, 62], [40, 47, 52, 55]],
+    melodies: [
+      { 0: 78, 10: 76, 22: 74, 36: 71, 50: 74, 60: 69 },
+      { 0: 74, 8: 78, 20: 81, 34: 78, 44: 74, 56: 76 },
+      { 2: 83, 14: 86, 28: 88, 40: 86, 52: 83, 62: 81 },
+      { 0: 69, 12: 74, 26: 78, 40: 81, 54: 83, 60: 86 },
+      { 4: 81, 16: 78, 24: 81, 38: 83, 48: 81, 58: 78 },
+      { 0: 86, 18: 88, 34: 90, 48: 86, 58: 88 },
+      { 0: 83, 10: 81, 20: 78, 32: 76, 44: 74, 56: 71, 62: 69 },
+      { 6: 76, 18: 78, 30: 81, 44: 78, 58: 83 },
+    ],
+    texture(tr, i, t, d, e) {
+      if (i % 16 === 12) tone({ freq: hz(88 + (tr.loops % 2) * 2), t, dur: 0.22, gain: 0.018 + 0.012 * e, attack: 0.04, dest: d });
+    },
+  },
+};
+
+// Title / intro theme data — a real "welcome home" tune (A-A-B-A) with a soft
+// counter line, unlike the ambient chamber loops. Warm C major pentatonic.
+const TITLE_A = { 0: 72, 6: 74, 12: 76, 20: 74, 24: 72, 32: 69, 40: 72, 48: 76, 54: 74, 60: 72 };
+const TITLE_B = { 0: 67, 8: 72, 14: 74, 24: 76, 30: 74, 36: 72, 44: 69, 52: 67, 58: 69 };
+const TITLE_COUNTER = { 2: 79, 16: 81, 26: 79, 34: 76, 48: 79, 56: 76 };
+const TITLE_CHORDS = [[36, 43, 48, 52], [33, 45, 52, 57], [43, 48, 52, 55], [38, 45, 50, 57], [36, 48, 55, 60]];
+
 const CELEBRATE_NOTES = { 0: 72, 2: 76, 4: 79, 6: 84, 9: 88 };
+
+function human(gain, spread = 0.24) {
+  return gain * (1 - spread / 2 + Math.random() * spread);
+}
+
+const VOICES = {
+  kal: (m, t, g, d) => kal(m, t, g, 1.0, d),
+  pluck: (m, t, g, d) => pluck(m, t, g, d),
+};
+
+// pick an index in [0, len) that differs from prev — non-repeating variation
+function pickOther(len, prev) {
+  if (len <= 1) return 0;
+  const k = (Math.random() * (len - 1)) | 0;
+  return k >= prev ? k + 1 : k;
+}
+
+// Build a looping chamber track from a CHAMBER_MUSIC config. The arrangement
+// re-casts itself every two loops (new lead + counter motif, occasional sparkle
+// octave, sometimes a different voice) and a slow two-sine "energy" envelope
+// fades the counter-melody, pad richness and high sparkle in and out — so it
+// drifts and breathes without ever speeding up or leaving the scale.
+function makeChamberTrack(cfg) {
+  const voices = cfg.altVoice ? [cfg.voice, cfg.voice, cfg.altVoice] : [cfg.voice];
+  return {
+    stepDur: 60 / cfg.bpm / 2,
+    length: 64,
+    loop: true,
+    lowpass: cfg.lowpass,
+    init(tr) {
+      tr.phase = Math.random() * 6.28;
+      tr.melA = (Math.random() * cfg.melodies.length) | 0;
+      tr.melB = pickOther(cfg.melodies.length, tr.melA);
+      tr.chordI = (Math.random() * cfg.chords.length) | 0;
+      tr.voiceI = 0;
+      tr.oct = 0;
+    },
+    step(tr, i, t) {
+      const d = tr.dest;
+      if (i === 0 && tr.loops > 0 && tr.loops % 2 === 0) {
+        tr.melA = pickOther(cfg.melodies.length, tr.melA);
+        tr.melB = pickOther(cfg.melodies.length, tr.melA);
+        tr.oct = Math.random() < 0.16 ? 12 : 0;
+        if (voices.length > 1) tr.voiceI = (Math.random() * voices.length) | 0;
+      }
+      // two slow sines → a wandering, non-repeating energy swell (~0.05..0.95)
+      const x = tr.loops + tr.phase;
+      const e = 0.5 + 0.3 * Math.sin(x * 0.5) + 0.15 * Math.sin(x * 0.23 + tr.phase);
+      // harmony: a fresh chord each half-loop, never the same one twice running
+      if (i % 32 === 0) {
+        tr.chordI = i === 0 ? pickOther(cfg.chords.length, tr.chordI) : (tr.chordI + 1) % cfg.chords.length;
+        pad(cfg.chords[tr.chordI], t, 32 * this.stepDur + 0.6, cfg.padGain * (0.8 + 0.4 * e), d);
+      }
+      // soft low pulse on the current chord root
+      if (i % cfg.bassEvery === 0) kal(cfg.chords[tr.chordI][0], t, cfg.bassGain * (0.82 + 0.28 * e), cfg.bassDur, d);
+      // the world's signature ambience (water / leaves / wood / wind)
+      cfg.texture?.(tr, i, t, d, e);
+      // lead voice
+      const lead = cfg.melodies[tr.melA][i];
+      if (lead != null) {
+        const g = human(cfg.melGain * (0.74 + 0.46 * e), 0.26);
+        VOICES[voices[tr.voiceI]](lead + tr.oct, t + Math.random() * 0.016, g, d);
+        if (e > 0.84 && Math.random() < 0.22) kal(lead + 12 + tr.oct, t + 0.02, g * 0.28, 0.7, d);
+      }
+      // a second motif (octave down) fades in only while energy is high
+      if (e > 0.56) {
+        const c = cfg.melodies[tr.melB][i];
+        if (c != null && Math.random() < 0.8) pluck(c - 12, t + 0.02, human(cfg.melGain * 0.32 * (e - 0.35), 0.3), d);
+      }
+      // gentle high sparkle near phrase ends
+      if (e > 0.6 && i % 32 === 26 && Math.random() < e) kal(cfg.accentNote, t + 0.04, 0.05 * e, 0.7, d);
+    },
+  };
+}
+
+const TITLE_TRACK = {
+  stepDur: 60 / 69 / 2,
+  length: 64,
+  loop: true,
+  lowpass: 3400,
+  init(tr) { tr.phase = Math.random() * 6.28; tr.chordI = TITLE_CHORDS.length - 1; },
+  step(tr, i, t) {
+    const d = tr.dest;
+    const section = [TITLE_A, TITLE_A, TITLE_B, TITLE_A][tr.loops % 4];
+    const withCounter = tr.loops % 4 >= 2; // counter joins on the B phrase and final A
+    const e = 0.62 + 0.22 * Math.sin((tr.loops + tr.phase) * 0.55);
+    if (i % 16 === 0) {
+      tr.chordI = (tr.chordI + 1) % TITLE_CHORDS.length;
+      pad(TITLE_CHORDS[tr.chordI], t, 16 * this.stepDur + 0.5, 0.05 * (0.85 + 0.3 * e), d);
+    }
+    if (i % 8 === 0) kal(TITLE_CHORDS[tr.chordI][0], t, 0.3, 1.1, d);
+    const m = section[i];
+    if (m != null) kal(m, t + Math.random() * 0.012, human(0.34 * (0.85 + 0.3 * e), 0.2), 1.1, d);
+    if (withCounter) { const c = TITLE_COUNTER[i]; if (c != null) pluck(c, t + 0.02, 0.12 * e, d); }
+    if (i === 56 && tr.loops % 2 === 1) kal(88, t + 0.04, 0.06, 0.8, d);
+  },
+};
+
+// Exposed for tests only (no runtime use): every melody note must stay inside
+// its world's pentatonic scale + register so the music can never turn harsh.
+export const MUSIC_TEST = {
+  scales: {
+    tide: { pcs: [0, 2, 4, 7, 9], lo: 55, hi: 88 },
+    garden: { pcs: [0, 2, 4, 7, 9], lo: 64, hi: 91 },
+    stump: { pcs: [0, 2, 4, 7, 9], lo: 52, hi: 84 },
+    vines: { pcs: [2, 4, 6, 9, 11], lo: 67, hi: 96 },
+    title: { pcs: [0, 2, 4, 7, 9], lo: 57, hi: 88 },
+  },
+  melodies: {
+    tide: CHAMBER_MUSIC.tide.melodies,
+    garden: CHAMBER_MUSIC.garden.melodies,
+    stump: CHAMBER_MUSIC.stump.melodies,
+    vines: CHAMBER_MUSIC.vines.melodies,
+    title: [TITLE_A, TITLE_B, TITLE_COUNTER],
+  },
+};
 
 const TRACKS = {
   island: {
@@ -239,6 +452,11 @@ const TRACKS = {
       if (m) pluck(m, t, 0.3 * (0.85 + Math.random() * 0.3), d);
     },
   },
+  'chamber:tide': makeChamberTrack(CHAMBER_MUSIC.tide),
+  'chamber:garden': makeChamberTrack(CHAMBER_MUSIC.garden),
+  'chamber:stump': makeChamberTrack(CHAMBER_MUSIC.stump),
+  'chamber:vines': makeChamberTrack(CHAMBER_MUSIC.vines),
+  title: TITLE_TRACK,
   celebrate: {
     stepDur: 0.115,
     length: 26, // ~3s sting, then auto-silence
@@ -291,6 +509,7 @@ function startTrack(name) {
   const tr = { name, def, out, dest: filter, step: 0, loops: 0, nextTime: t + 0.06, done: false, timer: 0 };
   tr.timer = setInterval(() => pump(tr), 100);
   currentTrack = tr;
+  def.init?.(tr); // let a track seed per-run state (organic-variation engine)
   pump(tr);
 }
 
@@ -357,7 +576,8 @@ export const audio = {
       });
     }
     if (ctx.state === 'suspended') ctx.resume();
-    if (musicOn && requestedMusic && TRACKS[requestedMusic]?.loop) startTrack(requestedMusic);
+    if (musicOn && requestedMusic && TRACKS[requestedMusic]?.loop
+      && currentTrack?.name !== requestedMusic) startTrack(requestedMusic);
   },
 
   sfx(name, opts = {}) {
@@ -395,7 +615,8 @@ export const audio = {
   setMusic(on) {
     musicOn = !!on;
     if (!musicOn) stopTrack(0.3);
-    else if (ctx && requestedMusic && TRACKS[requestedMusic]?.loop) startTrack(requestedMusic);
+    else if (ctx && requestedMusic && TRACKS[requestedMusic]?.loop
+      && currentTrack?.name !== requestedMusic) startTrack(requestedMusic);
   },
 
   get ready() {
