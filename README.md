@@ -1,164 +1,181 @@
-# 🐵 Monkey Grove 🍌
+# Monkey Grove
 
-**A cozy island adventure that secretly teaches arithmetic — built for kids (9–12) who struggle with math.**
-*Een knus eiland-avontuur dat stiekem rekenen leert — voor kinderen die rekenen lastig vinden.*
+**A cozy 3D island adventure that secretly teaches arithmetic.**
+*Een knus 3D eiland-avontuur dat stiekem rekenen leert.*
 
-The Crab King pinched all the island's numbers, and the grove faded to gray. Chamber by
-chamber, you bring the numbers home — and the island blooms back to life.
+The Crab King pinched all the island's numbers, and the grove faded to gray.
+Chamber by chamber, children bring the numbers home: the gates bloom, Mimi finds
+new blueprints, pets hatch, and the island comes back to life.
 
-🎮 **Play it:** see [How to start the game](#how-to-start-the-game) below — in the
-browser via GitHub Pages, or on your own computer, no internet needed.
-Works on laptops, tablets and phones. English + Nederlands (auto-detected).
+Monkey Grove is built for children around 9-12 who find math stressful. It uses
+visual, forgiving play instead of timed quizzes: arrays, fair sharing, number
+lines, place-value models, and friendly explanations after mistakes.
 
-## How to start the game
+## Play
 
-**Option A — play online (if this repo is published).** If GitHub Pages is enabled
-(see [Deploy](#deploy-to-github-pages-free-2-minutes) below), just open:
+Play the published build here:
 
-```
-https://<username>.github.io/monkeymath/
-```
+**https://jklarenbeek.github.io/monkeygrove/**
 
-**Option B — play on your own computer (works offline).** The game can't be started by
-double-clicking `index.html` — browsers block module scripts from plain files. It needs a
-tiny local server, which comes with the project:
+The game runs fully in the browser. There are no accounts, no ads, and no server
+backend. Progress is saved on the device in `localStorage` under
+`monkeymath.save`.
 
-1. Install [Node.js](https://nodejs.org) (LTS version) — one time only.
-2. Get this folder onto your machine (`git clone …` or GitHub's *Download ZIP*).
-3. In a terminal, inside the project folder:
+## What Is In The Game
 
-   ```bash
-   npm install     # one time only — the only step that needs internet
-   npm run dev     # starts the game and opens your browser automatically
-   ```
+- **Four math worlds**
+  - Tide Pools: addition, subtraction, missing addends, carrying, borrowing
+  - Banana Garden: multiplication through walked-out arrays
+  - Sharing Stump: division, fair sharing, remainders, missing factors
+  - Vine Heights: fractions on number lines, comparison, equivalence, fractions of a number
+- **Four problem verbs**
+  - Fetch the right number stone and carry it to the altar
+  - Grow an array by walking out rows and columns
+  - Stand on the correct point of a vine number line
+  - Deal coconuts fairly into baskets
+- **Adaptive practice**
+  - 18 skill ladder with per-skill Elo-style ratings
+  - Problems target roughly 65% expected success
+  - Visual scaffolds fade as mastery grows and return when needed
+  - Misconception-tagged wrong answers trigger targeted visual explanations
+- **Island progression**
+  - Mastery unlocks Mimi's blueprints
+  - Bananas fund builds such as lanterns, fruit stand, garden, stage, bakery, bridge, and festival plaza
+  - Gates and island life bloom as skills improve
+- **Retention without pressure**
+  - Daily streak gifts and streak freezes
+  - Egg meter, hatchable pets, hats, fur colors, and trails
+  - Banyan Gem Tree progress view for times-table facts and skill mastery
+  - Echo Doors for spaced review
+  - Hot-seat Banana Duel and shareable deterministic challenge codes
+- **Friendly by design**
+  - No countdown timers in core play
+  - No lives, Game Over, penalties, ads, or accounts
+  - English and Dutch, auto-detected and switchable in settings
 
-   If the browser doesn't open by itself, go to the address it prints —
-   normally **http://localhost:5173/monkeymath/**.
+## Controls
 
-After `npm install` has run once, `npm run dev` works with no internet connection at all:
-no server, no accounts, no downloads — saves live in the browser
-(per player profile, under the localStorage key `monkeymath.save`).
+- **Move:** arrow keys or WASD
+- **Act / talk / confirm:** Space, Enter, or the round action button
+- **Hint:** E or the lightbulb button
+- **Mouse / touch:** tap a tile to walk there, tap an object to interact, swipe to step
+- **Camera:** mouse wheel or trackpad pinch to zoom; on touch devices, pinch to zoom and drag with two fingers to pan
 
-> Prefer the optimized build? `npm run build` once, then `npm run preview` serves it
-> (it prints the address, normally http://localhost:4173/monkeymath/) — also fully offline.
+## Run Locally
 
-### How to play
-
-- **Walk** — arrow keys / WASD on a keyboard, or tap (and swipe) on a touch screen.
-- **Act** 🌱🔔✅💬 — Space or Enter, or the round button at the bottom right
-  (plant the garden-bed flag, ring the bell, confirm your share…). Stand next
-  to Mimi or any island friend and the button becomes 💬 — talk to them!
-  (Walking into them or tapping them works too.)
-- **Hint** 💡 — the E key or the lightbulb button shows the visual model.
-- **Stuck or sad?** Tap the helper animal (bunny, turtle, duckling, owl) — it explains
-  the task and cheers you on. Mistakes never cost anything.
-
-## What's inside
-
-- 🌱 **Banana Garden** — multiplication, by planting a flag and *walking out* row × column
-  garden beds (arrays)
-- 🥥 **Sharing Stump** — division, by *dealing* coconuts fairly into baskets; leftovers
-  become remainder berries that feed your pet egg
-- 🍇 **Vine Heights** — fractions, by *standing* where ¾ lives on a vine number line
-  (overshoot = comic splash, never failure)
-- 🌊 **Tide Pools** — addition & subtraction with place-value models
-- 🗿 **Fetch the stone** — compute first, then find the right number stone and carry it
-  to the altar, past mischievous (never dangerous) crabs
-- 💎 **The Banyan Gem Tree** — the whole times table as a gem collection; earning 7×8
-  lights 8×7 too
-- 🛠️ **Island restoration** — your math mastery unlocks Mimi's blueprints, your bananas
-  pay the materials: lantern path, fruit stand, bakery, music stage… each build pops into
-  the island, a new friend moves in (with daily gifts!), and a bridge finally leads to the
-  festival plaza — which the comically apologetic Crab King pays half of
-- 🐰 **Pets** — correct answers fill an egg; eggs hatch into pets that follow you around
-- 🐢 **Helper friends** — every world has a pet guide (Pip the Bunny, Olli the Owl…) who
-  explains each task and cheers; tap them whenever you need a friendly word
-- 🐒 **Mimi, your island guide** — she wanders the village square with a 💬 over her
-  head: walk up and talk to her (Animal-Crossing-style) for advice that actually
-  matters — which world to play next, how many bananas the next build needs, how
-  close your egg is to hatching. When a build is ready she walks you straight to
-  her worktable
-- 🦋 **A living island** — butterflies dance between the flowers and birds sail in to
-  land, hop and peck (sneak up and they flutter off!); the more the island blooms,
-  the more life arrives
-- 🔥 Daily streaks, 🍌 banana shop (hats! fur colors! trails!), ⚔️ hot-seat duels and
-  shareable challenge codes — no server, no accounts, no ads, ever
-
-## The learning science (for parents & teachers)
-
-Monkey Grove is built on what research says actually works for struggling learners
-(IES fractions practice guide, NCTM teaching practices, 2025 arithmetic-fluency synthesis):
-
-- **The math IS the game mechanic** — never a quiz bolted onto a game. You multiply by
-  building arrays, divide by fair-sharing, place fractions by magnitude.
-- **Mistakes teach instead of punish.** A wrong answer costs nothing: the visual model
-  (array, number line, baskets, place-value rods) materializes *in the world* and a
-  friendly helper animal explains why — targeting the specific misconception behind the error
-  (whole-number bias, forgotten carries, off-by-one-table…). No hearts, no Game Over,
-  no countdown timers.
-- **Invisible adaptivity.** A per-skill Elo rating keeps every child at ~65% success —
-  challenging, never crushing. Visual scaffolds (grid lines, tick marks) fade as
-  mastery grows and quietly return on struggle.
-- **Spaced review** sneaks in as shimmering bonus "Echo Doors".
-- **Practice has a purpose.** Restoring the island (the build projects) unlocks with
-  *mastery*, never with grinding — bananas only decide what gets built next. Long-term
-  goals across weeks, no missable content, choices sequence rather than exclude.
-- The **Gem Tree screen is the progress dashboard** — for the child it's a collection,
-  for you it's a mastery report (plus a "For parents" page with accuracy per skill).
-
-## Deploy to GitHub Pages (free, ~2 minutes)
+The game is a Vite app. Do not open `index.html` directly; browser module
+security rules require a local dev server.
 
 ```bash
 npm install
-npm run deploy        # builds with Vite and pushes dist/ to the gh-pages branch
+npm run dev
 ```
 
-Then once, on GitHub: **Settings → Pages → Source: Deploy from a branch →
-Branch: `gh-pages`, folder `/ (root)` → Save**. The game is live at
-`https://<username>.github.io/monkeymath/`.
+Vite opens the browser automatically. If it does not, use:
 
-The game itself stays fully static after the build: no server, no accounts,
-no ads — saves live in the player's browser.
+```text
+http://localhost:5173/monkeygrove/
+```
 
-## Develop & test
+After `npm install`, local development works without a runtime network
+connection. Three.js is bundled by Vite.
+
+## Scripts
+
+```bash
+npm run dev        # Vite dev server with hot reload
+npm test           # Vitest suites
+npm run build      # Production build into dist/
+npm run preview    # Serve the production build locally
+npm run deploy     # Build and publish dist/ to the gh-pages branch
+```
+
+## Deploy To GitHub Pages
+
+This repository is configured for GitHub Pages at `/monkeygrove/` in
+`vite.config.js`.
 
 ```bash
 npm install
-npm run dev           # Vite dev server with hot reload (http://localhost:5173/monkeymath/)
-npm test              # vitest: math engine + chamber layout + voxel model suites
-npm run build         # production build into dist/
-npm run preview       # serve the production build locally
+npm run deploy
 ```
 
-## Project layout
+Then, on GitHub, set:
 
+```text
+Settings -> Pages -> Source: Deploy from a branch
+Branch: gh-pages
+Folder: / (root)
 ```
-index.html        single page entry (Vite); style.css; vite.config.js
+
+The published URL is:
+
+```text
+https://jklarenbeek.github.io/monkeygrove/
+```
+
+If you fork the project under a different repository name, update `base` in
+`vite.config.js` before deploying.
+
+## Project Map
+
+```text
+index.html          single-page shell: WebGL canvas plus DOM overlay
+style.css           full UI, HUD, screens, responsive layout
+vite.config.js      Vite, Vitest, and GitHub Pages base path
+
 src/
-  mathengine.js   adaptive engine: 18-skill ladder, Elo, misconception distractors
-  verbs.js        the four math interactions (fetch / array / number line / share)
-  island.js       island restoration: blueprints, mastery gating, build funding
-  mimi.js         Mimi's conversation ladder (most useful advice first)
-  ambient.js      living-island critters: butterflies & birds
-  chamber.js      diorama builder + hand-authored layouts + hub island
-  main.js         game controller; world.js, player.js, entities.js, voxel.js (3D)
-  config.js, models.js, anim.js, rng.js   (knobs, voxel art data, tweens, seeded rng)
-  hud.js, screens.js, i18n.js (EN/NL), state.js (localStorage), audio.js (WebAudio synth)
-  duel.js         hot-seat duels + challenge codes
-tests/            vitest suites
-docs/             the research & retro-game inspiration that shaped the design
-DESIGN.md         the full game design document
-ARCHITECTURE.md   technical architecture
+  main.js           game controller, flow, input, rewards, hub/chamber transitions
+  world.js          Three.js renderer, orthographic camera, picking, zoom/pan
+  chamber.js        ASCII diorama layouts, hub island, portals, build plots
+  player.js         grid-hop movement, tap-to-walk, carrying, pet follower
+  entities.js       stones, pots, crabs, portals, particles, props, labels
+  voxel.js          ASCII voxel data to cached Three.js geometry
+  models.js         voxel models, props, pets, cosmetics, ambient critters
+  anim.js           tweening and easing
+  audio.js          procedural WebAudio music and SFX
+
+  mathengine.js     pure adaptive math engine and mastery report
+  verbs.js          fetch, array, number-line, and share interactions
+  island.js         restoration blueprints, gating, funding, daily perks
+  mimi.js           Mimi's advice ladder
+  state.js          save/load, profiles, settings, streaks, economy
+  i18n.js           English and Dutch dictionaries
+  hud.js            equation banner, chips, speech bubble, toasts, panels
+  screens.js        title, settings, shop, pets, gem tree, parents, results
+  duel.js           hot-seat duel mode and challenge codes
+  rng.js            seeded PRNG
+
+tests/              Vitest suites for math, chambers, island, Mimi, models, portals
+docs/               research notes and retro-game inspiration
+DESIGN.md           canonical game design document
+ARCHITECTURE.md     technical architecture notes
 ```
 
-All saves live in the browser's localStorage (key `monkeymath.save`) — nothing leaves
-the device. Multiple player profiles supported.
+## Learning Notes
+
+Monkey Grove follows a few simple principles:
+
+- The math is the game mechanic, not a quiz layer.
+- Mistakes are diagnostic, not punitive.
+- Visual models appear in the world: arrays, baskets, number lines, and place-value strips.
+- Practice adapts per skill and includes spaced review.
+- Long-term progress is visible through island restoration, pets, cosmetics, and the Gem Tree.
+
+The parent screen in the game shows recent accuracy, attempts, and mastery per
+skill for the active profile.
+
+## Privacy
+
+All saves stay in the browser. The app stores profiles, settings, progress,
+cosmetics, streaks, and math history in `localStorage`. Nothing is uploaded
+because there is no backend.
 
 ## Credits
 
-Made with ❤️ by a dad, for his daughter and every kid who thinks they "can't do math" —
-you can, you just haven't *seen* it yet.
+Made by a dad for his daughter, and for every child who thinks they "can't do
+math" before they have had the chance to see it.
 
-Standing on the shoulders of 1980s Konami: *Monkey Academy* (1984), *King's Valley II*
-(1988) and *The Treasure of Uşas* (1987). 3D by [Three.js](https://threejs.org) (MIT),
-built with [Vite](https://vite.dev). Everything else is hand-rolled vanilla JavaScript.
+Built with [Three.js](https://threejs.org/) and [Vite](https://vite.dev/).
+Inspired by cozy island games, 1980s Konami puzzle adventures, and research on
+visual arithmetic practice for struggling learners.

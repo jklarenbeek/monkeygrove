@@ -1274,13 +1274,13 @@ class Game {
   }
 
   // Default zoom for the next gameplay scene: once the player has pinched/wheeled
-  // to a level they like, keep it across hub and chambers; until then, fall back
-  // to the per-device comfort default. The number line never opens zoomed IN
-  // past fit, so both ends stay visible for magnitude estimation. The title is
-  // not routed through here — it stays pinned to its full-island framing.
+  // to a level they like, keep it across hub and chambers (including the number
+  // line — overriding a retained zoom each time read as a bug). Until they set
+  // one, fall back to the per-device comfort default, which is fit (1) for the
+  // number line so both ends show for magnitude estimation. The title is not
+  // routed through here — it stays pinned to its full-island framing.
   sceneZoom(kind) {
-    const z = this.userZoom ?? this.mobileZoom(kind);
-    return kind === 'numberline' ? Math.min(z, 1) : z;
+    return this.userZoom ?? this.mobileZoom(kind);
   }
 
   pickCell(cx, cy) {
