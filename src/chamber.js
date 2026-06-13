@@ -247,6 +247,7 @@ export class Place {
     this.group.add(inst);
     this.world.pickables = [inst];
     inst.userData.place = this;
+    inst.userData.gridList = list;
 
     // bridge planks
     for (const v of this.markers.V || []) {
@@ -254,6 +255,28 @@ export class Place {
       const p = this.worldPos(v.x, v.z);
       plank.position.set(p.x, -0.06, p.z);
       this.group.add(plank);
+    }
+    if ((this.markers.V || []).length) {
+      const bridgeList = this.markers.V.slice();
+      const pickGeo = new THREE.BoxGeometry(1, 1, 1);
+      const pickMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0, depthWrite: false,
+      });
+      pickGeo._owned = true;
+      pickMat._owned = true;
+      const pick = new THREE.InstancedMesh(pickGeo, pickMat, bridgeList.length);
+      bridgeList.forEach((v, i) => {
+        const p = this.worldPos(v.x, v.z);
+        m4.makeScale(TILE, 0.16, TILE);
+        m4.setPosition(p.x, 0.02, p.z);
+        pick.setMatrixAt(i, m4);
+      });
+      pick.instanceMatrix.needsUpdate = true;
+      pick.userData.place = this;
+      pick.userData.gridList = bridgeList;
+      this.bridgePick = pick;
+      this.group.add(pick);
+      this.world.pickables.push(pick);
     }
   }
 

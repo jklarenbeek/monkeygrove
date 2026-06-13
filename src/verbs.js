@@ -679,6 +679,9 @@ export class LineVerb extends VerbBase {
     this.lo = lo; this.hi = hi; this.d = d;
     this.ticks = [];
     this.knot = null;
+    this.readyMark = null;
+    this.readyKey = null;
+    this.readyPulseAt = 0;
     // end labels
     const a = this.tiles[0], b = this.tiles[this.n - 1];
     this.endA = makeTextSprite(String(lo), { bg: '#fff8ec', scale: 0.8 });
@@ -741,6 +744,56 @@ export class LineVerb extends VerbBase {
     return this.lo + (idx / (this.n - 1)) * (this.hi - this.lo);
   }
 
+  _tol() {
+    const { problem } = this.ctx;
+    return Math.max(problem.accept?.tol ?? 0.05, 0.55 / (this.n - 1)) * (this.hi - this.lo);
+  }
+
+  _isCorrectCell(x, z) {
+    if (!this.tiles.some((t) => t.x === x && t.z === z)) return false;
+    const val = this._valueAt(x);
+    return val !== null && Math.abs(val - this.ctx.problem.answer) <= this._tol();
+  }
+
+  _showReadyCue(x, z) {
+    if (this.done || this.resolving) return;
+    const now = performance.now();
+    const key = `${x},${z}`;
+    this.ctx.hud.setActionReady?.(true);
+    if (this.readyKey === key && now < this.readyPulseAt) return;
+    this.readyKey = key;
+    this.readyPulseAt = now + 1200;
+    const { place, particles } = this.ctx;
+    const pos = place.worldPos(x, z, 0.52);
+    particles.emit(pos, 10, {
+      colors: [0xffd966, 0xffffff, 0xc9a6ff],
+      speed: 0.8, up: 1.0, life: 620, spread: 0.18,
+    });
+    audio.sfx('sparkle', { pitch: 0.75, gain: 0.45 });
+    const mark = makeTextSprite('✦', { color: '#ffd966', scale: 0.72 });
+    mark.position.copy(pos);
+    place.group.add(mark);
+    this.readyMark = mark;
+    const base = mark.scale.clone();
+    tween({
+      ms: 680, ease: ease.outQuad,
+      onUpdate: (v, k) => {
+        mark.position.y = pos.y + Math.sin(k * Math.PI) * 0.22;
+        mark.scale.set(base.x * (1 + k * 0.55), base.y * (1 + k * 0.55), 1);
+        mark.material.opacity = 1 - k;
+      },
+      onDone: () => {
+        if (this.readyMark === mark) this.readyMark = null;
+        place.group.remove(mark);
+      },
+    });
+  }
+
+  onArrive(x, z) {
+    if (this._isCorrectCell(x, z) && this.ctx.player.queue.length === 0) this._showReadyCue(x, z);
+    else this.ctx.hud.setActionReady?.(false);
+  }
+
   showModel() {
     this._showTicks(0); // hint: full labels return
     return true; // the bridge is the model; ticks are the scaffold
@@ -750,13 +803,14 @@ export class LineVerb extends VerbBase {
     // resolving guards against gong-spam during the dunk animation, which
     // would record several wrong answers for one attempt
     if (this.done || this.resolving || this.ctx.player.locked) return;
-    const { player, place, problem, particles, world } = this.ctx;
+    const { player, place, problem, particles } = this.ctx;
     const onBridge = this.tiles.some((t) => t.x === player.x && t.z === player.z);
     if (!onBridge) { audio.sfx('boop'); return; }
     const val = this._valueAt(player.x);
     const target = problem.answer;
-    const tol = Math.max(problem.accept?.tol ?? 0.05, 0.55 / (this.n - 1)) * (this.hi - this.lo);
+    const tol = this._tol();
     audio.sfx('gong');
+    this.ctx.hud.setActionReady?.(false);
     if (Math.abs(val - target) <= tol) {
       this.done = true;
       // knot + flowers bloom along the vine
@@ -792,6 +846,7 @@ export class LineVerb extends VerbBase {
           m.rotation.z = 0;
           player.locked = false;
           player.setPlace(place, spawn.x, spawn.z);
+          this.ctx.hud.setActionReady?.(false);
           this._showTicks(0); // full labels return on struggle
           this.resolving = false;
           this.ctx.resolve(false, { tag: val < target ? 'magnitude_low' : 'magnitude_high', value: val });
@@ -805,8 +860,10 @@ export class LineVerb extends VerbBase {
     const { place } = this.ctx;
     place.group.remove(this.endA, this.endB);
     if (this.knot) place.group.remove(this.knot);
+    if (this.readyMark) place.group.remove(this.readyMark);
     for (const t of this.ticks) place.group.remove(t);
     this.ctx.hud.setAction(null);
+    this.ctx.hud.setActionReady?.(false);
   }
 }
 

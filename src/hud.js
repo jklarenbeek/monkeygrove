@@ -78,8 +78,14 @@ export function setCombo(n) {
 
 export function setAction(emoji) {
   const b = $('btn-action');
+  b.classList.remove('ready');
   if (emoji) { b.textContent = emoji; b.classList.remove('hidden'); }
   else b.classList.add('hidden');
+}
+
+export function setActionReady(on) {
+  const b = $('btn-action');
+  b.classList.toggle('ready', !!on && !b.classList.contains('hidden'));
 }
 
 export function showHintButton(on) { $('btn-hint').classList.toggle('hidden', !on); }

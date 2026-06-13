@@ -203,6 +203,22 @@ test('frac_equiv: exactly one choice is equivalent to the base fraction', () => 
   }
 });
 
+test('frac_magnitude spreads the first number-line targets', () => {
+  const m = createMathState();
+  const rng = new Rng('vine-openers');
+  const values = [];
+  const labels = [];
+  for (let i = 0; i < 3; i++) {
+    const p = nextProblem(m, { skill: 'frac_magnitude', rng });
+    validateProblem(p);
+    values.push(p.answer.toFixed(6));
+    labels.push(`${p.meta.n}/${p.meta.d}`);
+    recordResult(m, p, { correct: true, usedHint: false, ms: 1000 });
+  }
+  assert.equal(new Set(labels).size, labels.length, labels.join(', '));
+  assert.equal(new Set(values).size, values.length, labels.join(', '));
+});
+
 test('determinism: same seed and state produce identical problems', () => {
   const make = (seed) => {
     const m = createMathState();

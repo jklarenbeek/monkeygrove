@@ -1273,6 +1273,11 @@ class Game {
   pickCell(cx, cy) {
     const hit = this.world.pick(cx, cy);
     if (!hit) return null;
+    const gridList = hit.object?.userData?.gridList;
+    if (gridList && hit.instanceId !== undefined) {
+      const it = gridList[hit.instanceId];
+      if (it) return { x: it.x, z: it.z };
+    }
     if (hit.object === this.place?.floor && hit.instanceId !== undefined) {
       const it = this.place.floorList[hit.instanceId];
       if (it) return { x: it.x, z: it.z };

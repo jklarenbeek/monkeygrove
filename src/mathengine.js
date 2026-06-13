@@ -733,6 +733,43 @@ function targetDifficulty(s, rng) {
   return t + (rng.float() - 0.5) * 80;
 }
 
+function recentFractionMagnitude(math, limit = 2) {
+  const out = [];
+  for (let i = math.log.length - 1; i >= 0 && out.length < limit; i--) {
+    const e = math.log[i];
+    if (e.skill === 'frac_magnitude' && e.item && Number.isFinite(e.value)) out.push(e);
+  }
+  return out;
+}
+
+function fractionSpreadScore(problem, recent, s) {
+  const key = `${problem.meta.n}/${problem.meta.d}`;
+  let score = 0;
+  if (recent[0]?.item === key) score += 12;
+  else if (recent.some((e) => e.item === key)) score += 7;
+  if (recent.some((e) => Math.abs(e.value - problem.answer) < 1e-9)) score += 6;
+  // After the very first half, prefer the neighboring quarter landmarks when
+  // possible so one chamber does not ask for the exact middle over and over.
+  if (s.n > 0 && s.n < 4 && problem.meta.d === 2) score += 3;
+  return score;
+}
+
+function spreadFractionMagnitude(initial, math, rng, target, kind, scaffold, s) {
+  const recent = recentFractionMagnitude(math);
+  if (!recent.length) return initial;
+  let best = initial;
+  let bestScore = fractionSpreadScore(best, recent, s);
+  for (let i = 0; i < 12 && bestScore > 0; i++) {
+    const candidate = GEN.frac_magnitude(target, rng, kind, scaffold);
+    const score = fractionSpreadScore(candidate, recent, s);
+    if (score < bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 // opts: { world?, kind?, echo?, rng?, skill? } — skill is an extension used by
 // tests and duels to force a specific skill; the core game never passes it.
 export function nextProblem(math, opts = {}) {
@@ -758,7 +795,11 @@ export function nextProblem(math, opts = {}) {
   const s = math.skills[skillId];
   const scaffold = scaffoldFor(s.r);
   const kind = chooseKind(skillId, s, opts.kind, rng);
-  const inner = GEN[skillId](targetDifficulty(s, rng), rng, kind, scaffold);
+  const target = targetDifficulty(s, rng);
+  let inner = GEN[skillId](target, rng, kind, scaffold);
+  if (skillId === 'frac_magnitude') {
+    inner = spreadFractionMagnitude(inner, math, rng, target, kind, scaffold, s);
+  }
   const id = `${skillId}-${Math.floor(rng.float() * 0xffffffff).toString(36)}${Math.floor(rng.float() * 0xffffffff).toString(36)}`;
   return {
     id,
@@ -817,6 +858,10 @@ export function recordResult(math, problem, res) {
     t: Date.now(),
     skill: problem.skillId,
     tag: problem.explain?.key ?? null,
+    item: problem.meta?.n !== undefined && problem.meta?.d !== undefined
+      ? `${problem.meta.n}/${problem.meta.d}`
+      : null,
+    value: typeof problem.answer === 'number' ? problem.answer : null,
     ok: !!res.correct,
     ms: res.ms ?? 0,
     hint: !!res.usedHint,
