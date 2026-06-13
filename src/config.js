@@ -66,6 +66,12 @@ export const RARITY_STARS = { common: '⭐', rare: '🌟', epic: '💜', legenda
 export const IS_TOUCH = typeof window !== 'undefined' &&
   ('ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0);
 
+// Startup zoom on portrait phones, where the whole-board fit sits too far back
+// to feel inviting. Desktop & landscape keep 1 (full board); the number line
+// also stays at 1 so both ends remain visible for magnitude estimation. Pinch
+// always overrides. Tune these to taste.
+export const MOBILE_DEFAULT_ZOOM = { hub: 1.8, chamber: 1.5 };
+
 export const QUALITY = (() => {
   if (typeof window === 'undefined') return 'high';
   const dpr = window.devicePixelRatio || 1;

@@ -28,7 +28,7 @@ import * as screens from './screens.js';
 import { audio } from './audio.js';
 import { updateTweens, delay, tween, ease } from './anim.js';
 import { Rng } from './rng.js';
-import { BALANCE, WORLD_THEME, TILE, portalStage, IS_TOUCH } from './config.js';
+import { BALANCE, WORLD_THEME, TILE, portalStage, IS_TOUCH, MOBILE_DEFAULT_ZOOM } from './config.js';
 
 const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
 
@@ -205,6 +205,7 @@ class Game {
       const petSpot = this.findFreeNear(spawn.x, spawn.z) || spawn;
       this.pet.setPlace(this.place, petSpot.x, petSpot.z);
     }
+    this.world.defaultZoom = 1; // the title shows the whole island, full bloom
     this.world.follow(this.player.mesh, 10.5);
     // the island at full life: butterflies, birds dropping in, clouds
     // overhead — all the same AmbientLife the real hub runs
@@ -355,6 +356,7 @@ class Game {
     const spawn = (this.place.markers.P || [{ x: 11, z: 11 }])[0];
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.spawnPet(spawn);
+    this.world.defaultZoom = this.mobileZoom('hub');
     this.world.follow(this.player.mesh, 13, { x: this.place.size.w * 0.5, z: this.place.size.d * 0.5 });
     this.player.onArrive = (x, z) => this.hubArrive(x, z);
     this.player.onBump = (x, z) => this.hubBump(x, z);
@@ -543,7 +545,9 @@ class Game {
     this.spawnPet(spawn);
     // static, centered diorama: the whole board (every stone, the altar, the
     // full number line) stays on screen at any window aspect. Passing the player
-    // lets the camera trail them once a kid pinch-zooms in for a closer look.
+    // lets the camera trail them — on mobile it opens at a comfortable zoom that
+    // already trails them; the number line stays fit so both ends show.
+    this.world.defaultZoom = this.mobileZoom(kind);
     this.world.frameBoard(new THREE.Vector3(0, 0, 0), this.place.size.w, this.place.size.d, this.player.mesh);
     this.player.onArrive = (x, z) => {
       this.pet?.notePlayerAt(x, z);
@@ -1251,6 +1255,17 @@ class Game {
       localStorage.setItem('monkeymath.gestureHint', '1');
     } catch { /* private mode: the session flag above still holds it to one toast */ }
     delay(1200, () => hud.toast(t('hint.pinch')));
+  }
+
+  // Startup zoom for the next scene. Portrait phones open closer in (the full
+  // fit sits too far back); desktop, landscape, and the number line keep 1 so
+  // the whole board / both ends stay visible. Pinch overrides at any time.
+  mobileZoom(kind) {
+    const portrait = (window.innerHeight || 1) / (window.innerWidth || 1) > 1.35;
+    if (!IS_TOUCH || !portrait) return 1;
+    if (kind === 'hub') return MOBILE_DEFAULT_ZOOM.hub;
+    if (kind === 'numberline') return 1;
+    return MOBILE_DEFAULT_ZOOM.chamber;
   }
 
   pickCell(cx, cy) {

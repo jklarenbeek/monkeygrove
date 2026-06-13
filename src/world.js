@@ -59,6 +59,7 @@ export class World {
     //   'always' (hub) follows the player at any zoom; 'zoomed' (chamber) shows
     //   the whole board at min zoom and follows the player once zoomed in.
     this.zoom = 1;
+    this.defaultZoom = 1;             // per-scene startup zoom (mobile starts closer)
     this.pan = new THREE.Vector3();
     this.panLimit = new THREE.Vector3(16, 0, 16);
     this.boardCenter = new THREE.Vector3();
@@ -156,7 +157,7 @@ export class World {
   }
 
   resetCamera() {
-    this.zoom = 1;
+    this.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.defaultZoom || 1));
     this.pan.set(0, 0, 0);
     this._applyProjection();
   }
@@ -198,9 +199,13 @@ export class World {
     this.followMode = followObj ? 'zoomed' : null;
     this.fitBoard = { w, d };
     this.boardCenter.copy(center);
-    this.goal.copy(center);
-    this.target.copy(center);
     this.panLimit.set(w * TILE * 0.5, 0, d * TILE * 0.5);
+    // when the startup zoom already trails the player (mobile), open framed on
+    // them; otherwise center the whole board (the default, full-puzzle view).
+    const onPlayer = followObj && (this.defaultZoom || 1) > 1.05;
+    const c = onPlayer ? followObj.position : center;
+    this.goal.copy(c);
+    this.target.copy(c);
     this.resetCamera();
     this.resize();
     this._place();
