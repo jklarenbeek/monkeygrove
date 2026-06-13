@@ -1,0 +1,200 @@
+// Save/load, profiles, settings, streak, economy. localStorage under monkeymath.*
+import { createMathState } from './mathengine.js';
+import { freshIsland } from './island.js';
+import { BALANCE, RARITY_WEIGHTS } from './config.js';
+
+const KEY = 'monkeymath.save';
+const VERSION = 1;
+
+let save = null;
+let saveTimer = null;
+
+function freshProfile(name) {
+  return {
+    id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
+    name,
+    avatar: { fur: 'classic', hat: null, trail: null, pet: null },
+    bananas: 0,
+    egg: { points: 0, goal: BALANCE.eggGoal },
+    pets: [],
+    owned: { hats: [], furs: ['classic'], trails: [] },
+    streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
+    island: freshIsland(),
+    math: createMathState(),
+    stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
+    flags: {},
+    created: Date.now(),
+  };
+}
+
+function freshSave() {
+  return {
+    v: VERSION,
+    profiles: [],
+    activeProfile: null,
+    settings: { lang: detectLang(), sfx: true, music: true },
+  };
+}
+
+function detectLang() {
+  const l = (navigator.language || 'en').toLowerCase();
+  return l.startsWith('nl') ? 'nl' : 'en';
+}
+
+export function loadSave() {
+  if (save) return save;
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.v >= 1 && Array.isArray(parsed.profiles)) {
+        save = migrate(parsed);
+        return save;
+      }
+    }
+  } catch (e) {
+    try { localStorage.setItem('monkeymath.backup', localStorage.getItem(KEY) || ''); } catch {}
+  }
+  save = freshSave();
+  return save;
+}
+
+function migrate(s) {
+  // future versions migrate forward here
+  // heal any missing fields against a fresh profile (additive updates stay safe)
+  const ref = freshProfile('x');
+  for (const p of s.profiles) {
+    for (const k of Object.keys(ref)) if (p[k] === undefined) p[k] = structuredClone(ref[k]);
+    for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
+    for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
+  }
+  s.v = VERSION;
+  return s;
+}
+
+export function persist() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {}
+  }, 250);
+}
+
+export function persistNow() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {}
+}
+
+export function settings() { return loadSave().settings; }
+
+export function profiles() { return loadSave().profiles; }
+
+export function activeProfile() {
+  const s = loadSave();
+  return s.profiles.find((p) => p.id === s.activeProfile) || null;
+}
+
+export function createProfile(name) {
+  const s = loadSave();
+  const p = freshProfile(name);
+  s.profiles.push(p);
+  s.activeProfile = p.id;
+  persistNow();
+  return p;
+}
+
+export function selectProfile(id) {
+  const s = loadSave();
+  s.activeProfile = id;
+  persistNow();
+  return activeProfile();
+}
+
+export function deleteProfile(id) {
+  const s = loadSave();
+  s.profiles = s.profiles.filter((p) => p.id !== id);
+  if (s.activeProfile === id) s.activeProfile = s.profiles[0]?.id || null;
+  persistNow();
+}
+
+// ---------- daily streak ----------
+function dayString(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function todayString() { return dayString(); }
+
+// Returns {kind: 'same'|'extended'|'frozen'|'reset'|'first', gift: bool}
+export function touchDailyStreak(p) {
+  const today = dayString();
+  const st = p.streak;
+  if (st.lastDay === today) return { kind: 'same', gift: st.giftDay !== today ? false : false };
+  const yesterday = dayString(new Date(Date.now() - 864e5));
+  let kind;
+  if (!st.lastDay) { st.count = 1; kind = 'first'; }
+  else if (st.lastDay === yesterday) { st.count += 1; kind = 'extended'; }
+  else if (st.freezes > 0) { st.freezes -= 1; st.count += 1; kind = 'frozen'; }
+  else { st.count = 1; kind = 'reset'; }
+  st.lastDay = today;
+  p.stats.days += 1;
+  const gift = st.giftDay !== today;
+  st.giftDay = today;
+  persist();
+  return { kind, gift };
+}
+
+// ---------- economy ----------
+export function addBananas(p, n) {
+  p.bananas = Math.max(0, p.bananas + n);
+  persist();
+  return p.bananas;
+}
+
+export function spendBananas(p, n) {
+  if (p.bananas < n) return false;
+  p.bananas -= n;
+  persist();
+  return true;
+}
+
+export function addEggPoints(p, n) {
+  if (!p.egg) p.egg = { points: 0, goal: BALANCE.eggGoal };
+  p.egg.points += n;
+  persist();
+  return p.egg.points >= p.egg.goal;
+}
+
+// Roll a pet the profile doesn't own yet (weighted by rarity); null if all owned.
+export function rollPet(p, allPets, rng = Math.random) {
+  const unowned = allPets.filter((pet) => !p.pets.includes(pet.id));
+  if (!unowned.length) return null;
+  const weighted = [];
+  for (const pet of unowned) {
+    const w = RARITY_WEIGHTS[pet.rarity] || 10;
+    for (let i = 0; i < w; i++) weighted.push(pet);
+  }
+  return weighted[Math.floor(rng() * weighted.length)];
+}
+
+export function hatchEgg(p, allPets) {
+  const pet = rollPet(p, allPets);
+  p.egg.points = Math.max(0, p.egg.points - p.egg.goal);
+  p.egg.goal = Math.round(p.egg.goal * 1.25); // each egg a little bigger
+  if (pet) {
+    p.pets.push(pet.id);
+    if (!p.avatar.pet) p.avatar.pet = pet.id;
+  }
+  persist();
+  return pet;
+}
+
+export function ownItem(p, kind, id) {
+  const list = p.owned[kind];
+  if (list && !list.includes(id)) list.push(id);
+  persist();
+}
+
+export function equip(p, slot, id) {
+  p.avatar[slot] = id;
+  persist();
+}
