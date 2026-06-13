@@ -108,6 +108,25 @@ html, body {
 #banner.wiggle { animation: wiggle .4s; }
 @keyframes wiggle { 25% { transform: translate(-50%) rotate(-2deg); } 75% { transform: translate(-50%) rotate(2deg); } }
 
+@media (max-width: 640px) {
+  #banner {
+    top: calc(max(10px, env(safe-area-inset-top)) + 64px);
+    max-width: calc(100vw - 28px);
+    padding: 8px 18px 10px;
+  }
+  #banner-instruction {
+    font-size: 14px;
+    line-height: 1.24;
+    max-width: 220px;
+    margin: 0 auto;
+  }
+  #banner-equation {
+    font-size: clamp(25px, 8vw, 34px);
+    line-height: 1.02;
+    letter-spacing: 1px;
+  }
+}
+
 /* fraction rendering */
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.05; font-size: .72em; margin: 0 3px; }
 .frac > .n { border-bottom: 3px solid currentColor; padding: 0 5px; }
