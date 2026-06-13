@@ -393,6 +393,7 @@ class Game {
   }
 
   hubArrive(x, z) {
+    if (this.mode !== 'hub' || !this.place?.portals) return; // stray hop after we left the hub
     this.pet?.notePlayerAt(x, z);
     for (const [worldId, spot] of Object.entries(this.place.portals)) {
       if (spot.x === x && spot.z === z) {
@@ -672,6 +673,7 @@ class Game {
 
   // Walking straight into a friend also talks — the zero-tutorial way in.
   hubBump(x, z) {
+    if (this.mode !== 'hub' || !this.place?.mimiPos) return; // stray hop after we left the hub
     const found = this.hubNpcAt(x, z);
     if (!found) return;
     if (performance.now() < this.talkCooldown) return; // held arrow keys re-bump
@@ -1348,6 +1350,11 @@ class Game {
   }
 
   clearPlace() {
+    // Freeze the outgoing player: an in-flight hop's onArrive/onBump must not
+    // fire into the scene we're tearing down (e.g. a queued hub hop landing
+    // after enterWorld already swapped the place to a chamber). Locking makes
+    // its next _next() drop the queue instead of hopping on.
+    if (this.player) { this.player.stop(); this.player.locked = true; }
     this.verb?.destroy?.();
     this.verb = null;
     this.problem = null;
