@@ -91,7 +91,7 @@ html, body {
   position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
   background: var(--cream); border: 4px solid #fff; border-radius: var(--radius);
   box-shadow: 0 5px 0 var(--shadow); padding: 8px 28px 12px; text-align: center;
-  animation: drop-in .45s cubic-bezier(.34,1.56,.64,1); max-width: min(92vw, 560px);
+  animation: drop-in .45s cubic-bezier(.34,1.56,.64,1); width: max-content; max-width: min(92vw, 560px);
 }
 @keyframes drop-in { 0% { transform: translate(-50%, -120%); } 100% { transform: translate(-50%, 0); } }
 #banner-instruction { font-size: 15px; font-weight: 700; color: var(--ink-soft); }
@@ -112,7 +112,7 @@ html, body {
   position: absolute; bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); left: 50%; transform: translateX(-50%);
   background: var(--cream); border: 3px solid #fff; border-radius: var(--radius);
   box-shadow: 0 4px 0 var(--shadow); padding: 10px 20px; font-size: 22px; font-weight: 900;
-  text-align: center;
+  text-align: center; width: max-content; max-width: 92vw;
 }
 #verb-panel .sub { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
 
@@ -121,7 +121,7 @@ html, body {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -90%);
   background: var(--cream); border: 4px solid var(--sky); border-radius: var(--radius);
   box-shadow: 0 8px 18px var(--shadow); padding: 14px 20px; text-align: center;
-  animation: bubble-in .3s cubic-bezier(.34,1.56,.64,1); max-width: min(92vw, 460px);
+  animation: bubble-in .3s cubic-bezier(.34,1.56,.64,1); width: max-content; max-width: min(92vw, 460px);
 }
 .mp-grid { display: grid; gap: 3px; justify-content: center; margin: 6px auto; }
 .mp-cell { width: 16px; height: 16px; border-radius: 5px; background: var(--leaf); animation: toast-in .25s backwards; }
@@ -147,7 +147,7 @@ html, body {
 /* ---------- Mimi bubble ---------- */
 #bubble {
   position: absolute; bottom: max(96px, calc(env(safe-area-inset-bottom) + 84px)); left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 12px; max-width: min(92vw, 520px);
+  display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(92vw, 520px);
   background: #fff; border: 4px solid var(--pink); border-radius: var(--radius);
   box-shadow: 0 6px 14px var(--shadow); padding: 12px 26px 14px 18px;
   animation: bubble-in .35s cubic-bezier(.34,1.56,.64,1);
@@ -165,7 +165,7 @@ html, body {
 @keyframes next-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 
 /* ---------- toasts ---------- */
-#toasts { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+#toasts { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; width: max-content; max-width: 92vw; }
 .toast {
   background: var(--cream); border: 3px solid #fff; border-radius: 999px; padding: 10px 22px;
   font-weight: 900; font-size: 19px; box-shadow: 0 4px 0 var(--shadow);

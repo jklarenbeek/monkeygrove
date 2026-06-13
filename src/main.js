@@ -28,7 +28,7 @@ import * as screens from './screens.js';
 import { audio } from './audio.js';
 import { updateTweens, delay, tween, ease } from './anim.js';
 import { Rng } from './rng.js';
-import { BALANCE, WORLD_THEME, TILE, portalStage } from './config.js';
+import { BALANCE, WORLD_THEME, TILE, portalStage, IS_TOUCH } from './config.js';
 
 const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
 
@@ -75,6 +75,7 @@ class Game {
     this.talkCooldown = 0; // debounces bump-to-talk while keys are held
     this.hubWelcomed = false; // the hub greeting page shows once per session
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
+    this.gestureHintDone = false; // pinch/pan hint shows at most once per session
   }
 
   // ---------- boot ----------
@@ -276,6 +277,7 @@ class Game {
     hud.showHintButton(false);
     this.refreshHudCounts();
     audio.music('island');
+    this.maybeGestureHint();
     // daily streak
     const res = touchDailyStreak(this.profile);
     if (res.kind === 'extended') hud.toast(t('hub.streak_extended', { n: this.profile.streak.count }));
@@ -353,7 +355,7 @@ class Game {
     const spawn = (this.place.markers.P || [{ x: 11, z: 11 }])[0];
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.spawnPet(spawn);
-    this.world.follow(this.player.mesh, 13);
+    this.world.follow(this.player.mesh, 13, { x: this.place.size.w * 0.5, z: this.place.size.d * 0.5 });
     this.player.onArrive = (x, z) => this.hubArrive(x, z);
     this.player.onBump = (x, z) => this.hubBump(x, z);
     this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
@@ -513,6 +515,7 @@ class Game {
     hud.showHintButton(true);
     this.presentProblem(problem);
     audio.music('chamber');
+    this.maybeGestureHint();
     if (this.isEcho) hud.toast('✨ ' + t('play.echo_door'));
   }
 
@@ -539,8 +542,9 @@ class Game {
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.spawnPet(spawn);
     // static, centered diorama: the whole board (every stone, the altar, the
-    // full number line) stays on screen at any window aspect
-    this.world.frameBoard(new THREE.Vector3(0, 0, 0), this.place.size.w, this.place.size.d);
+    // full number line) stays on screen at any window aspect. Passing the player
+    // lets the camera trail them once a kid pinch-zooms in for a closer look.
+    this.world.frameBoard(new THREE.Vector3(0, 0, 0), this.place.size.w, this.place.size.d, this.player.mesh);
     this.player.onArrive = (x, z) => {
       this.pet?.notePlayerAt(x, z);
       this.collectPickupAt(x, z);
@@ -1150,22 +1154,61 @@ class Game {
       }
     });
 
-    let downPos = null, dragging = false;
+    // One finger drives the game (tap to walk/act, short swipe to step); two
+    // fingers drive the camera (pinch to zoom, drag to pan). A two-finger
+    // gesture suppresses the one-finger tap that would otherwise fire on lift.
+    const pointers = new Map();        // active pointers: id -> {x, y}
+    let downPos = null, dragging = false, gestured = false;
+    let pinch = null;                  // { dist, zoom, cx, cy } during 2 fingers
+
+    const centroid = () => {
+      let x = 0, y = 0;
+      for (const p of pointers.values()) { x += p.x; y += p.y; }
+      const n = pointers.size || 1;
+      return { x: x / n, y: y / n };
+    };
+    const spread = () => {
+      const pts = [...pointers.values()];
+      return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    };
+
     this.canvas.addEventListener('pointerdown', (e) => {
-      downPos = { x: e.clientX, y: e.clientY };
-      dragging = false;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        downPos = { x: e.clientX, y: e.clientY };
+        dragging = false; gestured = false;
+      } else if (pointers.size === 2) {
+        const c = centroid();
+        pinch = { dist: spread() || 1, zoom: this.world.zoom, cx: c.x, cy: c.y };
+        gestured = true;
+      }
     });
+
     this.canvas.addEventListener('pointermove', (e) => {
-      if (!downPos) return;
-      const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
-      if (Math.hypot(dx, dy) > 14) dragging = true;
-    });
-    this.canvas.addEventListener('pointerup', (e) => {
-      if (!downPos) return;
-      const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
-      const wasDrag = dragging;
-      downPos = null; dragging = false;
+      if (!pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.mode === 'title') return;
+      if (pointers.size >= 2 && pinch) {
+        const d = spread();
+        if (d > 0) this.world.setZoom(pinch.zoom * (d / pinch.dist));
+        const c = centroid();
+        this.world.panByPixels(c.x - pinch.cx, c.y - pinch.cy);
+        pinch.cx = c.x; pinch.cy = c.y;
+      } else if (pointers.size === 1 && downPos) {
+        const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
+        if (Math.hypot(dx, dy) > 14) dragging = true;
+      }
+    });
+
+    const endPointer = (e) => {
+      const start = downPos;
+      const had = pointers.delete(e.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (pointers.size > 0) return;   // wait until every finger is up
+      downPos = null;
+      const wasDrag = dragging, wasGesture = gestured;
+      dragging = false; gestured = false;
+      if (!had || this.mode === 'title' || wasGesture) return;
       if (!wasDrag) {
         const cell = this.pickCell(e.clientX, e.clientY);
         if (!cell) return;
@@ -1176,15 +1219,38 @@ class Game {
         }
         if (this.verb?.onCellTap(cell.x, cell.z, false)) return;
         this.player?.pathTo(cell.x, cell.z);
-      } else if (Math.hypot(dx, dy) > 30) {
-        // swipe = one step
-        const ang = Math.atan2(dy, dx);
-        const oct = Math.round(ang / (Math.PI / 2));
-        const map = { 0: [1, 0], 1: [0, 1], 2: [-1, 0], '-1': [0, -1], '-2': [-1, 0] };
-        const d = map[oct] || [0, 0];
-        this.player?.tryStep(d[0], d[1]);
+      } else {
+        const dx = e.clientX - (start?.x ?? e.clientX), dy = e.clientY - (start?.y ?? e.clientY);
+        if (Math.hypot(dx, dy) > 30) {
+          // swipe = one step
+          const ang = Math.atan2(dy, dx);
+          const oct = Math.round(ang / (Math.PI / 2));
+          const map = { 0: [1, 0], 1: [0, 1], 2: [-1, 0], '-1': [0, -1], '-2': [-1, 0] };
+          const d = map[oct] || [0, 0];
+          this.player?.tryStep(d[0], d[1]);
+        }
       }
-    });
+    };
+    this.canvas.addEventListener('pointerup', endPointer);
+    this.canvas.addEventListener('pointercancel', endPointer);
+
+    // desktop: mouse wheel / trackpad pinch zooms toward the current framing
+    this.canvas.addEventListener('wheel', (e) => {
+      if (this.mode === 'title') return;
+      e.preventDefault();
+      this.world.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+    }, { passive: false });
+  }
+
+  // One-time nudge so touch players discover the camera gestures.
+  maybeGestureHint() {
+    if (!IS_TOUCH || this.gestureHintDone) return;
+    this.gestureHintDone = true;   // once per session, even if storage is unavailable
+    try {
+      if (localStorage.getItem('monkeymath.gestureHint')) return; // shown on a past visit
+      localStorage.setItem('monkeymath.gestureHint', '1');
+    } catch { /* private mode: the session flag above still holds it to one toast */ }
+    delay(1200, () => hud.toast(t('hint.pinch')));
   }
 
   pickCell(cx, cy) {

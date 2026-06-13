@@ -14,6 +14,21 @@ const _upScr = new THREE.Vector3(0, 1, 0).projectOnPlane(_fwd).normalize();
 const ISO_PROJ_H = Math.abs(new THREE.Vector3().crossVectors(_fwd, _upScr).x); // ≈ 0.71
 const ISO_PROJ_V = Math.abs(_upScr.x);                                          // ≈ 0.45
 
+// Ground-plane directions that a screen-space drag maps to under the iso camera
+// — screen +X (right) and screen +Y (up). Used to turn a finger pan into a
+// look-at offset so the world tracks the fingers. Derived from ISO_DIR so they
+// stay in sync with the camera angle.
+const SCREEN_RIGHT_GROUND = new THREE.Vector3(-_fwd.z, 0, _fwd.x).normalize();
+const SCREEN_UP_GROUND = new THREE.Vector3()
+  .crossVectors(SCREEN_RIGHT_GROUND, _fwd)
+  .setComponent(1, 0)
+  .normalize();
+
+// User zoom range: 1 = the auto fit/follow framing; >1 zooms in. Below 1 just
+// pulls back a touch for breathing room.
+const ZOOM_MIN = 0.8;
+const ZOOM_MAX = 4;
+
 export class World {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({
@@ -36,6 +51,19 @@ export class World {
     this.goal = new THREE.Vector3();      // where target wants to be
     this.followObj = null;
     this.shakeAmp = 0;
+
+    // user camera control, composited over the auto fit/follow base:
+    //   zoom — multiplier on the framing span (1 = auto, >1 = closer)
+    //   pan  — ground-plane offset added to the look-at (pinch/two-finger drag)
+    // followMode decides whose position drives the look-at:
+    //   'always' (hub) follows the player at any zoom; 'zoomed' (chamber) shows
+    //   the whole board at min zoom and follows the player once zoomed in.
+    this.zoom = 1;
+    this.pan = new THREE.Vector3();
+    this.panLimit = new THREE.Vector3(16, 0, 16);
+    this.boardCenter = new THREE.Vector3();
+    this.followMode = null;
+    this.aspect = 1;
 
     const hemi = new THREE.HemisphereLight(0xeaf6ff, 0xcdeac0, 0.95);
     this.scene.add(hemi);
@@ -63,7 +91,7 @@ export class World {
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
-    const aspect = w / h;
+    this.aspect = w / h;
     // fit-board mode (chambers): the whole diorama must stay visible on ANY
     // aspect — stones in the far corner can't hide off-screen, and number-line
     // magnitude estimation needs the full bridge in view
@@ -71,10 +99,22 @@ export class World {
       const diag = (this.fitBoard.w + this.fitBoard.d) * TILE;
       const horiz = diag * ISO_PROJ_H + 1.5;  // side margin
       const vert = diag * ISO_PROJ_V + 2.5;   // headroom for props & HUD banner
-      this.span = Math.max(vert, horiz / aspect);
+      this.span = Math.max(vert, horiz / this.aspect);
     }
+    this._applyProjection();
+  }
+
+  // Rebuild the ortho frustum from span + aspect + user zoom. Split out from
+  // resize() so a pinch can re-zoom without recomputing the fit.
+  _applyProjection() {
+    const aspect = this.aspect || 1;
     // Keep a minimum horizontal span so portrait phones still see the diorama.
-    const vSpan = Math.max(this.span, (this.span * 1.15) / aspect);
+    // In fit-board mode `this.span` already folds in the aspect (via horiz/aspect
+    // above), so the guard must NOT divide by aspect again — doing so double-counts
+    // it and zooms a chamber to a tiny speck on portrait screens.
+    const baseVSpan = this.fitBoard ? this.span : Math.max(this.span, (this.span * 1.15) / aspect);
+    this.baseVSpan = baseVSpan;
+    const vSpan = baseVSpan / this.zoom;
     this.camera.top = vSpan / 2;
     this.camera.bottom = -vSpan / 2;
     this.camera.left = (-vSpan * aspect) / 2;
@@ -87,29 +127,81 @@ export class World {
     this.resize();
   }
 
+  // ---------- user camera control (pinch-zoom / two-finger pan) ----------
+
+  setZoom(z) {
+    this.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    this._clampPan();           // zooming out shrinks how far you can pan
+    this._applyProjection();
+  }
+
+  zoomBy(factor) { this.setZoom(this.zoom * factor); }
+
+  // Pan the look-at by a finger drag (screen pixels), so the world tracks the
+  // fingers. Converted to a ground-plane offset via the iso screen basis.
+  panByPixels(dxPx, dyPx) {
+    const wpp = (this.camera.top - this.camera.bottom) / (window.innerHeight || 1);
+    this.pan.addScaledVector(SCREEN_RIGHT_GROUND, -dxPx * wpp);
+    this.pan.addScaledVector(SCREEN_UP_GROUND, dyPx * wpp);
+    this._clampPan();
+  }
+
+  // Allowed pan scales with zoom: none at min zoom (board centered), up to the
+  // board half-extent when fully zoomed in — so you can never lose the island.
+  _clampPan() {
+    const f = Math.max(0, Math.min(1, (this.zoom - 1) / (ZOOM_MAX - 1)));
+    const lx = this.panLimit.x * f, lz = this.panLimit.z * f;
+    this.pan.x = Math.max(-lx, Math.min(lx, this.pan.x));
+    this.pan.z = Math.max(-lz, Math.min(lz, this.pan.z));
+  }
+
+  resetCamera() {
+    this.zoom = 1;
+    this.pan.set(0, 0, 0);
+    this._applyProjection();
+  }
+
   // Frame a static diorama (hub overview / chamber)
   lookAt(center, span) {
     this.fitBoard = null;
-    if (span) this.setSpan(span);
+    this.followObj = null;
+    this.followMode = null;
+    this.boardCenter.copy(center);
     this.goal.copy(center);
     this.target.copy(center);
-    this.followObj = null;
+    if (span) this.span = span;
+    this.resetCamera();
+    this.resize();
     this._place();
   }
 
-  follow(obj, span) {
+  follow(obj, span, bound) {
     this.fitBoard = null;
-    if (span) this.setSpan(span);
     this.followObj = obj;
+    this.followMode = 'always';
+    this.panLimit.set(bound?.x ?? 16, 0, bound?.z ?? 16);
+    if (span) this.span = span;
+    // snap to the followed object so the scene opens framed on it, rather than
+    // gliding in from the previous scene's look-at (matches lookAt/frameBoard).
+    this.target.copy(obj.position);
+    this.goal.copy(obj.position);
+    this.resetCamera();
+    this.resize();
+    this._place();
   }
 
-  // Static, centered framing that keeps a whole w×d tile board on screen,
-  // re-fitted automatically on window resize.
-  frameBoard(center, w, d) {
-    this.followObj = null;
+  // Centered framing that keeps a whole w×d tile board on screen (re-fitted on
+  // resize). When a followObj is given, the camera follows it once the player
+  // zooms in past the fit, while min zoom keeps the whole board in view.
+  frameBoard(center, w, d, followObj = null) {
+    this.followObj = followObj;
+    this.followMode = followObj ? 'zoomed' : null;
     this.fitBoard = { w, d };
+    this.boardCenter.copy(center);
     this.goal.copy(center);
     this.target.copy(center);
+    this.panLimit.set(w * TILE * 0.5, 0, d * TILE * 0.5);
+    this.resetCamera();
     this.resize();
     this._place();
   }
@@ -121,13 +213,17 @@ export class World {
       sx = (Math.random() - 0.5) * this.shakeAmp;
       sz = (Math.random() - 0.5) * this.shakeAmp;
     }
-    this.camera.position.set(this.target.x + off.x + sx, this.target.y + off.y, this.target.z + off.z + sz);
-    this.camera.lookAt(this.target.x + sx, this.target.y, this.target.z + sz);
+    // look-at = smoothed target + user pan offset (+ shake)
+    const lx = this.target.x + this.pan.x + sx;
+    const ly = this.target.y;
+    const lz = this.target.z + this.pan.z + sz;
+    this.camera.position.set(lx + off.x, ly + off.y, lz + off.z);
+    this.camera.lookAt(lx, ly, lz);
     // Sun follows the action so the shadow camera stays tight.
-    this.sun.position.set(this.target.x + 8, this.target.y + 14, this.target.z + 5);
-    this.sun.target.position.copy(this.target);
+    this.sun.position.set(lx + 8, ly + 14, lz + 5);
+    this.sun.target.position.set(lx, ly, lz);
     if (this.sun.castShadow) {
-      const s = this.span * 0.9;
+      const s = (this.baseVSpan || this.span) * 0.9;
       const c = this.sun.shadow.camera;
       c.left = -s; c.right = s; c.top = s; c.bottom = -s;
       c.updateProjectionMatrix();
@@ -137,8 +233,12 @@ export class World {
   shake(amount = 0.15) { this.shakeAmp = Math.max(this.shakeAmp, amount); }
 
   update(dtMs) {
-    if (this.followObj) {
+    // who the camera frames: the hub always trails the player; a chamber shows
+    // the whole board until the player zooms in, then trails them too.
+    if (this.followObj && (this.followMode === 'always' || this.zoom > 1.05)) {
       this.goal.copy(this.followObj.position);
+    } else {
+      this.goal.copy(this.boardCenter);
     }
     const k = 1 - Math.pow(0.0015, dtMs / 1000); // smooth exp follow
     this.target.lerp(this.goal, k);
