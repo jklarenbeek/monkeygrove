@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
-  // served from https://<user>.github.io/monkeymath/ via `npm run deploy`
-  base: '/monkeymath/',
+  // served from https://<user>.github.io/monkeygrove/ via `npm run deploy`
+  base: '/monkeygrove/',
   server: {
     port: 5173,
     open: true,
