@@ -17,9 +17,21 @@ import {
   addBananas, addEggPoints, hatchEgg, persist, persistNow, todayString,
 } from './state.js';
 import { applyWarmupResult, eligibleSkillIds } from './curriculum/placement.js';
+import { BusinessPlace } from './business/scene.js';
+import { BUSINESS_CUSTOMERS } from './business/data.js';
+import {
+  applyPaymentAction,
+  applyPrepAction,
+  buyUpgrade,
+  completeOrder,
+  dailyBusinessReport,
+  ensureBusinessState,
+  nextBusinessOrder,
+  restockIngredient,
+} from './business/engine.js';
 import {
   islandStatus, newBlueprints, markSeen, fund as fundIsland, buildById,
-  grantDailyPerks, BUILDS,
+  grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines } from './mimi.js';
 import { AmbientLife } from './ambient.js';
@@ -78,6 +90,8 @@ class Game {
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
     this.gestureHintDone = false; // pinch/pan hint shows at most once per session
     this.userZoom = null; // player's retained pinch/wheel zoom (null = comfort default)
+    this.businessAttempts = [];
+    this.businessCustomer = null;
   }
 
   // ---------- boot ----------
@@ -144,6 +158,13 @@ class Game {
       screens.showParents({
         report: p ? masteryReport(p.math) : null,
         profile: p,
+        businessReport: p?.business ? dailyBusinessReport(p.business) : null,
+        onCurriculumChange: (patch) => {
+          if (!p) return;
+          p.curriculum = { ...p.curriculum, ...patch };
+          persistNow();
+          showParents();
+        },
         onClose: () => this.showTitle(),
       });
     };
@@ -469,6 +490,13 @@ class Game {
     if (n && n.x === x && n.z === z) this.openPets();
   }
 
+  buildAt(x, z) {
+    for (const [id, spot] of Object.entries(this.place?.buildSpots || {})) {
+      if (spot.x === x && spot.z === z) return { id, ...spot };
+    }
+    return null;
+  }
+
   hubTap(x, z) {
     const m = this.place.markers;
     const at = (list) => (list || []).some((s) => s.x === x && s.z === z);
@@ -483,11 +511,16 @@ class Game {
       return true;
     }
     // build plots: unlocked opens the worktable, finished ones react playfully
-    for (const [id, spot] of Object.entries(this.place.buildSpots || {})) {
-      if (spot.x !== x || spot.z !== z) continue;
-      if (spot.state === 'unlocked') { this.openIsland(); return true; }
-      if (spot.state === 'built') {
-        audio.sfx(id === 'stage' ? 'gong' : 'sparkle');
+    const build = this.buildAt(x, z);
+    if (build) {
+      if (build.id === 'bakery' && isBuilt(this.profile, 'bakery')) {
+        hud.toast(t('business.open'));
+        this.startBusiness();
+        return true;
+      }
+      if (build.state === 'unlocked') { this.openIsland(); return true; }
+      if (build.state === 'built') {
+        audio.sfx(build.id === 'stage' ? 'gong' : 'sparkle');
         this.particles?.confetti(this.place.worldPos(x, z, 0.8), 18);
         return true;
       }
@@ -1196,6 +1229,252 @@ class Game {
     return { kind: p.kind, eq: p.equation, skill: p.skillId };
   }
 
+  // ---------- business ----------
+
+  startBusiness() {
+    if (!isBuilt(this.profile, 'bakery')) return false;
+    this.mode = 'business';
+    this.flowToken++;
+    screens.closeScreen();
+    this.clearPlace();
+    this.place = new BusinessPlace(this.world, { seed: 606 });
+    this.particles = new Particles(this.place.group);
+    this.place.fx = this.particles;
+    this.spawnAvatar();
+    const spawn = { x: 2, z: Math.max(1, this.place.size.d - 3) };
+    this.player.setPlace(this.place, spawn.x, spawn.z);
+    this.spawnPet(spawn);
+    this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);
+    this.player.onBump = (x, z) => this.businessTap(x, z);
+    this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
+    this.world.defaultZoom = this.sceneZoom('hub');
+    this.world.frameBoard(this.place.center(), this.place.size.w, this.place.size.d, this.player.mesh);
+    hud.showHud(true);
+    hud.hideBanner();
+    hud.setAction(null);
+    hud.setVerbPanel(null);
+    hud.showHintButton(false);
+    this.refreshHudCounts();
+    audio.music('island');
+    const business = ensureBusinessState(this.profile);
+    if (business.activeOrder?.tasks?.length) this.resumeBusinessOrder(business);
+    else this.startNextBusinessOrder();
+    return true;
+  }
+
+  resumeBusinessOrder(business) {
+    const order = business.activeOrder;
+    business.queue = [order];
+    this.businessAttempts = [];
+    this.place?.clearCustomers?.();
+    this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
+    persist();
+    this.showBusinessOrderPanel();
+  }
+
+  startNextBusinessOrder() {
+    const business = ensureBusinessState(this.profile);
+    if (business.activeOrder?.tasks?.length) {
+      this.resumeBusinessOrder(business);
+      return;
+    }
+    if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) {
+      this.endBusinessDay();
+      return;
+    }
+    const rng = new Rng(`business:${this.profile.id}:${business.currentDay}:${business.day.ordersServed}`);
+    const order = nextBusinessOrder(business, this.profile.curriculum, { rng });
+    business.activeOrder = order;
+    business.queue = [order];
+    this.businessAttempts = [];
+    this.place?.clearCustomers?.();
+    this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
+    persist();
+    this.showBusinessOrderPanel();
+  }
+
+  showBusinessOrderPanel() {
+    const business = ensureBusinessState(this.profile);
+    const order = business.activeOrder;
+    if (!order) {
+      this.startNextBusinessOrder();
+      return;
+    }
+    const customer = BUSINESS_CUSTOMERS[order.customerId];
+    screens.showBusinessOrder({
+      order,
+      customerName: t(customer?.nameKey || 'business.order'),
+      activeTask: this.nextOpenBusinessTask(order) || { kind: 'done', mode: 'ready' },
+      onPrep: (task) => this.handleBusinessPrep(task),
+      onPay: (task) => this.handleBusinessPayment(task),
+      onServe: () => this.serveBusinessOrder(),
+      onCloseDay: () => this.requestEndBusinessDay(),
+    });
+  }
+
+  nextOpenBusinessTask(order) {
+    return (order?.tasks || []).find((task) => (
+      (task.kind === 'prep' || task.kind === 'payment') && !task.businessDone
+    )) || null;
+  }
+
+  handleBusinessPrep(task) {
+    if (!task || task.kind !== 'prep') return;
+    screens.showBusinessPrep({
+      task,
+      onClose: () => this.showBusinessOrderPanel(),
+      onSubmit: (action) => {
+        const business = ensureBusinessState(this.profile);
+        const order = business.activeOrder;
+        if (!order || task.kind !== 'prep') return;
+        const result = applyPrepAction(business, order, task, action);
+        this.businessAttempts.push(result);
+        if (result.correct) {
+          task.businessDone = true;
+          audio.sfx('correct');
+          hud.toast(t('business.done'));
+        } else {
+          audio.sfx('boop');
+          hud.toast(t(result.reason === 'stock' ? 'business.stock' : 'business.prep'));
+        }
+        persist();
+        this.showBusinessOrderPanel();
+      },
+    });
+  }
+
+  handleBusinessPayment(task) {
+    if (!task || task.kind !== 'payment') return;
+    screens.showBusinessPayment({
+      task,
+      onClose: () => this.showBusinessOrderPanel(),
+      onSubmit: (action) => {
+        const business = ensureBusinessState(this.profile);
+        const order = business.activeOrder;
+        if (!order || task.kind !== 'payment') return;
+        const result = applyPaymentAction(business, order, task, action);
+        this.businessAttempts.push(result);
+        if (result.correct) {
+          task.businessDone = true;
+          audio.sfx('correct');
+          hud.toast(t('business.done'));
+        } else {
+          audio.sfx('boop');
+          hud.toast(t('business.pay'));
+        }
+        persist();
+        this.showBusinessOrderPanel();
+      },
+    });
+  }
+
+  serveBusinessOrder() {
+    const business = ensureBusinessState(this.profile);
+    const order = business.activeOrder;
+    if (!order) return;
+    const task = this.nextOpenBusinessTask(order);
+    if (task) {
+      this.showBusinessOrderPanel();
+      return;
+    }
+    const result = completeOrder(business, order, { attempts: this.businessAttempts });
+    business.queue = [];
+    this.businessAttempts = [];
+    this.place?.clearCustomers?.();
+    const bananas = this.rng.int(BALANCE.businessBananaReward[0], BALANCE.businessBananaReward[1]);
+    addBananas(this.profile, bananas);
+    persist();
+    this.refreshHudCounts();
+    audio.sfx('coin');
+    hud.toast(`+${bananas} 🍌 · ${t('business.profit')}: ${(result.profitCents / 100).toFixed(2)}`);
+    if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) this.endBusinessDay();
+    else this.startNextBusinessOrder();
+  }
+
+  openBusinessStock() {
+    const business = ensureBusinessState(this.profile);
+    screens.showBusinessStock({
+      business,
+      onRestock: (ingredientId) => {
+        const result = restockIngredient(business, ingredientId, 1);
+        audio.sfx(result.ok ? 'coin' : 'boop');
+        if (!result.ok) hud.toast(t(result.reason === 'full' ? 'business.stock_full' : 'business.not_enough'));
+        persist();
+        this.openBusinessStock();
+      },
+      onClose: () => this.showBusinessOrderPanel(),
+    });
+  }
+
+  openBusinessUpgrades() {
+    const business = ensureBusinessState(this.profile);
+    screens.showBusinessUpgrades({
+      business,
+      onBuy: (upgradeId) => {
+        const result = buyUpgrade(business, upgradeId);
+        audio.sfx(result.ok ? 'coin' : 'boop');
+        if (!result.ok) hud.toast(t('business.not_enough'));
+        persist();
+        this.openBusinessUpgrades();
+      },
+      onClose: () => this.showBusinessOrderPanel(),
+    });
+  }
+
+  requestEndBusinessDay() {
+    const business = ensureBusinessState(this.profile);
+    if (business.activeOrder) {
+      audio.sfx('boop');
+      hud.toast(t('business.serve'));
+      this.showBusinessOrderPanel();
+      return false;
+    }
+    this.endBusinessDay();
+    return true;
+  }
+
+  endBusinessDay() {
+    const business = ensureBusinessState(this.profile);
+    if (business.activeOrder) {
+      audio.sfx('boop');
+      hud.toast(t('business.serve'));
+      this.showBusinessOrderPanel();
+      return false;
+    }
+    const report = dailyBusinessReport(business);
+    business.activeOrder = null;
+    business.queue = [];
+    this.businessAttempts = [];
+    this.place?.clearCustomers?.();
+    screens.showBusinessDaySummary({
+      report,
+      onDone: () => {
+        business.currentDay = (business.currentDay || 1) + 1;
+        business.day = {
+          ordersServed: 0,
+          revenueCents: 0,
+          costCents: 0,
+          profitCents: 0,
+          wasteCents: 0,
+          demand: {},
+        };
+        persistNow();
+        this.startHub();
+      },
+    });
+  }
+
+  businessTap(x, z) {
+    if (this.mode !== 'business') return false;
+    const station = this.place?.stationAt?.(x, z);
+    if (!station) return false;
+    audio.sfx('click');
+    if (station === 'pantry' || station === 'shopTable') this.openBusinessStock();
+    else if (station === 'orderBoard') this.openBusinessUpgrades();
+    else this.showBusinessOrderPanel();
+    return true;
+  }
+
   // ---------- duel ----------
 
   async startDuelSetup() {
@@ -1294,6 +1573,7 @@ class Game {
         const cell = this.pickCell(e.clientX, e.clientY);
         if (!cell) return;
         if (this.mode === 'hub' && this.hubTap(cell.x, cell.z)) return;
+        if (this.mode === 'business' && this.businessTap(cell.x, cell.z)) return;
         if (this.helper && cell.x === this.helper.x && cell.z === this.helper.z) {
           this.helperTap();
           return;

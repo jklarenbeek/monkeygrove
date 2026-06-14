@@ -171,6 +171,17 @@ test('PROPS: full contract key set, all valid models', () => {
   }
 });
 
+test('PROPS: business bakery and pizzeria props exist and validate', () => {
+  const required = [
+    'counter', 'prepBoard', 'pizzaPan', 'doughBowl', 'toppingCrate',
+    'coinTray', 'orderBoard', 'shopTable',
+  ];
+  for (const key of required) {
+    assert.ok(key in PROPS, `PROPS.${key} exists`);
+    validateModel(`props.${key}`, PROPS[key], { maxHeight: 20, maxVoxels: 700 });
+  }
+});
+
 test('berry is the tiny 2-voxel remainder berry', () => {
   assert.equal(stats(PROPS.berry).count, 2);
 });

@@ -10,6 +10,7 @@ import {
 import { coverageForReport, getPack } from './curriculum/index.js';
 import { HATS, FURS, TRAILS, PETS } from './models.js';
 import { RARITY_STARS, BALANCE } from './config.js';
+import { BUSINESS_MODES, INGREDIENTS, RECIPES, UPGRADES } from './business/data.js';
 
 const $ = (id) => document.getElementById(id);
 const host = () => $('screens');
@@ -647,6 +648,315 @@ export function showGems({ report, onClose }) {
   el.querySelector('#scr-back').addEventListener('click', onClose);
 }
 
+// ---------- business ----------
+
+function money(cents) {
+  return `${(Number(cents || 0) / 100).toFixed(2)}`;
+}
+
+function objectiveLabel(objectiveId) {
+  if (!objectiveId) return null;
+  const objective = getPack('NL_PO').objectives.find((o) => o.id === objectiveId);
+  return objective?.titleKey ? t(objective.titleKey) : null;
+}
+
+function businessModeLabel(modeId) {
+  return objectiveLabel(BUSINESS_MODES[modeId]?.objectiveId);
+}
+
+function businessTaskLabel(task) {
+  return objectiveLabel(task?.objectiveId)
+    || businessModeLabel(task?.mode)
+    || (task?.kind === 'payment' ? t('business.pay') : null)
+    || (task?.kind === 'prep' ? t('business.prep') : null)
+    || t('business.order');
+}
+
+export function showBusinessOrder({
+  order, customerName, activeTask, onPrep, onPay, onServe, onCloseDay,
+}) {
+  const recipe = RECIPES[order.recipeId];
+  const task = activeTask || order.tasks[0];
+  const canPrep = task && task.kind === 'prep';
+  const canPay = task && task.kind === 'payment';
+  const el = render(`
+    <div class="business-panel">
+      <div class="business-head">
+        <h2>${t('business.title')}</h2>
+        <button class="round-btn" id="business-close">x</button>
+      </div>
+      <div class="card business-order-card">
+        <div class="chip">${esc(customerName)}</div>
+        <h3>${t('business.order')}: ${t(recipe.titleKey)}</h3>
+        <div class="business-price">${t('business.pay')}: ${money(order.priceCents)}</div>
+        <div class="menu-row">
+          <button class="btn green" id="business-prep" ${canPrep ? '' : 'disabled'}>${t('business.prep')}</button>
+          <button class="btn soft" id="business-pay" ${canPay ? '' : 'disabled'}>${t('business.pay')}</button>
+          <button class="btn green" id="business-serve">${t('business.serve')}</button>
+        </div>
+        <div class="tagline">${esc(businessTaskLabel(task))}</div>
+      </div>
+    </div>
+  `);
+  el.querySelector('#business-prep').addEventListener('click', () => { if (canPrep) onPrep?.(task); });
+  el.querySelector('#business-pay').addEventListener('click', () => { if (canPay) onPay?.(task); });
+  el.querySelector('#business-serve').addEventListener('click', onServe);
+  el.querySelector('#business-close').addEventListener('click', onCloseDay);
+}
+
+function choiceValues(expected, deltas, fallback) {
+  const base = Number(expected);
+  const values = Number.isFinite(base)
+    ? [base, ...deltas.map((delta) => base + delta)].filter((value) => value >= 0)
+    : fallback;
+  return [...new Set(values.map((value) => Number(value)))].sort((a, b) => a - b);
+}
+
+function setSelected(button, selector) {
+  for (const other of button.closest('.card')?.querySelectorAll(selector) || []) other.classList.remove('equipped');
+  button.classList.add('equipped');
+}
+
+export function showBusinessPrep({ task, onSubmit, onClose }) {
+  const expected = task?.expected || {};
+  const action = { ingredients: {} };
+  const sliceChoices = [...new Set([2, 4, 6, 8, Number(expected.slices)].filter((n) => Number.isFinite(n)))].sort((a, b) => a - b);
+  const toppings = [...new Set(['cheese', 'tomato', expected.topping].filter(Boolean))];
+  const totalChoices = choiceValues((expected.trays || 0) * (expected.perTray || 0), [-2, -1, 1, 2], [4, 6, 8, 12]);
+  const amountChoices = choiceValues(
+    expected.amount ?? ((expected.of || 0) * (expected.numerator || 0)) / (expected.denominator || 1),
+    [-2, -1, 1, 2],
+    [1, 2, 3, 4],
+  );
+  const ingredients = [...new Set(['flour', 'dough', 'sauce', 'cheese', expected.ingredient].filter(Boolean))];
+  const scaleRows = Object.entries(expected.base || {});
+
+  const el = render(`
+    ${backBtn(onClose, '←')}
+    <h2>${t('business.prep')}</h2>
+    <div class="tagline">${esc(businessTaskLabel(task))}</div>
+    <div class="card">
+      <h3>${t('business.prep')}</h3>
+      <div class="business-choice-grid">
+        ${sliceChoices.map((slices) => `
+          <button class="tile pressable" data-slices="${slices}">
+            <div class="t-icon">${slices}</div>
+            <div class="t-name">slices</div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="business-choice-grid">
+        ${toppings.map((topping) => `
+          <button class="tile pressable" data-topping="${esc(topping)}">
+            <div class="t-icon">${topping === 'tomato' ? '🍅' : '🧀'}</div>
+            <div class="t-name">${esc(topping)}</div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="business-choice-grid">
+        ${totalChoices.map((total) => `
+          <button class="tile pressable" data-total="${total}">
+            <div class="t-icon">${total}</div>
+            <div class="t-name">total</div>
+          </button>
+        `).join('')}
+      </div>
+      <div class="business-choice-grid">
+        ${ingredients.map((ingredient) => `
+          <button class="tile pressable" data-ingredient="${esc(ingredient)}">
+            <div class="t-icon">🥣</div>
+            <div class="t-name">${esc(ingredient)}</div>
+          </button>
+        `).join('')}
+        ${amountChoices.map((amount) => `
+          <button class="tile pressable" data-amount="${amount}">
+            <div class="t-icon">${amount}</div>
+            <div class="t-name">${esc(expected.unit || 'amount')}</div>
+          </button>
+        `).join('')}
+      </div>
+      ${scaleRows.length ? `
+        <div class="business-choice-grid">
+          ${scaleRows.map(([ingredient, amount]) => choiceValues(amount * (expected.factor || 1), [-1, 1], [amount]).map((choice) => `
+            <button class="tile pressable" data-scale-ingredient="${esc(ingredient)}" data-scale-amount="${choice}">
+              <div class="t-icon">${choice}</div>
+              <div class="t-name">${esc(ingredient)}</div>
+            </button>
+          `).join('')).join('')}
+        </div>
+      ` : ''}
+      <div class="menu-row">
+        <button class="btn green" id="business-prep-done">${t('business.done')}</button>
+      </div>
+    </div>
+  `);
+  el.querySelector('#scr-back').addEventListener('click', onClose);
+  for (const btn of el.querySelectorAll('[data-slices]')) {
+    btn.addEventListener('click', () => {
+      action.slices = Number(btn.dataset.slices);
+      setSelected(btn, '[data-slices]');
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-topping]')) {
+    btn.addEventListener('click', () => {
+      action.topping = btn.dataset.topping;
+      setSelected(btn, '[data-topping]');
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-total]')) {
+    btn.addEventListener('click', () => {
+      action.total = Number(btn.dataset.total);
+      setSelected(btn, '[data-total]');
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-ingredient]')) {
+    btn.addEventListener('click', () => {
+      action.ingredient = btn.dataset.ingredient;
+      action.unit = expected.unit;
+      setSelected(btn, '[data-ingredient]');
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-amount]')) {
+    btn.addEventListener('click', () => {
+      action.amount = Number(btn.dataset.amount);
+      action.unit = expected.unit;
+      setSelected(btn, '[data-amount]');
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-scale-ingredient]')) {
+    btn.addEventListener('click', () => {
+      action.ingredients[btn.dataset.scaleIngredient] = Number(btn.dataset.scaleAmount);
+      for (const other of el.querySelectorAll('[data-scale-ingredient]')) {
+        if (other.dataset.scaleIngredient === btn.dataset.scaleIngredient) other.classList.remove('equipped');
+      }
+      btn.classList.add('equipped');
+    });
+  }
+  el.querySelector('#business-prep-done').addEventListener('click', () => {
+    const submitted = { ...action, ingredients: { ...action.ingredients } };
+    if (!Object.keys(submitted.ingredients).length) delete submitted.ingredients;
+    onSubmit?.(submitted);
+  });
+}
+
+export function showBusinessPayment({ task, onSubmit, onClose }) {
+  const expected = task?.expected || {};
+  const action = {};
+  const amountChoices = choiceValues(expected.amountCents ?? expected.finalCents, [-100, -50, 50, 100], [100, 250, 500, 1000]);
+  const paidChoices = choiceValues(expected.paidCents, [-500, 500, 1000], [500, 1000, 2000]);
+  const changeChoices = choiceValues(expected.changeCents, [-100, -50, 50, 100], [0, 50, 100, 250]);
+
+  const el = render(`
+    ${backBtn(onClose, '←')}
+    <h2>${t('business.pay')}</h2>
+    <div class="tagline">${esc(businessTaskLabel(task))}</div>
+    <div class="card">
+      <div class="business-money-row">
+        ${amountChoices.map((cents) => `<button class="btn soft" data-money="${cents}">${money(cents)}</button>`).join('')}
+      </div>
+      <div class="business-price">${t('business.pay')}: <span id="business-paid-total">${money(0)}</span></div>
+      <div class="business-money-row">
+        ${paidChoices.map((cents) => `<button class="btn soft" data-paid="${cents}">${money(cents)}</button>`).join('')}
+      </div>
+      <div class="business-money-row">
+        ${changeChoices.map((cents) => `<button class="btn soft" data-change="${cents}">${money(cents)}</button>`).join('')}
+      </div>
+      <div class="menu-row">
+        <button class="btn green" id="business-payment-done">${t('business.done')}</button>
+      </div>
+    </div>
+  `);
+  const paidTotal = el.querySelector('#business-paid-total');
+  const updatePaidTotal = () => { paidTotal.textContent = money(action.paidCents || action.amountCents || action.finalCents || 0); };
+  el.querySelector('#scr-back').addEventListener('click', onClose);
+  for (const btn of el.querySelectorAll('[data-money]')) {
+    btn.addEventListener('click', () => {
+      const cents = Number(btn.dataset.money);
+      action.amountCents = cents;
+      action.finalCents = cents;
+      setSelected(btn, '[data-money]');
+      updatePaidTotal();
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-paid]')) {
+    btn.addEventListener('click', () => {
+      action.paidCents = Number(btn.dataset.paid);
+      setSelected(btn, '[data-paid]');
+      updatePaidTotal();
+    });
+  }
+  for (const btn of el.querySelectorAll('[data-change]')) {
+    btn.addEventListener('click', () => {
+      action.changeCents = Number(btn.dataset.change);
+      setSelected(btn, '[data-change]');
+    });
+  }
+  el.querySelector('#business-payment-done').addEventListener('click', () => onSubmit?.({ ...action }));
+}
+
+export function showBusinessStock({ business, onRestock, onClose }) {
+  const limit = Math.max(1, business.stockLimit || 1);
+  const el = render(`
+    ${backBtn()}
+    <h2>${t('business.stock')}</h2>
+    <div class="chip">${t('business.profit')}: ${money(business.shopCoins)}</div>
+    <div class="card">
+      ${Object.values(INGREDIENTS).map((ing) => {
+        const count = business.stock[ing.id] || 0;
+        return `
+          <div class="skill-row">
+            <div class="s-name">${t(ing.titleKey)}</div>
+            <div class="s-bar"><div class="s-fill" style="width:${Math.round((count / limit) * 100)}%"></div></div>
+            <div class="curriculum-count">${count}/${limit}</div>
+            <button class="btn soft" data-restock="${ing.id}">${t('business.restock')}</button>
+          </div>`;
+      }).join('')}
+    </div>
+  `);
+  el.querySelector('#scr-back').addEventListener('click', onClose);
+  for (const btn of el.querySelectorAll('[data-restock]')) {
+    btn.addEventListener('click', () => onRestock?.(btn.dataset.restock));
+  }
+}
+
+export function showBusinessUpgrades({ business, onBuy, onClose }) {
+  const ownedUpgrades = Array.isArray(business.upgrades) ? business.upgrades : [];
+  const el = render(`
+    ${backBtn()}
+    <h2>${t('business.upgrades')}</h2>
+    <div class="chip">${t('business.profit')}: ${money(business.shopCoins)}</div>
+    <div class="card">
+      ${Object.values(UPGRADES).map((upgrade) => {
+        const owned = ownedUpgrades.includes(upgrade.id);
+        return `
+          <div class="skill-row">
+            <div class="s-name">${t(upgrade.titleKey)}</div>
+            <div class="curriculum-count">${owned ? t('business.done') : money(upgrade.priceCents)}</div>
+            ${owned ? '' : `<button class="btn soft" data-upgrade="${upgrade.id}">${t('business.buy')}</button>`}
+          </div>`;
+      }).join('')}
+    </div>
+  `);
+  el.querySelector('#scr-back').addEventListener('click', onClose);
+  for (const btn of el.querySelectorAll('[data-upgrade]')) {
+    btn.addEventListener('click', () => onBuy?.(btn.dataset.upgrade));
+  }
+}
+
+export function showBusinessDaySummary({ report, onDone }) {
+  const el = render(`
+    <div style="flex:1"></div>
+    <h2>${t('business.summary')}</h2>
+    <div class="card business-summary">
+      <div class="reward-item">${t('business.orders_served', { n: report.ordersServed })}</div>
+      <div class="reward-item">${t('business.profit')}: ${money(report.profitCents)}</div>
+    </div>
+    <button class="btn green" id="business-done">${t('business.done')}</button>
+    <div style="flex:2"></div>
+  `);
+  el.querySelector('#business-done').addEventListener('click', onDone);
+}
+
 // ---------- parents ----------
 
 function stageLabel(pack, stageId) {
@@ -654,11 +964,12 @@ function stageLabel(pack, stageId) {
   return stage ? t(stage.labelKey) : t(pack.fallbackStagePrefixKey || 'curriculum.stage', { n: '?' });
 }
 
-function curriculumCoverageHtml(profile, report) {
+function curriculumCoverageHtml(profile, report, businessReport = null, showControls = false) {
   if (!profile?.curriculum || !report) return '';
   const pack = getPack(profile.curriculum.packId);
-  const coverage = coverageForReport(pack.id, report);
+  const coverage = coverageForReport(pack.id, report, { business: businessReport });
   const stage = profile.curriculum.confirmedStage || profile.curriculum.estimatedStage;
+  const strictness = profile.curriculum.strictness || 'soft';
   return `
     <div class="card">
       <h3>${esc(t('parents.curriculum'))}</h3>
@@ -666,6 +977,21 @@ function curriculumCoverageHtml(profile, report) {
         <div class="chip">${esc(t('parents.curriculum_pack'))}: ${esc(t(pack.titleKey))}</div>
         <div class="chip">${esc(t('parents.stage'))}: ${esc(stageLabel(pack, stage))}</div>
       </div>
+      ${showControls ? `<div class="curriculum-controls">
+        <label>
+          <span>${esc(t('parents.stage'))}</span>
+          <select data-stage>
+            ${pack.stages.map((s) => `<option value="${esc(s.id)}" ${s.id === stage ? 'selected' : ''}>${esc(t(s.labelKey))}</option>`).join('')}
+          </select>
+        </label>
+        <label>
+          <span>${esc(t('parents.strictness'))}</span>
+          <select data-strictness>
+            <option value="soft" ${strictness === 'soft' ? 'selected' : ''}>${esc(t('parents.strictness_soft'))}</option>
+            <option value="strict" ${strictness === 'strict' ? 'selected' : ''}>${esc(t('parents.strictness_strict'))}</option>
+          </select>
+        </label>
+      </div>` : ''}
       <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:8px">${esc(t('parents.coverage'))}</div>
       ${Object.values(coverage.domains).filter((d) => d.total > 0).map((d) => `
         <div class="curriculum-domain">
@@ -682,13 +1008,34 @@ function curriculumCoverageHtml(profile, report) {
     </div>`;
 }
 
-export function showParents({ report, profile, onClose }) {
+function parentBusinessHtml(businessReport) {
+  if (!businessReport) return '';
+  const modes = Object.entries(businessReport.modes || {});
+  return `
+    <div class="card">
+      <h3>${esc(t('parents.business'))}</h3>
+      <div class="curriculum-meta">
+        <div class="chip">${esc(t('business.orders_served', { n: businessReport.ordersServed || 0 }))}</div>
+        <div class="chip">${esc(t('business.profit'))}: ${esc(money(businessReport.profitCents))}</div>
+      </div>
+      <div class="curriculum-objectives">
+        ${modes.map(([id, mode]) => {
+          const coverage = mode?.coverage || 'partial';
+          const label = businessModeLabel(id) || t('parents.business');
+          return `<span class="curriculum-pill ${esc(coverage)}">${esc(label)} · ${esc(t(`parents.${coverage}`))}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+export function showParents({ report, profile, businessReport = null, onClose, onCurriculumChange }) {
   const el = render(`
     ${backBtn()}
     <h2>${t('parents.title')}</h2>
     <div class="card"><p style="margin:0;font-size:15px;line-height:1.5">${t('parents.body')}</p></div>
     ${profile && report ? `
-    ${curriculumCoverageHtml(profile, report)}
+    ${curriculumCoverageHtml(profile, report, businessReport, !!onCurriculumChange)}
+    ${parentBusinessHtml(businessReport)}
     <div class="card">
       <h3>${t('parents.skills')} — ${esc(profile.name)}</h3>
       ${Object.entries(report.worlds).map(([w, info]) => info.skills.filter((s) => s.n > 0).map((s) => `
@@ -702,6 +1049,12 @@ export function showParents({ report, profile, onClose }) {
     </div>` : ''}
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
+  el.querySelector('[data-stage]')?.addEventListener('change', (e) => {
+    onCurriculumChange?.({ confirmedStage: e.target.value });
+  });
+  el.querySelector('[data-strictness]')?.addEventListener('change', (e) => {
+    onCurriculumChange?.({ strictness: e.target.value });
+  });
 }
 
 // ---------- chamber result ----------

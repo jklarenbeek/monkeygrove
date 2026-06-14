@@ -156,6 +156,18 @@ her worktable.
   plots/builds/NPCs in `chamber.js` (HubPlace), worktable + finale in
   `screens.js`, flow in `main.js`.
 
+## Bakery/Pizzeria business simulation
+After the bakery build is complete, the child can open a cozy shop scene. The
+existing helper animal models become customers: Tuk the Turtle, Pip the Bunny,
+Dot the Duckling, and Olli the Owl. Orders ask the child to prepare recipes,
+portion pizzas, measure ingredients, handle payment and change, watch stock,
+earn shop coins, and buy gentle upgrades.
+
+There is no timer, debt, loss spiral, or shame. Mistakes keep the customer
+waiting kindly and offer another try. The shop is child-facing as orders, ovens,
+coins, stock, and upgrades; parent-facing progress maps to `NL_PO` objectives
+for money, measurement, fractions, ratios, percentages, profit, and data.
+
 ## Hub island
 Walkable (same grid-hop tech as chambers). Your monkey + pets idle and wander;
 waves lap. Region portals are living gates that bloom with mastery (below). NPCs:
@@ -222,11 +234,12 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
 - WebAudio synth: cozy marimba/kalimba island loop, pentatonic SFX, rising
   combo tones, friendly "boop" for wrong (never a buzzer).
 
-## Build order (each step was shippable — 1–9 shipped, secrets/business sims pending)
+## Build order (each step was shippable — 1–10 shipped, secrets pending)
 1. Chamber + grid-hop player feel (touch-first) → 2. Fetch loop + juice +
 audio → 3. Math engine + distractors + Elo → 4. Array verb + Garden world →
 5. Save/streak/i18n → 6. Number line + Share verbs, Vines/Stump/Tide worlds →
 7. Gem tree, pets, shop, hub island → 8. Echo Doors, duel → 9. `NL_PO`
 curriculum spine, age-first Explorer placement, warm-up, curriculum-aware
-chambers, and parent coverage. Business simulations such as pizzeria/bakery
-shop play remain the next major design direction.
+chambers, and parent coverage → 10. Bakery/pizzeria shop simulation with
+helper customers, stock, upgrades, payment/change, recipe prep, and parent
+curriculum coverage from business-mode progress.

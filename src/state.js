@@ -3,6 +3,7 @@ import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
 import { createCurriculumState } from './curriculum/placement.js';
+import { createBusinessState, ensureBusinessState } from './business/engine.js';
 
 const KEY = 'monkeygrove.save';
 const VERSION = 1;
@@ -22,6 +23,7 @@ function freshProfile(name, opts = {}) {
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
     curriculum: createCurriculumState({ age: opts.age }),
+    business: createBusinessState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
     flags: {},
@@ -80,6 +82,7 @@ function migrate(s) {
     if (p.curriculum.warmup.completed === undefined) p.curriculum.warmup.completed = false;
     if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
     if (p.curriculum.warmup.skillIds === undefined) p.curriculum.warmup.skillIds = [];
+    ensureBusinessState(p);
   }
   s.v = VERSION;
   return s;

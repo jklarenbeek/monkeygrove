@@ -1111,12 +1111,85 @@ const oven = {
   ],
 };
 
+const counter = {
+  palette: { W: '#b08550', w: '#8a6238', T: '#e6c48a', t: '#caa06a' },
+  layers: [
+    ['WWWWWWWW', 'WWWWWWWW', 'WWWWWWWW'],
+    ['WwwwwwWW', 'W......W', 'WWwwwwWW'],
+    ['WWWWWWWW', 'W......W', 'WWWWWWWW'],
+    ['TTTTTTTT', 'TttttttT', 'TTTTTTTT'],
+  ],
+};
+
+const prepBoard = {
+  palette: { B: '#f2d7a2', b: '#cfab73', F: '#fff2d0' },
+  layers: [
+    ['.......', '.bbbbb.', '.bbbbb.', '.bbbbb.', '.......'],
+    ['.......', '.BBBBB.', '.BFFFB.', '.BBBBB.', '.......'],
+  ],
+};
+
+const pizzaPan = {
+  palette: { P: '#8f8f98', p: '#c9c9d1', C: '#f2c36b', R: '#d95f55' },
+  layers: [
+    ['.....', '.PPP.', 'PPPPP', '.PPP.', '.....'],
+    ['.....', '.pCp.', 'pCRCp', '.pCp.', '.....'],
+  ],
+};
+
+const doughBowl = {
+  palette: { B: '#8fc7d8', b: '#5fa2b8', D: '#fff1cc', d: '#e8cf9a' },
+  layers: [
+    ['.....', '.bbb.', 'bbbbb', '.bbb.', '.....'],
+    ['.....', '.BBB.', 'B...B', '.BBB.', '.....'],
+    ['.....', '..D..', '.DdD.', '..D..', '.....'],
+  ],
+};
+
+const toppingCrate = {
+  palette: { W: '#b08550', w: '#8a6238', R: '#e75d5d', G: '#7ccf7c', Y: '#ffd966' },
+  layers: [
+    ['WWWWWW', 'WWWWWW', 'WWWWWW', 'WWWWWW'],
+    ['WwWwWW', 'W....W', 'W....W', 'WWwWwW'],
+    ['......', '.R.G..', '..Y.R.', '......'],
+  ],
+};
+
+const coinTray = {
+  palette: { T: '#b8b2a8', t: '#948e84', G: '#f4c95d', g: '#d9a83f' },
+  layers: [
+    ['.....', '.ttt.', 'ttttt', '.ttt.', '.....'],
+    ['.....', '.TGT.', 'TGgGT', '.TGT.', '.....'],
+  ],
+};
+
+const orderBoard = {
+  palette: { W: '#8a6238', B: '#4a5a78', b: '#64789b', C: '#fff4e0', R: '#ef7d6d' },
+  layers: [
+    ['...W...', '...W...'],
+    ['...W...', '...W...'],
+    ['.BBBBB.', '.BCCCCB.'],
+    ['.BCCCBB', '.BCRCCB.'],
+    ['.BBBBB.', '.BBBBB.'],
+  ],
+};
+
+const shopTable = {
+  palette: { W: '#b08550', w: '#8a6238', T: '#d9b27c' },
+  layers: [
+    ['W.....W', '.......', '.......', 'W.....W'],
+    ['W.....W', '.......', '.......', 'W.....W'],
+    ['TTTTTTT', 'TTTTTTT', 'TTTTTTT', 'TTTTTTT'],
+  ],
+};
+
 export const PROPS = {
   palm, palmSmall, bush, flowerPink, flowerYellow, flowerBlue,
   pot, stone, altar, chestBase, chestLid, egg, basket, coconut,
   bananas, stump, gong, plank, portal, portalVine1, portalVine2, portalVine3,
   sign, rockA, rockB,
   lantern, shell, sprout, berry, stall, oven,
+  counter, prepBoard, pizzaPan, doughBowl, toppingCrate, coinTray, orderBoard, shopTable,
 };
 
 // ---------------------------------------------------------------------------

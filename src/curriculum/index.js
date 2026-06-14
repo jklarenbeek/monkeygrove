@@ -25,9 +25,27 @@ function skillMapFromReport(report) {
   return out;
 }
 
-export function coverageForReport(packId = 'NL_PO', report = null) {
+function businessCoverage(obj, businessReport) {
+  const modes = obj.businessModes || [];
+  if (!modes.length || !businessReport?.modes) return null;
+  if (modes.every((id) => businessReport.modes[id]?.coverage === 'covered')) return 'covered';
+  if (modes.some((id) => {
+    const coverage = businessReport.modes[id]?.coverage;
+    return coverage === 'partial' || coverage === 'covered';
+  })) return 'partial';
+  return null;
+}
+
+function mergeCoverage(...states) {
+  if (states.includes('covered')) return 'covered';
+  if (states.includes('partial')) return 'partial';
+  return 'playable';
+}
+
+export function coverageForReport(packId = 'NL_PO', report = null, opts = {}) {
   const pack = getPack(packId);
   const skills = skillMapFromReport(report);
+  const businessReport = opts.business || null;
   const domains = {};
   const statusCounts = { covered: 0, partial: 0, playable: 0, planned: 0 };
 
@@ -49,9 +67,11 @@ export function coverageForReport(packId = 'NL_PO', report = null) {
     const skillStates = gameSkills.map((id) => skills[id]).filter(Boolean);
     const mastered = skillStates.filter((s) => s.mastered).length;
     const practiced = skillStates.filter((s) => (s.n || 0) > 0).length;
+    const bySkills = mastered && mastered === gameSkills.length ? 'covered'
+      : practiced ? 'partial' : null;
+    const byBusiness = businessCoverage(obj, businessReport);
     const coverage = obj.status === 'planned' ? 'planned'
-      : mastered && mastered === gameSkills.length ? 'covered'
-        : practiced ? 'partial' : 'playable';
+      : mergeCoverage(bySkills, byBusiness);
 
     const entry = { ...obj, coverage };
     const domain = domains[obj.domain];

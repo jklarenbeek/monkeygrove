@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const screensSource = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
 const i18nSource = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 
 function mockStorage() {
   const data = new Map();
@@ -19,7 +20,24 @@ test('task 7 wiring exists for curriculum coverage on the parent screen', () => 
   assert.match(screensSource, /coverageForReport/);
   assert.match(screensSource, /getPack/);
   assert.match(screensSource, /curriculumCoverageHtml/);
-  assert.match(screensSource, /\$\{curriculumCoverageHtml\(profile, report\)\}/);
+  assert.match(screensSource, /businessReport = null/);
+  assert.match(screensSource, /coverageForReport\(pack\.id, report, \{ business: businessReport \}\)/);
+});
+
+test('task 8 parent business reporting is wired and translated', () => {
+  assert.match(screensSource, /businessReport/);
+  assert.match(screensSource, /parentBusinessHtml/);
+  assert.match(screensSource, /parentBusinessHtml\(businessReport\)/);
+  assert.match(mainSource, /dailyBusinessReport/);
+  assert.match(mainSource, /businessReport:\s*p\?\.business\s*\?\s*dailyBusinessReport\(p\.business\)\s*:\s*null/);
+
+  for (const key of [
+    'parents.business',
+    'business.profit',
+  ]) {
+    const n = i18nSource.split(`'${key}'`).length - 1;
+    assert.ok(n >= 2, `${key} needs EN and NL entries (found ${n})`);
+  }
 });
 
 test('task 7 i18n keys exist in english and dutch', () => {
@@ -40,6 +58,12 @@ test('task 7 i18n keys exist in english and dutch', () => {
     const n = i18nSource.split(`'${key}'`).length - 1;
     assert.ok(n >= 2, `${key} needs EN and NL entries (found ${n})`);
   }
+});
+
+test('parent curriculum controls expose stage and strictness change wiring', () => {
+  assert.match(screensSource, /data-stage/);
+  assert.match(screensSource, /data-strictness/);
+  assert.match(screensSource, /onCurriculumChange/);
 });
 
 test('showParents renders translated curriculum coverage without exposing internal ids', async () => {
@@ -95,7 +119,12 @@ test('showParents renders translated curriculum coverage without exposing intern
   globalThis.localStorage = mockStorage();
 
   try {
-    const { showParents } = await import('../src/screens.js');
+    const {
+      showBusinessOrder,
+      showBusinessPayment,
+      showBusinessPrep,
+      showParents,
+    } = await import('../src/screens.js');
     const { setLang } = await import('../src/i18n.js');
 
     const profile = {
@@ -135,6 +164,64 @@ test('showParents renders translated curriculum coverage without exposing intern
     assert.ok(!currentHtml.includes('nl_po.grade3.add_sub_to_20'));
     assert.ok(!currentHtml.includes('curriculum.domain.operations'));
     assert.ok(!currentHtml.includes('grade_5'));
+
+    showParents({
+      report,
+      profile,
+      businessReport: {
+        ordersServed: 3,
+        profitCents: 450,
+        modes: {
+          money_make_amounts: { coverage: 'covered' },
+          recipe_measure_whole: { coverage: 'partial' },
+        },
+      },
+      onClose() {},
+    });
+    assert.match(currentHtml, /Bakery\/pizzeria practice/);
+    assert.match(currentHtml, /3 orders served/);
+    assert.match(currentHtml, /Profit: 4\.50/);
+    assert.match(currentHtml, /Money amounts to 100 · covered/);
+    assert.match(currentHtml, /Measurement units · started/);
+    assert.ok(!currentHtml.includes('money_make_amounts'));
+    assert.ok(!currentHtml.includes('recipe_measure_whole'));
+
+    showParents({
+      report,
+      profile,
+      businessReport: { ordersServed: 0, profitCents: 0 },
+      onClose() {},
+    });
+    assert.match(currentHtml, /Bakery\/pizzeria practice/);
+    assert.ok(!currentHtml.includes('undefined'));
+
+    const task = {
+      id: 'pay',
+      kind: 'payment',
+      mode: 'money_make_amounts',
+      objectiveId: 'nl_po.grade4.money_to_100',
+      expected: { amountCents: 450, paidCents: 500, changeCents: 50 },
+    };
+    showBusinessOrder({
+      order: { recipeId: 'margherita', priceCents: 450, tasks: [task] },
+      customerName: 'Sam',
+      activeTask: task,
+      onCloseDay() {},
+    });
+    assert.ok(!currentHtml.includes('money_make_amounts'));
+    assert.ok(!currentHtml.includes('grade_4'));
+
+    showBusinessPrep({
+      task: { ...task, kind: 'prep', mode: 'recipe_measure_whole', objectiveId: 'nl_po.grade5.measurement_units_intro' },
+      onSubmit() {},
+      onClose() {},
+    });
+    assert.ok(!currentHtml.includes('recipe_measure_whole'));
+    assert.ok(!currentHtml.includes('grade_5'));
+
+    showBusinessPayment({ task, onSubmit() {}, onClose() {} });
+    assert.ok(!currentHtml.includes('money_make_amounts'));
+    assert.ok(!currentHtml.includes('grade_4'));
 
     setLang('nl');
     showParents({ report, profile, onClose() {} });

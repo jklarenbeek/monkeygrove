@@ -31,6 +31,10 @@ src/
     nl_po.js            first curriculum pack: Dutch primary arithmetic objectives
     placement.js        age-to-stage estimate, warm-up scoring, eligible skill window
     index.js            pack registry, objective filtering, coverage summaries
+  business/
+    data.js             helper customers, recipes, ingredients, upgrades, business modes
+    engine.js           pure orders, prep/payment checks, stock, profit, upgrades, reports
+    scene.js            bakery/pizzeria place with helper-customer queue and shop stations
   verbs.js              the four math interactions (fetch / array / number line / share)
   island.js             pure logic: restoration blueprints, mastery gating, funding, perks
   mimi.js               Mimi's conversation ladder (most useful advice first)
@@ -118,7 +122,7 @@ still speaks in islands, quests, helpers, and treasures.
 ```js
 getPack('NL_PO') -> curriculum pack metadata and objectives
 listObjectives(packId, filters?) -> objectives by status/stage/domain
-coverageForReport(packId, masteryReport) -> parent-facing domain/objective coverage
+coverageForReport(packId, masteryReport, { business? }) -> parent-facing coverage
 
 createCurriculumState({ age? }) -> profile.curriculum defaults
 estimateStageFromAge(packId, age) -> 'grade_1'..'grade_8' | null
@@ -131,7 +135,9 @@ eligibleSkillIds(curriculum) -> skill ids for the soft current-stage window
 internally (`grade_5`, `operations`, `measurement_geometry`); Dutch and English
 labels live in `i18n.js`. The default targeting window is soft: previous,
 current, and next stage playable objectives are eligible unless parent policy
-later tightens `strictness`.
+tightens `strictness`. Business-mode progress can also contribute to objective
+coverage for mapped money, measurement, fraction, ratio, percentage, profit, and
+data objectives.
 
 ## Save format (versioned)
 ```js
@@ -153,6 +159,13 @@ monkeygrove.save = {
       placementBand,                        // unknown | below | on_track | ahead
       strictness,                           // soft by default
       warmup: { completed, results, skillIds, scored? },
+    },
+    business: {
+      level, shopCoins, stock, stockLimit, upgrades,
+      currentDay, activeOrder, queue,
+      progress: { [businessMode]: { attempts, correct } },
+      day: { ordersServed, revenueCents, costCents, profitCents, wasteCents, demand },
+      history: [{ recipeId, customerId, priceCents, costCents, profitCents, t }],
     },
     math:    { skills: { [skillId]: { r, n, hist } },     // Elo rating, attempts, last-10
                facts:  { '7x8': { n, ok, lastOk } },      // gem lit = ok ≥ 3 && lastOk
@@ -184,6 +197,10 @@ blob in `monkeygrove.backup`.
   debug forced-skill paths remain deterministic and unchanged.
 - The parent screen renders `coverageForReport(...)` beside the existing skill
   overview, with translated pack, stage, domain, objective, and status labels.
+- Once the bakery is built, tapping it opens the pizzeria/bakery simulation.
+  Business orders use the existing helper animal models as customers, mutate
+  only `profile.business`, and report mapped objective progress back to the
+  parent curriculum coverage.
 
 ## Determinism
 Chamber layout generation/variation and duels flow through `rng.js` (mulberry32):

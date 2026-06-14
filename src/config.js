@@ -58,6 +58,18 @@ export const BALANCE = {
   hatRandomChestChance: 0.05,
   streakFreezePrice: 40,
   petBananaBonus: 0.1,              // +10% bananas with a pet equipped
+  businessOrdersPerDay: 4,
+  businessMaxQueue: 3,
+  businessBananaReward: [2, 4],
+  businessStartingStock: {
+    dough: 6,
+    sauce: 6,
+    cheese: 6,
+    tomato: 4,
+    flour: 6,
+    berries: 4,
+    milk: 4,
+  },
 };
 
 export const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 12, legendary: 3 };
