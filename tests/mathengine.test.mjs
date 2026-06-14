@@ -378,6 +378,35 @@ test('selection: prereqs gate focus; mix is ~70/20/10', () => {
   assert.ok(counts.add_20 > 40, `review ${counts.add_20}`);
 });
 
+test('selection: allowedSkills constrains world focus when possible', () => {
+  const m = createMathState();
+  const rng = new Rng(123);
+  for (let i = 0; i < 20; i++) {
+    const p = nextProblem(m, { world: 'garden', allowedSkills: ['tables_b'], rng });
+    assert.equal(p.skillId, 'tables_b');
+    validateProblem(p);
+  }
+});
+
+test('selection: allowedSkills falls back to normal world focus when empty for world', () => {
+  const m = createMathState();
+  const p = nextProblem(m, { world: 'tide', allowedSkills: ['tables_b'], rng: new Rng(5) });
+  assert.equal(p.world, 'tide');
+  assert.ok(['add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100'].includes(p.skillId));
+  validateProblem(p);
+});
+
+test('selection: forced skill still works with allowedSkills', () => {
+  const m = createMathState();
+  const p = nextProblem(m, {
+    skill: 'frac_magnitude',
+    allowedSkills: ['add_20'],
+    rng: new Rng(9),
+  });
+  assert.equal(p.skillId, 'frac_magnitude');
+  validateProblem(p);
+});
+
 test('selection: refresh can pull mastered skills from other worlds', () => {
   const m = createMathState();
   master(m, 'add_20');

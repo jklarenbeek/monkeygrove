@@ -1,15 +1,16 @@
-// Save/load, profiles, settings, streak, economy. localStorage under monkeymath.*
+// Save/load, profiles, settings, streak, economy. localStorage under monkeygrove.*
 import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
+import { createCurriculumState } from './curriculum/placement.js';
 
-const KEY = 'monkeymath.save';
+const KEY = 'monkeygrove.save';
 const VERSION = 1;
 
 let save = null;
 let saveTimer = null;
 
-function freshProfile(name) {
+function freshProfile(name, opts = {}) {
   return {
     id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
     name,
@@ -20,6 +21,7 @@ function freshProfile(name) {
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
+    curriculum: createCurriculumState({ age: opts.age }),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
     flags: {},
@@ -53,7 +55,7 @@ export function loadSave() {
       }
     }
   } catch (e) {
-    try { localStorage.setItem('monkeymath.backup', localStorage.getItem(KEY) || ''); } catch {}
+    try { localStorage.setItem('monkeygrove.backup', localStorage.getItem(KEY) || ''); } catch {}
   }
   save = freshSave();
   return save;
@@ -65,11 +67,26 @@ function migrate(s) {
   const ref = freshProfile('x');
   for (const p of s.profiles) {
     for (const k of Object.keys(ref)) if (p[k] === undefined) p[k] = structuredClone(ref[k]);
+    if (!isObject(p.stats)) p.stats = structuredClone(ref.stats);
+    if (!isObject(p.avatar)) p.avatar = structuredClone(ref.avatar);
     for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
     for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
+    if (!isObject(p.curriculum)) p.curriculum = createCurriculumState();
+    const cref = createCurriculumState({ age: p.curriculum.ageAtStart });
+    for (const k of Object.keys(cref)) {
+      if (p.curriculum[k] === undefined) p.curriculum[k] = structuredClone(cref[k]);
+    }
+    if (!isObject(p.curriculum.warmup)) p.curriculum.warmup = {};
+    if (p.curriculum.warmup.completed === undefined) p.curriculum.warmup.completed = false;
+    if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
+    if (p.curriculum.warmup.skillIds === undefined) p.curriculum.warmup.skillIds = [];
   }
   s.v = VERSION;
   return s;
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function persist() {
@@ -94,9 +111,9 @@ export function activeProfile() {
   return s.profiles.find((p) => p.id === s.activeProfile) || null;
 }
 
-export function createProfile(name) {
+export function createProfile(name, opts = {}) {
   const s = loadSave();
-  const p = freshProfile(name);
+  const p = freshProfile(name, opts);
   s.profiles.push(p);
   s.activeProfile = p.id;
   persistNow();

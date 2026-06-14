@@ -1,11 +1,13 @@
 // Full-screen DOM overlays: title, story, settings, shop, pets, gem tree,
 // parents, chamber results, duel. One active screen at a time in #screens.
 import { t, setLang } from './i18n.js';
+import { languageButton } from './langFlags.js';
 import { audio } from './audio.js';
 import {
   settings, profiles, activeProfile, createProfile, selectProfile, deleteProfile,
   spendBananas, ownItem, equip, persist, persistNow,
 } from './state.js';
+import { coverageForReport, getPack } from './curriculum/index.js';
 import { HATS, FURS, TRAILS, PETS } from './models.js';
 import { RARITY_STARS, BALANCE } from './config.js';
 
@@ -66,8 +68,8 @@ export function showAttract({ onStart, onParents, onDuel }) {
         <div class="attract-prompt">${t('attract.prompt')}</div>
         <div class="menu-row attract-menu" id="attract-menu">
           <div class="lang-toggle">
-            <button class="round-btn ${s.lang === 'en' ? 'active' : ''}" data-lang="en">🇬🇧</button>
-            <button class="round-btn ${s.lang === 'nl' ? 'active' : ''}" data-lang="nl">🇳🇱</button>
+            ${languageButton('en', s.lang)}
+            ${languageButton('nl', s.lang)}
           </div>
           ${ps.length >= 2 ? `<button class="btn soft" id="btn-duel">⚔️ ${t('title.duel')}</button>` : ''}
           <button class="btn soft" id="btn-parents">${t('title.parents')}</button>
@@ -173,16 +175,19 @@ export function showTitle({ onPlay, onParents, onDuel }) {
           <div class="t-name">${t('title.new_player')}</div>
         </div>
       </div>
-      <div id="new-player-row" class="hidden" style="margin-top:12px;display:flex;gap:8px">
+      <div id="new-player-row" class="new-player-form hidden">
         <input id="new-name" maxlength="14" placeholder="${t('title.name_prompt')}"
           style="flex:1;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
+        <input id="new-age" type="number" min="4" max="13" inputmode="numeric" placeholder="${t('title.age_prompt')}"
+          style="width:140px;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
         <button class="btn green" id="new-go">${t('title.start')}</button>
+        <div class="form-help">${t('title.age_help')}</div>
       </div>
     </div>
     <div class="menu-row">
       <div class="lang-toggle">
-        <button class="round-btn ${s.lang === 'en' ? 'active' : ''}" data-lang="en">🇬🇧</button>
-        <button class="round-btn ${s.lang === 'nl' ? 'active' : ''}" data-lang="nl">🇳🇱</button>
+        ${languageButton('en', s.lang)}
+        ${languageButton('nl', s.lang)}
       </div>
       ${ps.length >= 2 ? `<button class="btn soft" id="btn-duel">⚔️ ${t('title.duel')}</button>` : ''}
       <button class="btn soft" id="btn-parents">${t('title.parents')}</button>
@@ -205,12 +210,15 @@ export function showTitle({ onPlay, onParents, onDuel }) {
   });
   const go = () => {
     const name = el.querySelector('#new-name').value.trim() || 'Monkey';
-    const p = createProfile(name);
+    const ageValue = Number(el.querySelector('#new-age').value);
+    const age = Number.isFinite(ageValue) && ageValue >= 4 && ageValue <= 13 ? ageValue : null;
+    const p = createProfile(name, { age });
     audio.sfx('correct');
     onPlay(p.id, true);
   };
   el.querySelector('#new-go').addEventListener('click', go);
   el.querySelector('#new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  el.querySelector('#new-age').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
       setLang(b.dataset.lang); persistNow();
@@ -246,6 +254,98 @@ export function showStory(onDone) {
   });
 }
 
+export function showWarmup({ problems, onAnswer, onDone, onSkip }) {
+  let started = false;
+  let finished = false;
+  let i = 0;
+  let answered = false;
+
+  const finish = (fn) => {
+    if (finished) return false;
+    finished = true;
+    fn?.();
+    return true;
+  };
+
+  const renderProblem = () => {
+    answered = false;
+    const problem = problems[i];
+    const choices = Array.isArray(problem?.choices) ? problem.choices : [];
+    const el = render(`
+      <div style="flex:1"></div>
+      <h2>${t('placement.title')}</h2>
+      <div class="tagline">${t('placement.body')}</div>
+      <div class="card placement-card">
+        <div class="placement-eq">${formatWarmupEquation(problem?.equation || '')}</div>
+        <div class="tile-grid">
+          ${choices.map((choice) => `
+            <button class="tile pressable warmup-choice" data-value="${esc(String(choice.value))}" aria-label="${t('placement.answer')} ${esc(String(choice.value))}">
+              <div class="t-icon">✨</div>
+              <div class="t-name">${esc(String(choice.value))}</div>
+              <div class="t-price">${t('placement.answer')}</div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="menu-row">
+        <button class="btn soft" id="warmup-skip">${t('placement.skip')}</button>
+      </div>
+      <div style="flex:2"></div>
+    `);
+
+    for (const btn of el.querySelectorAll('[data-value]')) {
+      btn.addEventListener('click', () => {
+        if (finished || answered) return;
+        answered = true;
+        for (const other of el.querySelectorAll('[data-value]')) other.disabled = true;
+        const correct = String(btn.dataset.value) === String(problem.answer);
+        onAnswer({ problem, correct });
+        i += 1;
+        if (i >= problems.length) {
+          flash(t('placement.done'));
+          finish(onDone);
+          return;
+        }
+        renderProblem();
+      });
+    }
+    el.querySelector('#warmup-skip')?.addEventListener('click', () => finish(onSkip));
+  };
+
+  const renderIntro = () => {
+    const el = render(`
+      <div style="flex:1"></div>
+      <h2>${t('placement.title')}</h2>
+      <div class="tagline">${t('placement.body')}</div>
+      <div class="card placement-card">
+        <div class="placement-eq"><span class="slot">?</span> <span aria-hidden="true">+</span> <span class="slot">?</span></div>
+      </div>
+      <div class="menu-row">
+        <button class="btn green" id="warmup-start">${t('placement.start')}</button>
+        <button class="btn soft" id="warmup-skip">${t('placement.skip')}</button>
+      </div>
+      <div style="flex:2"></div>
+    `);
+    el.querySelector('#warmup-start')?.addEventListener('click', () => {
+      if (finished || started) return;
+      started = true;
+      for (const btn of el.querySelectorAll('button')) btn.disabled = true;
+      if (!problems.length) {
+        finish(onSkip);
+        return;
+      }
+      renderProblem();
+    });
+    el.querySelector('#warmup-skip')?.addEventListener('click', () => finish(onSkip));
+  };
+
+  if (!started || !problems.length) renderIntro();
+}
+
+function formatWarmupEquation(equation) {
+  return esc(equation).replace(/\?/g, '<span class="slot">?</span>');
+}
+
 // ---------- settings ----------
 
 export function showSettings({ onClose, onSwitchPlayer, onLangChange }) {
@@ -258,8 +358,8 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange }) {
         <div class="menu-row" style="align-items:center">
           <span style="font-weight:800">${t('settings.lang')}</span>
           <div class="lang-toggle">
-            <button class="round-btn ${s.lang === 'en' ? 'active' : ''}" data-lang="en">🇬🇧</button>
-            <button class="round-btn ${s.lang === 'nl' ? 'active' : ''}" data-lang="nl">🇳🇱</button>
+            ${languageButton('en', s.lang)}
+            ${languageButton('nl', s.lang)}
           </div>
         </div>
         <div class="menu-row">
@@ -549,12 +649,46 @@ export function showGems({ report, onClose }) {
 
 // ---------- parents ----------
 
+function stageLabel(pack, stageId) {
+  const stage = pack.stages.find((s) => s.id === stageId);
+  return stage ? t(stage.labelKey) : t(pack.fallbackStagePrefixKey || 'curriculum.stage', { n: '?' });
+}
+
+function curriculumCoverageHtml(profile, report) {
+  if (!profile?.curriculum || !report) return '';
+  const pack = getPack(profile.curriculum.packId);
+  const coverage = coverageForReport(pack.id, report);
+  const stage = profile.curriculum.confirmedStage || profile.curriculum.estimatedStage;
+  return `
+    <div class="card">
+      <h3>${esc(t('parents.curriculum'))}</h3>
+      <div class="curriculum-meta">
+        <div class="chip">${esc(t('parents.curriculum_pack'))}: ${esc(t(pack.titleKey))}</div>
+        <div class="chip">${esc(t('parents.stage'))}: ${esc(stageLabel(pack, stage))}</div>
+      </div>
+      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:8px">${esc(t('parents.coverage'))}</div>
+      ${Object.values(coverage.domains).filter((d) => d.total > 0).map((d) => `
+        <div class="curriculum-domain">
+          <div class="skill-row">
+            <div class="s-name">${esc(t(d.labelKey))}</div>
+            <div class="s-bar"><div class="s-fill" style="width:${Math.round((d.covered / Math.max(1, d.total)) * 100)}%"></div></div>
+            <div class="curriculum-count">${d.covered}/${d.total}</div>
+          </div>
+          <div class="curriculum-objectives">
+            ${d.objectives.map((o) => `<span class="curriculum-pill ${o.coverage}">${esc(t(o.titleKey))} · ${esc(t(`parents.${o.coverage}`))}</span>`).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
 export function showParents({ report, profile, onClose }) {
   const el = render(`
     ${backBtn()}
     <h2>${t('parents.title')}</h2>
     <div class="card"><p style="margin:0;font-size:15px;line-height:1.5">${t('parents.body')}</p></div>
     ${profile && report ? `
+    ${curriculumCoverageHtml(profile, report)}
     <div class="card">
       <h3>${t('parents.skills')} — ${esc(profile.name)}</h3>
       ${Object.entries(report.worlds).map(([w, info]) => info.skills.filter((s) => s.n > 0).map((s) => `

@@ -695,11 +695,18 @@ function chooseKind(skillId, s, forced, rng) {
 
 // ---------- selection ----------
 
+function allowedSetForWorld(allowedSkills, world) {
+  if (!Array.isArray(allowedSkills) || !allowedSkills.length) return null;
+  const set = new Set(allowedSkills.filter((id) => SKILLS[id]?.world === world));
+  return set.size ? set : null;
+}
+
 // Linear prereqs => the first unmastered skill in a world has its prereqs met.
-function focusSkill(math, world) {
-  const ids = LADDER[world];
+function focusSkill(math, world, allowedSkills = null) {
+  const allowed = allowedSetForWorld(allowedSkills, world);
+  const ids = LADDER[world].filter((id) => !allowed || allowed.has(id));
   for (const id of ids) if (!isMastered(math.skills[id])) return id;
-  return ids[ids.length - 1];
+  return ids[ids.length - 1] ?? LADDER[world][0];
 }
 
 function lastPracticed(math, skillId) {
@@ -778,17 +785,21 @@ export function nextProblem(math, opts = {}) {
   if (opts.skill && SKILLS[opts.skill]) {
     skillId = opts.skill;
   } else if (opts.echo) {
-    skillId = echoSkill(math) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS));
+    skillId = echoSkill(math) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills);
   } else {
     const world = opts.world && WORLDS.includes(opts.world) ? opts.world : rng.pick(WORLDS);
-    const focus = focusSkill(math, world);
+    const focus = focusSkill(math, world, opts.allowedSkills);
+    const allowed = allowedSetForWorld(opts.allowedSkills, world);
     const roll = rng.float();
     if (roll < 0.7) {
       skillId = focus;
     } else if (roll < 0.9) {
-      skillId = LADDER[world][SKILLS[focus].order - 1] ?? focus;
+      const prev = LADDER[world][SKILLS[focus].order - 1] ?? focus;
+      skillId = !allowed || allowed.has(prev) ? prev : focus;
     } else {
-      const mastered = Object.keys(SKILLS).filter((id) => id !== focus && isMastered(math.skills[id]));
+      const mastered = Object.keys(SKILLS).filter((id) => id !== focus
+        && isMastered(math.skills[id])
+        && (!allowed || allowed.has(id)));
       skillId = mastered.length ? rng.pick(mastered) : focus;
     }
   }

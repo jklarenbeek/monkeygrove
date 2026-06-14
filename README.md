@@ -7,9 +7,11 @@ The Crab King pinched all the island's numbers, and the grove faded to gray.
 Chamber by chamber, children bring the numbers home: the gates bloom, Mimi finds
 new blueprints, pets hatch, and the island comes back to life.
 
-Monkey Grove is built for children around 9-12 who find math stressful. It uses
-visual, forgiving play instead of timed quizzes: arrays, fair sharing, number
-lines, place-value models, and friendly explanations after mistakes.
+Monkey Grove is built for children who find math stressful, especially Dutch
+primary-school learners working through the `NL_PO` arithmetic path. New
+Explorers can enter their age so the island can start near the right level, then
+a short warm-up helps Mimi tune the first quests. The child sees playful worlds
+and quests; parents can see the school-stage mapping and curriculum coverage.
 
 ## Play
 
@@ -19,7 +21,7 @@ Play the published build here:
 
 The game runs fully in the browser. There are no accounts, no ads, and no server
 backend. Progress is saved on the device in `localStorage` under
-`monkeymath.save`.
+`monkeygrove.save`.
 
 ## What Is In The Game
 
@@ -38,6 +40,13 @@ backend. Progress is saved on the device in `localStorage` under
   - Problems target roughly 65% expected success
   - Visual scaffolds fade as mastery grows and return when needed
   - Misconception-tagged wrong answers trigger targeted visual explanations
+- **Curriculum-aware onboarding**
+  - New Explorers can enter an optional age from 4-13
+  - The first shipped curriculum pack is `NL_PO` for Dutch primary arithmetic
+  - Age estimates a Dutch school stage; warm-up results softly adjust the band
+  - English and Dutch UI can both run over the Dutch curriculum path
+  - Generic fallback labels exist, but other country mappings are not claimed
+    until their packs are defined
 - **Island progression**
   - Mastery unlocks Mimi's blueprints
   - Bananas fund builds such as lanterns, fruit stand, garden, stage, bakery, bridge, and festival plaza
@@ -136,17 +145,20 @@ src/
   audio.js          procedural WebAudio music and SFX
 
   mathengine.js     pure adaptive math engine and mastery report
+  curriculum/       NL_PO pack, age placement, warm-up scoring, coverage, eligibility
   verbs.js          fetch, array, number-line, and share interactions
   island.js         restoration blueprints, gating, funding, daily perks
   mimi.js           Mimi's advice ladder
   state.js          save/load, profiles, settings, streaks, economy
   i18n.js           English and Dutch dictionaries
+  langFlags.js      accessible drawn language flags for EN/NL toggles
   hud.js            equation banner, chips, speech bubble, toasts, panels
-  screens.js        title, settings, shop, pets, gem tree, parents, results
+  screens.js        title, warm-up, settings, shop, pets, gem tree, parents, results
   duel.js           hot-seat duel mode and challenge codes
   rng.js            seeded PRNG
 
-tests/              Vitest suites for math, chambers, island, Mimi, models, portals
+tests/              Vitest suites for math, curriculum, state, UI wiring, chambers,
+                    island, Mimi, models, portals
 docs/               research notes and retro-game inspiration
 DESIGN.md           canonical game design document
 ARCHITECTURE.md     technical architecture notes
@@ -160,10 +172,14 @@ Monkey Grove follows a few simple principles:
 - Mistakes are diagnostic, not punitive.
 - Visual models appear in the world: arrays, baskets, number lines, and place-value strips.
 - Practice adapts per skill and includes spaced review.
+- Curriculum targeting is soft by default: previous, current, and next stage
+  skills stay available so the adaptive engine can still meet the learner where
+  they are.
 - Long-term progress is visible through island restoration, pets, cosmetics, and the Gem Tree.
 
-The parent screen in the game shows recent accuracy, attempts, and mastery per
-skill for the active profile.
+The parent screen in the game shows the active profile's `NL_PO` learning path,
+estimated or confirmed school stage, curriculum coverage by domain and
+objective, plus recent accuracy, attempts, and mastery per skill.
 
 ## Privacy
 

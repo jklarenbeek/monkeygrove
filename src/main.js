@@ -16,6 +16,7 @@ import {
   loadSave, settings, activeProfile, selectProfile, touchDailyStreak,
   addBananas, addEggPoints, hatchEgg, persist, persistNow, todayString,
 } from './state.js';
+import { applyWarmupResult, eligibleSkillIds } from './curriculum/placement.js';
 import {
   islandStatus, newBlueprints, markSeen, fund as fundIsland, buildById,
   grantDailyPerks, BUILDS,
@@ -150,15 +151,15 @@ class Game {
       onPlay: (pid, isNew) => {
         this.profile = selectProfile(pid);
         if (!this.profile) return;
-        if (isNew || !this.profile.flags.introSeen) {
-          screens.showStory(() => {
-            this.profile.flags.introSeen = true;
-            persist();
-            this.startHub();
-          });
-        } else {
-          this.startHub();
-        }
+        const continueFromIntro = () => {
+          this.profile.flags.introSeen = true;
+          persist();
+          if (this.needsWarmup()) this.startWarmupThenHub();
+          else this.startHub();
+        };
+        if (isNew || !this.profile.flags.introSeen) screens.showStory(continueFromIntro);
+        else if (this.needsWarmup()) this.startWarmupThenHub();
+        else this.startHub();
       },
       onParents: showParents,
       onDuel: () => this.startDuelSetup(),
@@ -168,6 +169,62 @@ class Game {
       onStart: showPlayerSelect,
       onParents: showParents,
       onDuel: () => this.startDuelSetup(),
+    });
+  }
+
+  needsWarmup(profile = this.profile) {
+    return profile?.curriculum?.ageAtStart != null && !profile.curriculum?.warmup?.completed;
+  }
+
+  startWarmupThenHub() {
+    let settled = false;
+    const finishWarmup = (fn) => {
+      if (settled) return;
+      settled = true;
+      fn?.();
+    };
+    const savedWarmup = this.profile.curriculum?.warmup || {};
+    const savedSkills = Array.isArray(savedWarmup.skillIds) ? savedWarmup.skillIds.slice(0, 3) : [];
+    const probeSkills = savedSkills.length
+      ? savedSkills
+      : eligibleSkillIds(this.profile.curriculum).slice(0, 3);
+    const skillIds = probeSkills.length ? probeSkills : ['add_20', 'sub_20', 'tables_a'];
+    const results = Array.isArray(savedWarmup.results)
+      ? savedWarmup.results.slice(0, skillIds.length)
+      : [];
+    if (results.length >= skillIds.length) {
+      this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
+      persist();
+      finishWarmup(() => this.startHub());
+      return;
+    }
+    const problems = skillIds.map((skill, i) => nextProblem(this.profile.math, {
+      skill,
+      kind: 'fetch',
+      rng: new Rng(`warmup:${this.profile.id}:${skill}:${i}`),
+    })).slice(results.length);
+
+    screens.showWarmup({
+      problems,
+      onAnswer: ({ problem, correct }) => {
+        results.push({ skill: problem.skillId, correct });
+        recordResult(this.profile.math, problem, { correct, ms: 0, usedHint: false });
+        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, {
+          completed: false,
+          skillIds,
+        });
+        persist();
+      },
+      onDone: () => {
+        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
+        persist();
+        finishWarmup(() => this.startHub());
+      },
+      onSkip: () => {
+        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
+        persist();
+        finishWarmup(() => this.startHub());
+      },
     });
   }
 
@@ -516,7 +573,10 @@ class Game {
     if (this.duel) {
       problem = this.duel.nextProblem();
     } else {
-      const opts = this.isEcho ? { echo: true } : { world: this.currentWorld };
+      const allowedSkills = eligibleSkillIds(this.profile.curriculum);
+      const opts = this.isEcho
+        ? { echo: true, allowedSkills }
+        : { world: this.currentWorld, allowedSkills };
       problem = ensureHostable(nextProblem(this.profile.math, opts), this.profile.math, opts);
     }
     this.buildChamber(problem);
@@ -834,9 +894,10 @@ class Game {
         if (this.duel) {
           next = this.duel.nextProblem();
         } else {
+          const allowedSkills = eligibleSkillIds(this.profile.curriculum);
           const opts = this.isEcho
-            ? { echo: true, kind: this.problem.kind }
-            : { world: this.currentWorld, kind: this.problem.kind };
+            ? { echo: true, kind: this.problem.kind, allowedSkills }
+            : { world: this.currentWorld, kind: this.problem.kind, allowedSkills };
           next = ensureHostable(nextProblem(this.profile.math, opts), this.profile.math, opts);
         }
         // the chamber was built for problem 1's verb; reroute kinds the
@@ -844,11 +905,17 @@ class Game {
         // can't simply be re-labelled 'fetch' — regenerate it properly.
         if (next.kind !== this.problem.kind && !this.canHost(next.kind)) {
           if (this.canHost('fetch')) {
+            const allowedSkills = eligibleSkillIds(this.profile.curriculum);
             next = next.choices
               ? { ...next, kind: 'fetch' }
               : ensureHostable(
-                nextProblem(this.profile.math, { world: next.world, skill: next.skillId, kind: 'fetch' }),
-                this.profile.math, { world: next.world },
+                nextProblem(this.profile.math, {
+                  world: next.world,
+                  skill: next.skillId,
+                  kind: 'fetch',
+                  allowedSkills,
+                }),
+                this.profile.math, { world: next.world, allowedSkills },
               );
           } else {
             next = { ...next, kind: this.problem.kind };
@@ -1262,8 +1329,8 @@ class Game {
     if (!IS_TOUCH || this.gestureHintDone) return;
     this.gestureHintDone = true;   // once per session, even if storage is unavailable
     try {
-      if (localStorage.getItem('monkeymath.gestureHint')) return; // shown on a past visit
-      localStorage.setItem('monkeymath.gestureHint', '1');
+      if (localStorage.getItem('monkeygrove.gestureHint')) return; // shown on a past visit
+      localStorage.setItem('monkeygrove.gestureHint', '1');
     } catch { /* private mode: the session flag above still holds it to one toast */ }
     delay(1200, () => hud.toast(t('hint.pinch')));
   }

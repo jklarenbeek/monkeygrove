@@ -231,6 +231,25 @@ html, body {
 .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 8px; }
 .menu-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
+.new-player-form {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.new-player-form.hidden {
+  display: none;
+}
+
+.form-help {
+  flex-basis: 100%;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* grid of purchasables / pets / profiles */
 .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
 .tile {
@@ -246,6 +265,21 @@ html, body {
 .tile .t-name { font-size: 13px; font-weight: 800; }
 .tile .t-price { font-size: 13px; font-weight: 900; color: var(--ink-soft); }
 .tile .t-rarity { position: absolute; top: 5px; right: 7px; font-size: 12px; }
+
+.placement-card {
+  text-align: center;
+}
+
+.placement-eq {
+  font-size: clamp(28px, 6vw, 54px);
+  font-weight: 950;
+  margin-bottom: 16px;
+}
+
+.warmup-choice {
+  border: 0;
+  font-family: inherit;
+}
 
 /* gem tree */
 #gem-grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; width: min(94vw, 520px); }
@@ -263,6 +297,46 @@ html, body {
 .skill-row .s-bar { flex: 2; height: 14px; background: #e7d9bf; border-radius: 999px; overflow: hidden; }
 .skill-row .s-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--sky), var(--leaf)); transition: width .6s; }
 .skill-row .s-star { width: 26px; text-align: center; font-size: 17px; }
+
+.curriculum-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.curriculum-domain {
+  margin: 10px 0 14px;
+}
+
+.curriculum-count {
+  min-width: 48px;
+  text-align: right;
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.curriculum-objectives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.curriculum-pill {
+  border: 2px solid var(--cream-2);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fffaf0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.curriculum-pill.covered { border-color: #75c878; }
+.curriculum-pill.partial { border-color: #f4c95d; }
+.curriculum-pill.playable { border-color: #8fd0e8; }
+.curriculum-pill.planned { opacity: .65; }
 
 /* world select cards on hub */
 .world-pill {
@@ -372,6 +446,31 @@ html, body {
 .lang-toggle { display: flex; gap: 6px; }
 .lang-toggle button { font-size: 22px; }
 .lang-toggle button.active { outline: 4px solid var(--sun); }
+.lang-btn { padding: 0; }
+.flag-icon {
+  width: 31px; height: 22px; border-radius: 4px; overflow: hidden;
+  display: inline-block; border: 2px solid rgba(74, 63, 53, .2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .45);
+}
+.flag-nl {
+  background: linear-gradient(
+    #ae1c28 0 33.333%,
+    #fff 33.333% 66.666%,
+    #21468b 66.666% 100%
+  );
+}
+.flag-gb {
+  background:
+    linear-gradient(90deg, transparent 41%, #fff 41% 59%, transparent 59%),
+    linear-gradient(transparent 36%, #fff 36% 64%, transparent 64%),
+    linear-gradient(90deg, transparent 46%, #c8102e 46% 54%, transparent 54%),
+    linear-gradient(transparent 43%, #c8102e 43% 57%, transparent 57%),
+    linear-gradient(28deg, transparent 47%, #fff 47% 53%, transparent 53%),
+    linear-gradient(-28deg, transparent 47%, #fff 47% 53%, transparent 53%),
+    linear-gradient(28deg, transparent 49%, #c8102e 49% 51%, transparent 51%),
+    linear-gradient(-28deg, transparent 49%, #c8102e 49% 51%, transparent 51%),
+    #012169;
+}
 
 /* small screens */
 @media (max-width: 480px) {

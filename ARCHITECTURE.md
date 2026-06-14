@@ -3,26 +3,34 @@
 ## Hard constraints
 - **Vite** for dev/build/preview (`npm run dev|build|preview`), **vitest** for tests
   (`npm test`); deployed to GitHub Pages via `npm run deploy` (gh-pages branch,
-  base path `/monkeymath/`).
+  base path `/monkeygrove/`).
 - **No network dependencies at runtime** once built; three.js comes from npm and
   is bundled. No server, no accounts.
-- **All state in localStorage** under the `monkeymath.*` key namespace.
+- **All state in localStorage** under the `monkeygrove.*` key namespace.
 - **Targets:** mid-range laptop (Chrome/Firefox/Safari) and tablet/phone browsers. 60fps desktop, 30fps+ mobile.
 - **Inputs:** keyboard (arrows/WASD hop, Space/Enter act, E hint), mouse click on tiles, touch (tap tile / swipe).
 - **Bilingual EN/NL**, auto-detected from `navigator.language`, switchable in settings.
+  The first curriculum pack is Dutch primary arithmetic (`NL_PO`); English UI is
+  also supported for English-speaking children in the Netherlands. Other country
+  mappings are not claimed until their packs are defined.
 
 ## File layout
 ```
 index.html              SPA shell: canvas + DOM overlay layers (Vite entry)
-vite.config.js          base '/monkeymath/', vitest config
+vite.config.js          base '/monkeygrove/', vitest config
 src/
   main.js               game controller: boot, RAF loop, chamber/hub flow, input, juice
   config.js             central knobs: palette, world themes (accent/bloom colors),
                         grid metrics, timings, balance, portal growth stages, QUALITY
   i18n.js               t(key, vars) helper + EN/NL dictionaries
+  langFlags.js          accessible drawn flag buttons for EN/NL language toggles
   state.js              save/load/migrate localStorage; profiles; settings; streak; economy
   mathengine.js         pure logic: 18-skill ladder, Elo-lite ratings, misconception
                         distractors, times-table fact gems, mastery report, review mix
+  curriculum/
+    nl_po.js            first curriculum pack: Dutch primary arithmetic objectives
+    placement.js        age-to-stage estimate, warm-up scoring, eligible skill window
+    index.js            pack registry, objective filtering, coverage summaries
   verbs.js              the four math interactions (fetch / array / number line / share)
   island.js             pure logic: restoration blueprints, mastery gating, funding, perks
   mimi.js               Mimi's conversation ladder (most useful advice first)
@@ -40,11 +48,12 @@ src/
   anim.js               hand-rolled tween engine + easing, ticked from the main loop
   hud.js                DOM HUD: equation banner, chips, helper/Mimi bubble, toasts,
                         verb panels, action/hint buttons
-  screens.js            DOM screens: title, story, settings, shop, pets, gem tree,
-                        island worktable, parents, chamber results, duel
+  screens.js            DOM screens: title, story, warm-up, settings, shop, pets,
+                        gem tree, island worktable, parents, chamber results, duel
   duel.js               hot-seat duel mode + seeded challenge codes
   rng.js                seeded PRNG (mulberry32)
-tests/                  vitest: mathengine, chambers, island, mimi, models, portal stages
+tests/                  vitest: mathengine, curriculum, state migration, warm-up and
+                        parent wiring, chambers, island, mimi, models, portal stages
 ```
 
 ## Rendering approach
@@ -89,7 +98,8 @@ accessible hit targets (≥48px), CSS animations for cheap polish.
   meta,                           // generator extras (e.g. a, b for fact gems)
 }
 createMathState() -> the profile.math blob (skills, facts, log)
-nextProblem(math, { world?, kind?, skill?, echo?, rng? }) -> Problem  // ≈65% expected success
+nextProblem(math, { world?, kind?, skill?, echo?, allowedSkills?, rng? }) -> Problem
+  // ≈65% expected success; allowedSkills softly constrains adaptive selection
 recordResult(math, problem, { correct, ms, usedHint })
   -> { delta, rating, masteredSkill, newGems }      // masteredSkill/newGems drive toasts
 masteryReport(math)
@@ -100,9 +110,32 @@ The math state lives at `profile.math` and is owned by `state.js`; the engine mu
 it only through these functions. `island.js` is pure in the same way: gating reads the
 mastery report, funding mutates `profile.island` and bananas via small exported fns.
 
+## Curriculum contract
+The curriculum layer is deliberately separate from the math engine. It maps
+school-facing requirements to existing game skills, while child-facing play
+still speaks in islands, quests, helpers, and treasures.
+
+```js
+getPack('NL_PO') -> curriculum pack metadata and objectives
+listObjectives(packId, filters?) -> objectives by status/stage/domain
+coverageForReport(packId, masteryReport) -> parent-facing domain/objective coverage
+
+createCurriculumState({ age? }) -> profile.curriculum defaults
+estimateStageFromAge(packId, age) -> 'grade_1'..'grade_8' | null
+scoreWarmup(results) -> { band: 'below'|'on_track'|'ahead', correct, total, rate }
+applyWarmupResult(curriculum, results, opts?) -> updated curriculum state
+eligibleSkillIds(curriculum) -> skill ids for the soft current-stage window
+```
+
+`NL_PO` is the only registered pack for now. Stage and domain IDs stay English
+internally (`grade_5`, `operations`, `measurement_geometry`); Dutch and English
+labels live in `i18n.js`. The default targeting window is soft: previous,
+current, and next stage playable objectives are eligible unless parent policy
+later tightens `strictness`.
+
 ## Save format (versioned)
 ```js
-monkeymath.save = {
+monkeygrove.save = {
   v: 1,
   profiles: [{
     id, name, created,
@@ -113,6 +146,14 @@ monkeymath.save = {
     owned:   { hats: [], furs: ['classic'], trails: [] },
     streak:  { count, lastDay, freezes, giftDay },
     island:  { built: [buildId], seen: [buildId], perkDay },
+    curriculum: {
+      packId: 'NL_PO',
+      ageAtStart,
+      estimatedStage, confirmedStage,       // English internal ids, e.g. 'grade_5'
+      placementBand,                        // unknown | below | on_track | ahead
+      strictness,                           // soft by default
+      warmup: { completed, results, skillIds, scored? },
+    },
     math:    { skills: { [skillId]: { r, n, hist } },     // Elo rating, attempts, last-10
                facts:  { '7x8': { n, ok, lastOk } },      // gem lit = ok ≥ 3 && lastOk
                log:    [{ t, skill, tag, ok, ms, hint }] }, // capped at 200
@@ -126,7 +167,23 @@ monkeymath.save = {
 ```
 `state.js` heals missing profile fields against a fresh profile on load (migrations
 stay additive); corrupt JSON falls back to a fresh save after stashing the broken
-blob in `monkeymath.backup`.
+blob in `monkeygrove.backup`.
+
+## Runtime flow additions
+- New Explorer creation accepts an optional age from 4-13 and calls
+  `createProfile(name, { age })`.
+- Age-created profiles go through story -> warm-up -> hub. If interrupted after
+  the story or mid-warm-up, `needsWarmup()` routes them back through warm-up
+  before the hub. Old migrated profiles with no `ageAtStart` are not forced into
+  warm-up.
+- Warm-up records normal math results, but partial progress keeps
+  `warmup.completed === false`; final answer or explicit skip completes the
+  warm-up. UI and controller guards prevent double-tap duplicate finalization.
+- Normal chamber generation passes `allowedSkills: eligibleSkillIds(profile.curriculum)`
+  into `nextProblem`. Empty eligibility means unconstrained selection. Duels and
+  debug forced-skill paths remain deterministic and unchanged.
+- The parent screen renders `coverageForReport(...)` beside the existing skill
+  overview, with translated pack, stage, domain, objective, and status labels.
 
 ## Determinism
 Chamber layout generation/variation and duels flow through `rng.js` (mulberry32):

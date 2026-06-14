@@ -1,8 +1,10 @@
 # Monkey Grove 🍌 — Design Document (canonical)
 
 A cozy, cute, Animal-Crossing-hearted voxel island game that secretly delivers
-research-grade arithmetic practice to 9–12 year olds who struggle with math.
-Built for an 11-year-old who loves ACNH, Roblox and Minecraft.
+research-grade arithmetic practice to children who struggle with math. It began
+for an 11-year-old who loves ACNH, Roblox and Minecraft, and now starts from the
+Dutch primary-school arithmetic path (`NL_PO`) while keeping the child-facing
+experience playful.
 
 ## Story & tone
 The Crab King pinched all the island's numbers, and without them the monkeys
@@ -10,9 +12,10 @@ forgot how to plant, share and bake — the grove faded to gray. You are the new
 caretaker. Chamber by chamber you bring the numbers home, and the island blooms
 back to color. Crabs are mischievous thieves, never lethal; Mimi the monkey
 guide never says "wrong" — she shows. Time only ever gives (daily gift, streak),
-never takes. **No hearts. No Game Over. No school words** (no academy / lesson /
-test / score-penalty vocabulary). UI vocabulary: worlds, quests, eggs, coins,
-gems, pets.
+never takes. **No hearts. No Game Over. No school words for the child** (no
+academy / lesson / test / score-penalty vocabulary in play). Parent-facing
+screens may show curriculum, stage, and objective labels. Child UI vocabulary:
+worlds, quests, eggs, coins, gems, pets.
 
 ## Form
 3D voxel dioramas (Three.js from npm, bundled by Vite), orthographic isometric
@@ -29,6 +32,22 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   hand-authored diorama layouts (ASCII templates), seeded decoration.
 - Regions bloom (gray → color, props appear) as skill mastery rises — and so
   do their gates (see Hub island → Living gates).
+
+## Explorer placement & curriculum spine
+- New Explorers can enter an optional age (4-13). For the shipped `NL_PO`
+  curriculum pack, that estimates a Dutch primary stage (`grade_1`...`grade_8`
+  internally, shown to parents as Groep 1...8).
+- A short warm-up after the intro story gives Mimi a few tiny number quests
+  before the hub. It adjusts the placement band (`below`, `on_track`, `ahead`)
+  without putting a permanent label on the child.
+- Targeting is soft by default: previous, current, and next stage playable
+  objectives feed into the adaptive engine as eligible game skills. If no
+  eligible skills exist, the engine falls back to normal play.
+- `NL_PO` is the only real curriculum mapping for now. English-speaking children
+  in the Netherlands can use the English UI over the Dutch curriculum, but the
+  design must not pretend to support other countries until their mappings exist.
+- Internal IDs remain English (`grade_5`, `operations`,
+  `nl_po.grade5.tables_3_4_6`). Dutch and English labels live in `i18n.js`.
 
 ## Core loop (60–120 s per chamber)
 1. Enter chamber → equation banner slides in (e.g. `7 × ? = 42`).
@@ -80,6 +99,19 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   monkeys") to seed ratings.
 - **Selection**: ~70% focus skill (lowest unmastered, prereqs met), 20%
   neighbor review, 10% older refresh; Echo Doors pull the weakest stale skill.
+- **Curriculum filter**: normal chamber selection accepts `allowedSkills` from
+  the profile curriculum. Forced skill paths, duels, and deterministic challenge
+  codes remain in control when they explicitly choose a skill.
+
+## Parent visibility
+- The parent screen explains the pedagogy and now shows the active profile's
+  learning path, stage, domain coverage, and objective pills before the existing
+  skill overview.
+- Coverage is objective-based: covered, started, ready to play, or planned.
+  Planned objectives are visible so parents can see the broader `NL_PO` map even
+  before every requirement has a game mechanic.
+- The same parent screen translates between English and Dutch. Raw internal
+  curriculum IDs must never appear in the UI.
 
 ## Retention kit (exactly four systems)
 1. **Daily streak flame** + small daily gift chest on first play of the day.
@@ -190,8 +222,11 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
 - WebAudio synth: cozy marimba/kalimba island loop, pentatonic SFX, rising
   combo tones, friendly "boop" for wrong (never a buzzer).
 
-## Build order (each step was shippable — 1–8 shipped, secrets pending)
+## Build order (each step was shippable — 1–9 shipped, secrets/business sims pending)
 1. Chamber + grid-hop player feel (touch-first) → 2. Fetch loop + juice +
 audio → 3. Math engine + distractors + Elo → 4. Array verb + Garden world →
 5. Save/streak/i18n → 6. Number line + Share verbs, Vines/Stump/Tide worlds →
-7. Gem tree, pets, shop, hub island → 8. Echo Doors, duel; secrets still open.
+7. Gem tree, pets, shop, hub island → 8. Echo Doors, duel → 9. `NL_PO`
+curriculum spine, age-first Explorer placement, warm-up, curriculum-aware
+chambers, and parent coverage. Business simulations such as pizzeria/bakery
+shop play remain the next major design direction.
