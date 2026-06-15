@@ -34,18 +34,25 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   do their gates (see Hub island → Living gates).
 
 ## Explorer placement & curriculum spine
-- New Explorers can enter an optional age (4-13). For the shipped `NL_PO`
-  curriculum pack, that estimates a Dutch primary stage (`grade_1`...`grade_8`
-  internally, shown to parents as Groep 1...8).
+- New Explorers choose a country/curriculum pack and can enter an optional age
+  (4-13). For the shipped `NL_PO` curriculum pack, that estimates a Dutch primary
+  stage (`grade_1`...`grade_8` internally, shown to parents as Groep 1...8).
 - A short warm-up after the intro story gives Mimi a few tiny number quests
   before the hub. It adjusts the placement band (`below`, `on_track`, `ahead`)
   without putting a permanent label on the child.
-- Targeting is soft by default: previous, current, and next stage playable
-  objectives feed into the adaptive engine as eligible game skills. If no
-  eligible skills exist, the engine falls back to normal play.
+- The age-estimated stage is the default lower bound. Warm-up can open the upper
+  side of the window, but it may not send a child below the age/curriculum floor.
+- Parent-selected stage/group is the explicit override. If a parent chooses a
+  different group, that confirmed stage becomes the lower bound for play.
+- Targeting is soft by default: playable objectives from the lower bound upward
+  into the next stage feed the adaptive engine as eligible game skills. Strict
+  targeting keeps play close to the confirmed stage. If no eligible skills exist,
+  the engine falls back to normal play.
 - `NL_PO` is the only real curriculum mapping for now. English-speaking children
   in the Netherlands can use the English UI over the Dutch curriculum, but the
   design must not pretend to support other countries until their mappings exist.
+  The pack registry, profile state, and parent UI are prepared for completely
+  different country curricula once those mappings are defined.
 - Internal IDs remain English (`grade_5`, `operations`,
   `nl_po.grade5.tables_3_4_6`). Dutch and English labels live in `i18n.js`.
 
@@ -105,8 +112,12 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
 
 ## Parent visibility
 - The parent screen explains the pedagogy and now shows the active profile's
-  learning path, stage, domain coverage, and objective pills before the existing
-  skill overview.
+  country, learning path, stage, domain coverage, and objective pills before the
+  existing skill overview.
+- Parents can change curriculum pack, stage/group, and targeting strictness.
+  Changing the pack recalculates the age estimate for that pack and resets
+  warm-up placement so old probes from a different curriculum do not leak into
+  the new path.
 - Coverage is objective-based: covered, started, ready to play, or planned.
   Planned objectives are visible so parents can see the broader `NL_PO` map even
   before every requirement has a game mechanic.

@@ -50,6 +50,54 @@ Bronnen: SLO Tussendoelen rekenen-wiskunde PO 2017; actualisatie kerndoelen; wij
 
 ---
 
+## Toepassing in Monkey Grove (`NL_PO`)
+
+Monkey Grove gebruikt dit document als inhoudelijke onderbouwing voor het eerste
+curriculumpakket: `NL_PO`. Het spel claimt op dit moment geen andere landen of
+curricula te dekken; de code is wel ingericht om later volledig andere pakketten
+toe te voegen met eigen leeftijdsbanden, groepsnamen, domeinen, doelen en
+vaardigheidskoppelingen.
+
+**Leeftijd als ondergrens**:
+- Bij het aanmaken van een nieuwe speler kiest de ouder/kind een
+  land/curriculum en kan een leeftijd van 4 t/m 13 worden ingevuld.
+- Voor `NL_PO` wordt de leeftijd vertaald naar de bijpassende basisschoolgroep
+  (`grade_1` t/m `grade_8` intern, zichtbaar als Groep 1 t/m 8).
+- Die geschatte groep is de standaard **ondergrens** voor spelinhoud. Een kind
+  van 11 jaar start dus minimaal op Groep 8-inhoud en krijgt geen vroege sommen
+  zoals `2 + 8` als plaatsingsopgave.
+
+**Bovengrens mag omhoog**:
+- De korte warming-up kan laten zien dat het kind meer aankan.
+- In de zachte standaardinstelling mag het spel daarom doelen boven de
+  ondergrens aanbieden.
+- De warming-up mag het kind niet onder de leeftijds-/curriculumondergrens
+  plaatsen.
+
+**Ouder als expliciete override**:
+- De ouder kan in het oudermenu de groep/stage aanpassen.
+- Als de ouder een andere groep kiest, wordt die bevestigde groep de nieuwe
+  ondergrens.
+- Dit is bewust de enige manier om onder de leeftijdsinschatting te spelen,
+  omdat ouders vaak weten of een kind in een andere groep zit of extra herhaling
+  nodig heeft.
+
+**Huidige speelbare dekking**:
+- Groep 3-5: optellen/aftrekken, ontbrekende termen, tafels en delen/verdelen
+  via Tide Pools, Banana Garden en Sharing Stump.
+- Groep 6: grotere vermenigvuldiging, deling, resten, inverse relaties en
+  breuken via arrays, baskets en number-line/fraction mechanics.
+- Groep 7-8: onderhoud van bewerkingen, breuken vergelijken/equivalentie,
+  breuk van een hoeveelheid, inverse vermenigvuldiging en zakelijke contexten
+  zoals geld, meten, procenten, winst en data in de bakkerij/pizzeria.
+
+Niet elk `NL_PO`-doel is al een direct speelbare 3D-quest. Het oudermenu toont
+daarom ook geplande of contextuele doelen, zodat duidelijk blijft wat al door
+het spel wordt geoefend en wat nog als bredere curriculumdekking op de kaart
+staat.
+
+---
+
 ## Gedetailleerde Eisen per Groep
 
 ### Groep 1 en Groep 2 (4–7 jaar): Voorbereidend en Beginnend Rekenen

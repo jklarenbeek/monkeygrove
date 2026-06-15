@@ -26,11 +26,13 @@ src/
   langFlags.js          accessible drawn flag buttons for EN/NL language toggles
   state.js              save/load/migrate localStorage; profiles; settings; streak; economy
   mathengine.js         pure logic: 18-skill ladder, Elo-lite ratings, misconception
-                        distractors, times-table fact gems, mastery report, review mix
+                        distractors, times-table fact gems, mastery report, review mix,
+                        curriculum-constrained selection via allowedSkills
   curriculum/
     nl_po.js            first curriculum pack: Dutch primary arithmetic objectives
-    placement.js        age-to-stage estimate, warm-up scoring, eligible skill window
-    index.js            pack registry, objective filtering, coverage summaries
+    placement.js        age-to-stage estimate, pack retargeting, warm-up scoring,
+                        eligible skill lower-bound window
+    index.js            pack registry/listing, objective filtering, coverage summaries
   business/
     data.js             helper customers, recipes, ingredients, upgrades, business modes
     engine.js           pure orders, prep/payment checks, stock, profit, upgrades, reports
@@ -121,23 +123,32 @@ still speaks in islands, quests, helpers, and treasures.
 
 ```js
 getPack('NL_PO') -> curriculum pack metadata and objectives
+listPacks() -> registered curriculum packs for onboarding/parent selectors
 listObjectives(packId, filters?) -> objectives by status/stage/domain
 coverageForReport(packId, masteryReport, { business? }) -> parent-facing coverage
 
-createCurriculumState({ age? }) -> profile.curriculum defaults
+createCurriculumState({ packId?, age? }) -> profile.curriculum defaults
 estimateStageFromAge(packId, age) -> 'grade_1'..'grade_8' | null
+retargetCurriculumPack(curriculum, packId) -> state for a newly selected pack
 scoreWarmup(results) -> { band: 'below'|'on_track'|'ahead', correct, total, rate }
 applyWarmupResult(curriculum, results, opts?) -> updated curriculum state
-eligibleSkillIds(curriculum) -> skill ids for the soft current-stage window
+eligibleSkillIds(curriculum) -> skill ids for the curriculum lower-bound window
 ```
 
-`NL_PO` is the only registered pack for now. Stage and domain IDs stay English
-internally (`grade_5`, `operations`, `measurement_geometry`); Dutch and English
-labels live in `i18n.js`. The default targeting window is soft: previous,
-current, and next stage playable objectives are eligible unless parent policy
-tightens `strictness`. Business-mode progress can also contribute to objective
-coverage for mapped money, measurement, fraction, ratio, percentage, profit, and
-data objectives.
+`NL_PO` is the only real registered pack for now. Each pack owns its country
+metadata, stage age bands, objectives, playable skill mappings, and translated
+labels. Stage and domain IDs stay English internally (`grade_5`, `operations`,
+`measurement_geometry`); Dutch and English labels live in `i18n.js`.
+
+The age-estimated stage is the default lower bound for play. Warm-up placement
+can open the upper side of the soft window, but cannot move eligibility below
+that lower bound. Parent-selected stage/group is the override: once the parent
+confirms a different stage, that confirmed stage becomes the lower bound. Strict
+targeting keeps eligibility at the current lower-bound/placement center instead
+of including the next stage.
+
+Business-mode progress can also contribute to objective coverage for mapped
+money, measurement, fraction, ratio, percentage, profit, and data objectives.
 
 ## Save format (versioned)
 ```js
@@ -183,20 +194,29 @@ stay additive); corrupt JSON falls back to a fresh save after stashing the broke
 blob in `monkeygrove.backup`.
 
 ## Runtime flow additions
-- New Explorer creation accepts an optional age from 4-13 and calls
-  `createProfile(name, { age })`.
+- New Explorer creation accepts an optional age from 4-13 plus the selected
+  country/curriculum pack and calls `createProfile(name, { age, packId })`.
 - Age-created profiles go through story -> warm-up -> hub. If interrupted after
   the story or mid-warm-up, `needsWarmup()` routes them back through warm-up
   before the hub. Old migrated profiles with no `ageAtStart` are not forced into
   warm-up.
+- The warm-up problems are chosen from `eligibleSkillIds(profile.curriculum)`,
+  so age 11 on `NL_PO` starts with upper-primary probes such as multi-digit
+  multiplication, division with remainders, and fraction comparison rather than
+  early addition.
 - Warm-up records normal math results, but partial progress keeps
   `warmup.completed === false`; final answer or explicit skip completes the
   warm-up. UI and controller guards prevent double-tap duplicate finalization.
 - Normal chamber generation passes `allowedSkills: eligibleSkillIds(profile.curriculum)`
-  into `nextProblem`. Empty eligibility means unconstrained selection. Duels and
-  debug forced-skill paths remain deterministic and unchanged.
+  into `nextProblem`; Echo Door review uses the same filter before choosing stale
+  skills. Empty eligibility means unconstrained selection. Duels and debug
+  forced-skill paths remain deterministic and unchanged. If the requested world
+  has no eligible skills, the math engine chooses a world that can host an
+  eligible skill and `main.js` updates the chamber world to match.
 - The parent screen renders `coverageForReport(...)` beside the existing skill
-  overview, with translated pack, stage, domain, objective, and status labels.
+  overview, with translated country, pack, stage, domain, objective, and status
+  labels. Parent controls can change pack, stage/group, and targeting strictness;
+  changing pack recalculates the age estimate and resets warm-up placement.
 - Once the bakery is built, tapping it opens the pizzeria/bakery simulation.
   Business orders use the existing helper animal models as customers, mutate
   only `profile.business`, and report mapped objective progress back to the

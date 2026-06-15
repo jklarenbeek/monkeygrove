@@ -9,9 +9,11 @@ new blueprints, pets hatch, and the island comes back to life.
 
 Monkey Grove is built for children who find math stressful, especially Dutch
 primary-school learners working through the `NL_PO` arithmetic path. New
-Explorers can enter their age so the island can start near the right level, then
-a short warm-up helps Mimi tune the first quests. The child sees playful worlds
-and quests; parents can see the school-stage mapping and curriculum coverage.
+Explorers choose a country/curriculum path and can enter their age, so the
+island can start at the curriculum's age-based lower bound. A short warm-up
+helps Mimi tune the first quests upward when the child is ready. The child sees
+playful worlds and quests; parents can see and override the school-stage mapping
+and curriculum coverage.
 
 ## Play
 
@@ -42,8 +44,11 @@ backend. Progress is saved on the device in `localStorage` under
   - Misconception-tagged wrong answers trigger targeted visual explanations
 - **Curriculum-aware onboarding**
   - New Explorers can enter an optional age from 4-13
+  - The onboarding form also stores the selected country/curriculum pack
   - The first shipped curriculum pack is `NL_PO` for Dutch primary arithmetic
-  - Age estimates a Dutch school stage; warm-up results softly adjust the band
+  - Age estimates the selected curriculum stage and sets the default lower bound
+  - Warm-up results can move the child upward, but not below that lower bound
+  - Parents can override the lower bound by changing the profile's stage/group
   - English and Dutch UI can both run over the Dutch curriculum path
   - Generic fallback labels exist, but other country mappings are not claimed
     until their packs are defined
@@ -172,14 +177,16 @@ Monkey Grove follows a few simple principles:
 - Mistakes are diagnostic, not punitive.
 - Visual models appear in the world: arrays, baskets, number lines, and place-value strips.
 - Practice adapts per skill and includes spaced review.
-- Curriculum targeting is soft by default: previous, current, and next stage
-  skills stay available so the adaptive engine can still meet the learner where
-  they are.
+- Curriculum targeting is soft by default, but the age-derived stage is a floor:
+  eligible practice starts at that lower bound and may include higher stages so
+  the adaptive engine can let the learner stretch. Parents can explicitly change
+  the profile's stage/group when that floor should be different.
 - Long-term progress is visible through island restoration, pets, cosmetics, and the Gem Tree.
 
-The parent screen in the game shows the active profile's `NL_PO` learning path,
+The parent screen in the game shows the active profile's country, learning path,
 estimated or confirmed school stage, curriculum coverage by domain and
-objective, plus recent accuracy, attempts, and mastery per skill.
+objective, plus recent accuracy, attempts, and mastery per skill. It also exposes
+the curriculum pack, stage/group, and targeting policy controls.
 
 ## Privacy
 

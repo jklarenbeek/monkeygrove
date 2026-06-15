@@ -69,6 +69,27 @@ Here are the most relevant categories, from simplest to more advanced, with suit
 5. **Narrative & fun layer**: "Adaptive companion" or enemy strength scales with player rating. Subtle visual progression or bigger rewards on harder challenges. Optional "Practice Mode" vs "Adventure Mode" that biases adaptation.
 6. **Spaced practice & forgetting**: Review weak skills over sessions (combine with Elo/BKT).
 
+### Current Monkey Grove Implementation
+
+Monkey Grove currently uses the recommended hybrid approach:
+
+- **Curriculum gate first**: the selected curriculum pack and starting age create
+  a lower bound for eligible skills. For the shipped `NL_PO` pack, an
+  11-year-old starts at Groep 8-level probes rather than early addition.
+- **Parent override**: parents can change the confirmed stage/group. That stage
+  becomes the lower bound when it differs from the age estimate.
+- **Soft upper window**: warm-up and normal play may move upward into harder
+  eligible stages, but the warm-up does not push the player below the selected
+  curriculum lower bound.
+- **Elo-lite inside the gate**: once eligible skills are known, the math engine
+  still chooses problems near the target success rate and adjusts scaffold level
+  by per-skill rating.
+- **Spaced review with the same gate**: Echo Door review filters stale skills
+  through the curriculum eligibility before choosing a review target.
+- **Future curriculum packs**: other countries should be added as separate packs
+  with their own age bands, stages, objectives, and skill mappings rather than
+  by reusing `NL_PO` labels.
+
 **Practical Implementation Notes**:
 - **Metrics**: Accuracy (primary), response time (fluency), hints/scaffolds used, specific misconceptions (e.g., whole-number bias in fractions), engagement (session length, retries, completion).
 - **Cold start**: Start easy or use short diagnostic; assume average starting rating.
