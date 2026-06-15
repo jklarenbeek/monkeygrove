@@ -20,16 +20,29 @@ export function estimateStageFromAge(packId = DEFAULT_PACK, age = null) {
 }
 
 export function createCurriculumState({ packId = DEFAULT_PACK, age = null } = {}) {
+  const pack = getPack(packId);
   const ageAtStart = parseAge(age);
-  const estimatedStage = estimateStageFromAge(packId, age);
+  const estimatedStage = estimateStageFromAge(pack.id, age);
   return {
-    packId,
+    packId: pack.id,
     ageAtStart,
     estimatedStage,
     confirmedStage: estimatedStage,
     placementBand: 'unknown',
     strictness: 'soft',
     warmup: { completed: false, results: [], skillIds: [] },
+  };
+}
+
+export function retargetCurriculumPack(curriculum = {}, packId = DEFAULT_PACK) {
+  const base = createCurriculumState({
+    packId,
+    age: curriculum.ageAtStart,
+  });
+  return {
+    ...curriculum,
+    ...base,
+    strictness: curriculum.strictness || base.strictness,
   };
 }
 
@@ -45,21 +58,27 @@ function stageOrder(pack, stageId) {
   return pack.stages.find((s) => s.id === stageId)?.order ?? null;
 }
 
-function resolveStageOrder(pack, curriculum) {
-  return stageOrder(pack, curriculum.confirmedStage)
-    ?? stageOrder(pack, curriculum.estimatedStage);
+function resolveLowerBoundOrder(pack, curriculum) {
+  const estimated = stageOrder(pack, curriculum.estimatedStage);
+  const confirmed = stageOrder(pack, curriculum.confirmedStage);
+  if (confirmed != null && (estimated == null || curriculum.confirmedStage !== curriculum.estimatedStage)) {
+    return confirmed;
+  }
+  return estimated ?? confirmed;
 }
 
 export function eligibleObjectives(curriculum = null) {
   if (!curriculum?.packId) return [];
   const pack = getPack(curriculum.packId);
-  const order = resolveStageOrder(pack, curriculum);
-  if (!order) return listObjectives(pack.id, { status: 'playable' });
+  const lowerBound = resolveLowerBoundOrder(pack, curriculum);
+  if (!lowerBound) return listObjectives(pack.id, { status: 'playable' });
 
   const bandShift = curriculum.placementBand === 'ahead' ? 1
     : curriculum.placementBand === 'below' ? -1 : 0;
-  const center = Math.min(pack.stages.length, Math.max(1, order + bandShift));
-  const stageWindow = curriculum.strictness === 'strict' ? [center] : [center - 1, center, center + 1];
+  const center = Math.min(pack.stages.length, Math.max(lowerBound, lowerBound + bandShift));
+  const stageWindow = curriculum.strictness === 'strict'
+    ? [center]
+    : Array.from({ length: (center + 1) - lowerBound + 1 }, (_, i) => lowerBound + i);
   const allowed = new Set(stageWindow.filter((n) => n >= 1 && n <= pack.stages.length));
 
   return listObjectives(pack.id, { status: 'playable' })

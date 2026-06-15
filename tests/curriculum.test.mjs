@@ -1,11 +1,11 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
-  CURRICULUM_PACKS, getPack, listObjectives, coverageForReport,
+  CURRICULUM_PACKS, getPack, listPacks, listObjectives, coverageForReport,
 } from '../src/curriculum/index.js';
 import {
   createCurriculumState, estimateStageFromAge, scoreWarmup,
-  eligibleSkillIds,
+  eligibleSkillIds, retargetCurriculumPack,
 } from '../src/curriculum/placement.js';
 
 test('NL_PO pack uses English internal identifiers', () => {
@@ -93,6 +93,13 @@ test('registry exposes NL_PO only for now', () => {
   assert.deepEqual(Object.keys(CURRICULUM_PACKS), ['NL_PO']);
 });
 
+test('registered packs expose country metadata for selection', () => {
+  assert.deepEqual(listPacks().map((p) => p.id), ['NL_PO']);
+  const pack = listPacks()[0];
+  assert.equal(pack.countryCode, 'NL');
+  assert.equal(pack.countryKey, 'curriculum.country.nl');
+});
+
 test('estimateStageFromAge maps ages to NL_PO grade stages', () => {
   assert.equal(estimateStageFromAge('NL_PO', 4), 'grade_1');
   assert.equal(estimateStageFromAge('NL_PO', 6), 'grade_3');
@@ -111,6 +118,75 @@ test('createCurriculumState stores estimate with soft targeting', () => {
     strictness: 'soft',
     warmup: { completed: false, results: [], skillIds: [] },
   });
+});
+
+test('createCurriculumState normalizes unknown pack ids to the default pack', () => {
+  assert.equal(createCurriculumState({ packId: 'UNKNOWN', age: 8 }).packId, 'NL_PO');
+});
+
+test('selected curriculum pack controls age estimates and lower bounds', () => {
+  CURRICULUM_PACKS.TEST_COUNTRY = {
+    id: 'TEST_COUNTRY',
+    titleKey: 'curriculum.test.title',
+    countryCode: 'TT',
+    countryKey: 'curriculum.country.test',
+    fallbackStagePrefixKey: 'curriculum.stage',
+    stages: [
+      { id: 'level_a', order: 1, minAge: 4, maxAge: 9, labelKey: 'curriculum.stage' },
+      { id: 'level_b', order: 2, minAge: 9, maxAge: 14, labelKey: 'curriculum.stage' },
+    ],
+    domains: [{ id: 'operations', labelKey: 'curriculum.domain.operations' }],
+    objectives: [
+      { id: 'test.level_a.add', stage: 'level_a', domain: 'operations', titleKey: 'x', status: 'playable', gameSkills: ['add_20'] },
+      { id: 'test.level_b.frac', stage: 'level_b', domain: 'operations', titleKey: 'y', status: 'playable', gameSkills: ['frac_compare'] },
+    ],
+  };
+
+  try {
+    const curriculum = createCurriculumState({ packId: 'TEST_COUNTRY', age: 8 });
+    assert.equal(curriculum.packId, 'TEST_COUNTRY');
+    assert.equal(curriculum.estimatedStage, 'level_a');
+    assert.deepEqual(eligibleSkillIds(curriculum), ['add_20', 'frac_compare']);
+
+    const strict = { ...curriculum, strictness: 'strict' };
+    assert.deepEqual(eligibleSkillIds(strict), ['add_20']);
+  } finally {
+    delete CURRICULUM_PACKS.TEST_COUNTRY;
+  }
+});
+
+test('retargetCurriculumPack recalculates age estimate and resets parent stage to selected pack', () => {
+  CURRICULUM_PACKS.TEST_COUNTRY = {
+    id: 'TEST_COUNTRY',
+    titleKey: 'curriculum.test.title',
+    countryCode: 'TT',
+    countryKey: 'curriculum.country.test',
+    fallbackStagePrefixKey: 'curriculum.stage',
+    stages: [
+      { id: 'level_a', order: 1, minAge: 4, maxAge: 9, labelKey: 'curriculum.stage' },
+      { id: 'level_b', order: 2, minAge: 9, maxAge: 14, labelKey: 'curriculum.stage' },
+    ],
+    domains: [{ id: 'operations', labelKey: 'curriculum.domain.operations' }],
+    objectives: [],
+  };
+
+  try {
+    const oldState = {
+      ...createCurriculumState({ age: 11 }),
+      confirmedStage: 'grade_5',
+      placementBand: 'ahead',
+      warmup: { completed: true, results: [{ correct: true }], skillIds: ['mult_2digit'] },
+    };
+    const next = retargetCurriculumPack(oldState, 'TEST_COUNTRY');
+    assert.equal(next.packId, 'TEST_COUNTRY');
+    assert.equal(next.ageAtStart, 11);
+    assert.equal(next.estimatedStage, 'level_b');
+    assert.equal(next.confirmedStage, 'level_b');
+    assert.equal(next.placementBand, 'unknown');
+    assert.deepEqual(next.warmup, { completed: false, results: [], skillIds: [] });
+  } finally {
+    delete CURRICULUM_PACKS.TEST_COUNTRY;
+  }
 });
 
 test('missing and blank ages remain unknown', () => {
@@ -148,6 +224,40 @@ test('eligibleSkillIds softly includes previous current and next stage skills', 
   assert.ok(!strict.includes('mult_2digit'));
 });
 
+test('age estimate is the default lower bound for eligible skills', () => {
+  const curriculum = createCurriculumState({ age: 8 });
+  const soft = eligibleSkillIds(curriculum);
+  assert.ok(!soft.includes('add_100'));
+  assert.ok(!soft.includes('sub_100'));
+  assert.ok(!soft.includes('tables_a'));
+  assert.ok(soft.includes('tables_b'));
+  assert.ok(soft.includes('mult_2digit'));
+
+  const below = eligibleSkillIds({ ...curriculum, placementBand: 'below' });
+  assert.ok(!below.includes('add_100'));
+  assert.ok(!below.includes('sub_100'));
+  assert.ok(!below.includes('tables_a'));
+  assert.ok(below.includes('tables_b'));
+});
+
+test('parent confirmed stage can override the age lower bound', () => {
+  const curriculum = {
+    ...createCurriculumState({ age: 11 }),
+    confirmedStage: 'grade_5',
+  };
+  const soft = eligibleSkillIds(curriculum);
+  assert.ok(soft.includes('tables_b'));
+  assert.ok(soft.includes('tables_c'));
+  assert.ok(!soft.includes('add_20'));
+});
+
+test('age eleven warmup starts with representative grade eight gameplay probes', () => {
+  assert.deepEqual(
+    eligibleSkillIds(createCurriculumState({ age: 11 })).slice(0, 3),
+    ['mult_2digit', 'div_remainder', 'frac_compare'],
+  );
+});
+
 test('invalid confirmedStage falls back to estimatedStage for eligibility', () => {
   const curriculum = {
     ...createCurriculumState({ age: 8 }),
@@ -168,7 +278,12 @@ test('soft eligibility windows clamp at first and last stages', () => {
   assert.ok(!first.includes('mult_2digit'));
 
   const last = eligibleSkillIds(createCurriculumState({ age: 13 }));
+  assert.ok(last.includes('mult_2digit'));
+  assert.ok(last.includes('div_remainder'));
+  assert.ok(last.includes('missing_factor'));
   assert.ok(last.includes('frac_compare'));
   assert.ok(last.includes('frac_equiv'));
   assert.ok(!last.includes('add_20'));
+  assert.ok(!last.includes('add_100'));
+  assert.ok(!last.includes('tables_a'));
 });

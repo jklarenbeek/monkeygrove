@@ -270,6 +270,21 @@ html, body {
   text-align: center;
 }
 
+.placement-step {
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.placement-task {
+  color: var(--ink);
+  font-size: clamp(16px, 2.6vw, 21px);
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
 .placement-eq {
   font-size: clamp(28px, 6vw, 54px);
   font-weight: 950;

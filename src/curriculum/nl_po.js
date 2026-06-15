@@ -1,6 +1,8 @@
 export const NL_PO = {
   id: 'NL_PO',
   titleKey: 'curriculum.nl_po.title',
+  countryCode: 'NL',
+  countryKey: 'curriculum.country.nl',
   fallbackStagePrefixKey: 'curriculum.stage',
   stages: [
     { id: 'grade_1', order: 1, minAge: 4, maxAge: 5, labelKey: 'curriculum.nl_po.stage.grade_1' },
@@ -43,7 +45,9 @@ export const NL_PO = {
     { id: 'nl_po.grade7.profit_margin_intro', stage: 'grade_7', domain: 'data_relationships', titleKey: 'curriculum.nl_po.objective.profit_margin_intro', status: 'playable', gameSkills: [], businessModes: ['profit_margin'] },
     { id: 'nl_po.grade7.scale_recipe', stage: 'grade_7', domain: 'measurement_geometry', titleKey: 'curriculum.nl_po.objective.scale_recipe', status: 'playable', gameSkills: [], businessModes: ['scale_recipe'] },
     { id: 'nl_po.grade7.scale_and_coordinates', stage: 'grade_7', domain: 'measurement_geometry', titleKey: 'curriculum.nl_po.objective.scale_and_coordinates', status: 'planned', gameSkills: [] },
-    { id: 'nl_po.grade8.fraction_decimal_percent_relations', stage: 'grade_8', domain: 'ratios', titleKey: 'curriculum.nl_po.objective.fraction_decimal_percent_relations', status: 'planned', gameSkills: [] },
+    { id: 'nl_po.grade8.operations_maintenance', stage: 'grade_8', domain: 'operations', titleKey: 'curriculum.nl_po.objective.operations_maintenance', status: 'playable', gameSkills: ['mult_2digit', 'div_remainder'] },
+    { id: 'nl_po.grade8.fraction_decimal_percent_relations', stage: 'grade_8', domain: 'ratios', titleKey: 'curriculum.nl_po.objective.fraction_decimal_percent_relations', status: 'playable', gameSkills: ['frac_compare', 'frac_equiv', 'frac_of_n'] },
+    { id: 'nl_po.grade8.inverse_reasoning', stage: 'grade_8', domain: 'operations', titleKey: 'curriculum.nl_po.objective.inverse_reasoning', status: 'playable', gameSkills: ['missing_factor'] },
     { id: 'nl_po.grade8.advanced_data_reasoning', stage: 'grade_8', domain: 'data_relationships', titleKey: 'curriculum.nl_po.objective.advanced_data_reasoning', status: 'playable', gameSkills: [], businessModes: ['demand_chart'] },
   ],
 };

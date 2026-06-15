@@ -701,6 +701,12 @@ function allowedSetForWorld(allowedSkills, world) {
   return set.size ? set : null;
 }
 
+function allowedWorlds(allowedSkills) {
+  if (!Array.isArray(allowedSkills) || !allowedSkills.length) return null;
+  const worlds = [...new Set(allowedSkills.map((id) => SKILLS[id]?.world).filter(Boolean))];
+  return worlds.length ? worlds : null;
+}
+
 // Linear prereqs => the first unmastered skill in a world has its prereqs met.
 function focusSkill(math, world, allowedSkills = null) {
   const allowed = allowedSetForWorld(allowedSkills, world);
@@ -718,15 +724,17 @@ function lastPracticed(math, skillId) {
 
 // Weakest stale skill: lowest rating among practiced skills; ties (within a
 // hair) go to the least recently practiced.
-function echoSkill(math) {
+function echoSkill(math, allowedSkills = null) {
+  const allowed = Array.isArray(allowedSkills) && allowedSkills.length ? new Set(allowedSkills) : null;
   const practiced = Object.keys(SKILLS).filter((id) => math.skills[id].n > 0);
-  if (!practiced.length) return null;
-  practiced.sort((p, q) => {
+  const candidates = allowed ? practiced.filter((id) => allowed.has(id)) : practiced;
+  if (!candidates.length) return null;
+  candidates.sort((p, q) => {
     const dr = math.skills[p].r - math.skills[q].r;
     if (Math.abs(dr) > 1) return dr;
     return lastPracticed(math, p) - lastPracticed(math, q);
   });
-  return practiced[0];
+  return candidates[0];
 }
 
 function targetDifficulty(s, rng) {
@@ -785,9 +793,14 @@ export function nextProblem(math, opts = {}) {
   if (opts.skill && SKILLS[opts.skill]) {
     skillId = opts.skill;
   } else if (opts.echo) {
-    skillId = echoSkill(math) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills);
+    skillId = echoSkill(math, opts.allowedSkills) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills);
   } else {
-    const world = opts.world && WORLDS.includes(opts.world) ? opts.world : rng.pick(WORLDS);
+    const wantedWorld = opts.world && WORLDS.includes(opts.world) ? opts.world : rng.pick(WORLDS);
+    const allowedInWantedWorld = allowedSetForWorld(opts.allowedSkills, wantedWorld);
+    const constrainedWorlds = allowedWorlds(opts.allowedSkills);
+    const world = allowedInWantedWorld || !constrainedWorlds
+      ? wantedWorld
+      : rng.pick(constrainedWorlds);
     const focus = focusSkill(math, world, opts.allowedSkills);
     const allowed = allowedSetForWorld(opts.allowedSkills, world);
     const roll = rng.float();

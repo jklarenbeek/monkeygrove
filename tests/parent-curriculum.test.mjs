@@ -19,6 +19,7 @@ function mockStorage() {
 test('task 7 wiring exists for curriculum coverage on the parent screen', () => {
   assert.match(screensSource, /coverageForReport/);
   assert.match(screensSource, /getPack/);
+  assert.match(screensSource, /listPacks/);
   assert.match(screensSource, /curriculumCoverageHtml/);
   assert.match(screensSource, /businessReport = null/);
   assert.match(screensSource, /coverageForReport\(pack\.id, report, \{ business: businessReport \}\)/);
@@ -42,6 +43,8 @@ test('task 8 parent business reporting is wired and translated', () => {
 
 test('task 7 i18n keys exist in english and dutch', () => {
   for (const key of [
+    'title.curriculum_prompt',
+    'title.curriculum_help',
     'parents.curriculum',
     'parents.curriculum_pack',
     'parents.stage',
@@ -50,6 +53,7 @@ test('task 7 i18n keys exist in english and dutch', () => {
     'parents.partial',
     'parents.playable',
     'parents.planned',
+    'curriculum.country.nl',
     'curriculum.nl_po.title',
     'curriculum.domain.operations',
     'curriculum.nl_po.objective.add_sub_to_20',
@@ -61,9 +65,16 @@ test('task 7 i18n keys exist in english and dutch', () => {
 });
 
 test('parent curriculum controls expose stage and strictness change wiring', () => {
+  assert.match(screensSource, /data-pack/);
   assert.match(screensSource, /data-stage/);
   assert.match(screensSource, /data-strictness/);
   assert.match(screensSource, /onCurriculumChange/);
+});
+
+test('new player form sends selected curriculum pack into profile creation', () => {
+  assert.match(screensSource, /id="new-pack"/);
+  assert.match(screensSource, /const packId = el\.querySelector\('#new-pack'\)\.value/);
+  assert.match(screensSource, /createProfile\(name, \{ age, packId \}\)/);
 });
 
 test('showParents renders translated curriculum coverage without exposing internal ids', async () => {
@@ -156,6 +167,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     setLang('en');
     showParents({ report, profile, onClose() {} });
     assert.match(currentHtml, /Curriculum/);
+    assert.match(currentHtml, /Country: Netherlands/);
     assert.match(currentHtml, /Learning path: Dutch primary math \(NL_PO\)/);
     assert.match(currentHtml, /Stage: Groep 5/);
     assert.match(currentHtml, /Operations/);
@@ -226,6 +238,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     setLang('nl');
     showParents({ report, profile, onClose() {} });
     assert.match(currentHtml, /Leerlijn/);
+    assert.match(currentHtml, /Land: Nederland/);
     assert.match(currentHtml, /Leerpad: Nederlands basisschoolrekenen \(NL_PO\)/);
     assert.match(currentHtml, /Groep: Groep 5/);
     assert.match(currentHtml, /Bewerkingen/);

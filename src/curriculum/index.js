@@ -6,6 +6,11 @@ export function getPack(packId = 'NL_PO') {
   return CURRICULUM_PACKS[packId] || CURRICULUM_PACKS.NL_PO;
 }
 
+export function listPacks() {
+  return Object.values(CURRICULUM_PACKS)
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
 export function listObjectives(packId = 'NL_PO', filters = {}) {
   const pack = getPack(packId);
   return pack.objectives.filter((o) => {

@@ -16,7 +16,7 @@ import {
   loadSave, settings, activeProfile, selectProfile, touchDailyStreak,
   addBananas, addEggPoints, hatchEgg, persist, persistNow, todayString,
 } from './state.js';
-import { applyWarmupResult, eligibleSkillIds } from './curriculum/placement.js';
+import { applyWarmupResult, eligibleSkillIds, retargetCurriculumPack } from './curriculum/placement.js';
 import { BusinessPlace } from './business/scene.js';
 import { BUSINESS_CUSTOMERS } from './business/data.js';
 import {
@@ -161,7 +161,12 @@ class Game {
         businessReport: p?.business ? dailyBusinessReport(p.business) : null,
         onCurriculumChange: (patch) => {
           if (!p) return;
-          p.curriculum = { ...p.curriculum, ...patch };
+          const { packId, ...rest } = patch;
+          const currentPack = p.curriculum?.packId;
+          const base = packId && packId !== currentPack
+            ? retargetCurriculumPack(p.curriculum, packId)
+            : p.curriculum;
+          p.curriculum = { ...base, ...rest };
           persistNow();
           showParents();
         },
@@ -611,6 +616,7 @@ class Game {
         ? { echo: true, allowedSkills }
         : { world: this.currentWorld, allowedSkills };
       problem = ensureHostable(nextProblem(this.profile.math, opts), this.profile.math, opts);
+      if (problem?.world) this.currentWorld = problem.world;
     }
     this.buildChamber(problem);
     hud.showHud(true);

@@ -11,6 +11,13 @@ test('runChamber passes curriculum eligible skills into normal chamber problems'
   );
 });
 
+test('runChamber adopts the generated problem world before building the chamber', () => {
+  assert.match(
+    main,
+    /problem = ensureHostable\(nextProblem\(this\.profile\.math, opts\), this\.profile\.math, opts\);\s+if \(problem\?\.world\) this\.currentWorld = problem\.world;/s,
+  );
+});
+
 test('correct-answer chamber follow-up also passes curriculum eligible skills', () => {
   assert.match(
     main,

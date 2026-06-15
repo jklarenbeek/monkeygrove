@@ -7,7 +7,7 @@ import {
   settings, profiles, activeProfile, createProfile, selectProfile, deleteProfile,
   spendBananas, ownItem, equip, persist, persistNow,
 } from './state.js';
-import { coverageForReport, getPack } from './curriculum/index.js';
+import { coverageForReport, getPack, listPacks } from './curriculum/index.js';
 import { HATS, FURS, TRAILS, PETS } from './models.js';
 import { RARITY_STARS, BALANCE } from './config.js';
 import { BUSINESS_MODES, INGREDIENTS, RECIPES, UPGRADES } from './business/data.js';
@@ -159,6 +159,7 @@ export function showAttract({ onStart, onParents, onDuel }) {
 export function showTitle({ onPlay, onParents, onDuel }) {
   const ps = profiles();
   const s = settings();
+  const packs = listPacks();
   const el = render(`
     <h1>🐵 Monkey Grove 🍌</h1>
     <div class="tagline">${t('title.tagline')}</div>
@@ -181,8 +182,12 @@ export function showTitle({ onPlay, onParents, onDuel }) {
           style="flex:1;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
         <input id="new-age" type="number" min="4" max="13" inputmode="numeric" placeholder="${t('title.age_prompt')}"
           style="width:140px;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
+        <select id="new-pack" aria-label="${esc(t('title.curriculum_prompt'))}"
+          style="min-width:220px;font-family:inherit;font-size:16px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto">
+          ${packs.map((pack) => `<option value="${esc(pack.id)}">${esc(curriculumPackLabel(pack))}</option>`).join('')}
+        </select>
         <button class="btn green" id="new-go">${t('title.start')}</button>
-        <div class="form-help">${t('title.age_help')}</div>
+        <div class="form-help">${t('title.age_help')} ${t('title.curriculum_help')}</div>
       </div>
     </div>
     <div class="menu-row">
@@ -213,7 +218,8 @@ export function showTitle({ onPlay, onParents, onDuel }) {
     const name = el.querySelector('#new-name').value.trim() || 'Monkey';
     const ageValue = Number(el.querySelector('#new-age').value);
     const age = Number.isFinite(ageValue) && ageValue >= 4 && ageValue <= 13 ? ageValue : null;
-    const p = createProfile(name, { age });
+    const packId = el.querySelector('#new-pack').value;
+    const p = createProfile(name, { age, packId });
     audio.sfx('correct');
     onPlay(p.id, true);
   };
@@ -272,15 +278,20 @@ export function showWarmup({ problems, onAnswer, onDone, onSkip }) {
     answered = false;
     const problem = problems[i];
     const choices = Array.isArray(problem?.choices) ? problem.choices : [];
+    const instruction = problem?.prompt?.key
+      ? t(warmupPromptKey(problem.prompt.key), problemPromptVars(problem))
+      : t('placement.answer');
     const el = render(`
       <div style="flex:1"></div>
       <h2>${t('placement.title')}</h2>
       <div class="tagline">${t('placement.body')}</div>
       <div class="card placement-card">
+        <div class="placement-step">${esc(t('placement.step', { n: i + 1, total: problems.length }))}</div>
+        <div class="placement-task">${esc(instruction)}</div>
         <div class="placement-eq">${formatWarmupEquation(problem?.equation || '')}</div>
         <div class="tile-grid">
           ${choices.map((choice) => `
-            <button class="tile pressable warmup-choice" data-value="${esc(String(choice.value))}" aria-label="${t('placement.answer')} ${esc(String(choice.value))}">
+            <button class="tile pressable warmup-choice" data-value="${esc(String(choice.value))}" aria-label="${esc(instruction)} ${esc(String(choice.value))}">
               <div class="t-icon">✨</div>
               <div class="t-name">${esc(String(choice.value))}</div>
               <div class="t-price">${t('placement.answer')}</div>
@@ -344,7 +355,26 @@ export function showWarmup({ problems, onAnswer, onDone, onSkip }) {
 }
 
 function formatWarmupEquation(equation) {
-  return esc(equation).replace(/\?/g, '<span class="slot">?</span>');
+  return esc(equation)
+    .replace(/(\d+)\s*\/\s*(\d+)/g, '<span class="frac"><span class="n">$1</span><span class="d">$2</span></span>')
+    .replace(/\?/g, '<span class="slot">?</span>');
+}
+
+function problemPromptVars(problem) {
+  const v = { ...(problem?.meta || {}), ...(problem?.model?.params || {}), ...(problem?.prompt?.vars || {}) };
+  if (v.n !== undefined && v.d !== undefined) v.frac = `${v.n}/${v.d}`;
+  v.answer = problem?.answer;
+  return v;
+}
+
+function warmupPromptKey(promptKey) {
+  return ({
+    'q.compare': 'warmup.q.compare',
+    'q.equiv': 'warmup.q.equiv',
+    'q.frac_of': 'warmup.q.frac_of',
+    'q.missing': 'warmup.q.missing',
+    'q.share_fetch': 'warmup.q.share_fetch',
+  })[promptKey] || 'warmup.q.fetch';
 }
 
 // ---------- settings ----------
@@ -959,6 +989,11 @@ export function showBusinessDaySummary({ report, onDone }) {
 
 // ---------- parents ----------
 
+function curriculumPackLabel(pack) {
+  const country = pack.countryKey ? t(pack.countryKey) : pack.countryCode || pack.id;
+  return `${country} - ${t(pack.titleKey)}`;
+}
+
 function stageLabel(pack, stageId) {
   const stage = pack.stages.find((s) => s.id === stageId);
   return stage ? t(stage.labelKey) : t(pack.fallbackStagePrefixKey || 'curriculum.stage', { n: '?' });
@@ -967,6 +1002,7 @@ function stageLabel(pack, stageId) {
 function curriculumCoverageHtml(profile, report, businessReport = null, showControls = false) {
   if (!profile?.curriculum || !report) return '';
   const pack = getPack(profile.curriculum.packId);
+  const packs = listPacks();
   const coverage = coverageForReport(pack.id, report, { business: businessReport });
   const stage = profile.curriculum.confirmedStage || profile.curriculum.estimatedStage;
   const strictness = profile.curriculum.strictness || 'soft';
@@ -974,10 +1010,17 @@ function curriculumCoverageHtml(profile, report, businessReport = null, showCont
     <div class="card">
       <h3>${esc(t('parents.curriculum'))}</h3>
       <div class="curriculum-meta">
+        <div class="chip">${esc(t('parents.country'))}: ${esc(pack.countryKey ? t(pack.countryKey) : pack.countryCode || pack.id)}</div>
         <div class="chip">${esc(t('parents.curriculum_pack'))}: ${esc(t(pack.titleKey))}</div>
         <div class="chip">${esc(t('parents.stage'))}: ${esc(stageLabel(pack, stage))}</div>
       </div>
       ${showControls ? `<div class="curriculum-controls">
+        <label>
+          <span>${esc(t('parents.curriculum_pack'))}</span>
+          <select data-pack>
+            ${packs.map((p) => `<option value="${esc(p.id)}" ${p.id === pack.id ? 'selected' : ''}>${esc(curriculumPackLabel(p))}</option>`).join('')}
+          </select>
+        </label>
         <label>
           <span>${esc(t('parents.stage'))}</span>
           <select data-stage>
@@ -1049,6 +1092,9 @@ export function showParents({ report, profile, businessReport = null, onClose, o
     </div>` : ''}
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
+  el.querySelector('[data-pack]')?.addEventListener('change', (e) => {
+    onCurriculumChange?.({ packId: e.target.value });
+  });
   el.querySelector('[data-stage]')?.addEventListener('change', (e) => {
     onCurriculumChange?.({ confirmedStage: e.target.value });
   });

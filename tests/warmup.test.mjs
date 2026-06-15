@@ -9,7 +9,8 @@ const i18n = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
 
 test('task 5 wiring exists for explorer age and warmup flow', () => {
   assert.match(screens, /id="new-age"/);
-  assert.match(screens, /createProfile\(name, \{ age \}\)/);
+  assert.match(screens, /id="new-pack"/);
+  assert.match(screens, /createProfile\(name, \{ age, packId \}\)/);
   assert.match(screens, /export function showWarmup/);
   assert.match(main, /needsWarmup\(profile = this\.profile\)/);
   assert.match(main, /startWarmupThenHub\(\)/);
@@ -78,6 +79,7 @@ test('showWarmup ignores repeated clicks after a choice or skip is already handl
 
   const toastHost = { appendChild() {} };
   let currentScreen = null;
+  let currentHtml = '';
   const makeScreen = (html) => {
     const buttons = [];
     const byId = new Map();
@@ -113,6 +115,7 @@ test('showWarmup ignores repeated clicks after a choice or skip is already handl
       return currentScreen;
     },
     set innerHTML(html) {
+      currentHtml = html;
       currentScreen = makeScreen(html);
     },
   };
@@ -164,6 +167,7 @@ test('showWarmup ignores repeated clicks after a choice or skip is already handl
       problems: [{
         answer: '4',
         equation: '2 + 2 = ?',
+        prompt: { key: 'q.compare', vars: {} },
         choices: [{ value: '4' }, { value: '5' }],
       }],
       onAnswer: () => { answerCalls += 1; },
@@ -172,6 +176,8 @@ test('showWarmup ignores repeated clicks after a choice or skip is already handl
     });
 
     currentScreen.querySelector('#warmup-start').click();
+    assert.match(currentHtml, /Question 1 of 1/);
+    assert.match(currentHtml, /Choose the largest fraction\./);
     const finalChoice = currentScreen.querySelectorAll('[data-value]')[0];
     finalChoice.click();
     finalChoice.click();

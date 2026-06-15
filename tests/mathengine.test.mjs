@@ -388,11 +388,11 @@ test('selection: allowedSkills constrains world focus when possible', () => {
   }
 });
 
-test('selection: allowedSkills falls back to normal world focus when empty for world', () => {
+test('selection: allowedSkills can redirect when empty for world', () => {
   const m = createMathState();
   const p = nextProblem(m, { world: 'tide', allowedSkills: ['tables_b'], rng: new Rng(5) });
-  assert.equal(p.world, 'tide');
-  assert.ok(['add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100'].includes(p.skillId));
+  assert.equal(p.world, 'garden');
+  assert.equal(p.skillId, 'tables_b');
   validateProblem(p);
 });
 
@@ -436,6 +436,23 @@ test('echo picks the weakest stale skill', () => {
   const m3 = createMathState();
   const fallback = nextProblem(m3, { echo: true, rng: new Rng(4) });
   validateProblem(fallback);
+});
+
+test('echo respects allowedSkills before reviewing stale skills', () => {
+  const m = createMathState();
+  m.skills.add_20 = { r: 450, n: 10, hist: [0, 0, 1] };
+  m.skills.frac_compare = { r: 620, n: 3, hist: [1, 0] };
+  m.log.push({ t: 1000, skill: 'add_20', tag: null, ok: false, ms: 1, hint: false });
+  m.log.push({ t: 2000, skill: 'frac_compare', tag: null, ok: true, ms: 1, hint: false });
+
+  const p = nextProblem(m, {
+    echo: true,
+    allowedSkills: ['frac_compare', 'frac_equiv', 'frac_of_n'],
+    rng: new Rng(12),
+  });
+
+  assert.equal(p.skillId, 'frac_compare');
+  validateProblem(p);
 });
 
 test('misconception tags appear in distractors over 200 generations', () => {

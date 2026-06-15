@@ -3,6 +3,7 @@ import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
 import { createCurriculumState } from './curriculum/placement.js';
+import { getPack } from './curriculum/index.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
 
 const KEY = 'monkeygrove.save';
@@ -22,7 +23,7 @@ function freshProfile(name, opts = {}) {
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
-    curriculum: createCurriculumState({ age: opts.age }),
+    curriculum: createCurriculumState({ age: opts.age, packId: opts.packId }),
     business: createBusinessState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
@@ -74,10 +75,20 @@ function migrate(s) {
     for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
     for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
     if (!isObject(p.curriculum)) p.curriculum = createCurriculumState();
-    const cref = createCurriculumState({ age: p.curriculum.ageAtStart });
+    const cref = createCurriculumState({ age: p.curriculum.ageAtStart, packId: p.curriculum.packId });
     for (const k of Object.keys(cref)) {
       if (p.curriculum[k] === undefined) p.curriculum[k] = structuredClone(cref[k]);
     }
+    p.curriculum.packId = cref.packId;
+    if (p.curriculum.estimatedStage === undefined || p.curriculum.estimatedStage === null) {
+      p.curriculum.estimatedStage = cref.estimatedStage;
+    }
+    if (p.curriculum.confirmedStage === undefined || p.curriculum.confirmedStage === null) {
+      p.curriculum.confirmedStage = cref.confirmedStage;
+    }
+    const stageIds = new Set(getPack(p.curriculum.packId).stages.map((stage) => stage.id));
+    if (!stageIds.has(p.curriculum.estimatedStage)) p.curriculum.estimatedStage = cref.estimatedStage;
+    if (!stageIds.has(p.curriculum.confirmedStage)) p.curriculum.confirmedStage = cref.confirmedStage;
     if (!isObject(p.curriculum.warmup)) p.curriculum.warmup = {};
     if (p.curriculum.warmup.completed === undefined) p.curriculum.warmup.completed = false;
     if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
