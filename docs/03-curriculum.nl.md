@@ -60,12 +60,20 @@ vaardigheidskoppelingen.
 
 **Leeftijd als ondergrens**:
 - Bij het aanmaken van een nieuwe speler kiest de ouder/kind een
-  land/curriculum en kan een leeftijd van 4 t/m 13 worden ingevuld.
-- Voor `NL_PO` wordt de leeftijd vertaald naar de bijpassende basisschoolgroep
-  (`grade_1` t/m `grade_8` intern, zichtbaar als Groep 1 t/m 8).
+  land/curriculum en kan een leeftijd van 4 t/m 13 of een verjaardag worden
+  ingevuld.
+- Voor `NL_PO` wordt de huidige leeftijd vertaald naar de bijpassende
+  basisschoolgroep (`grade_1` t/m `grade_8` intern, zichtbaar als Groep 1 t/m 8).
 - Die geschatte groep is de standaard **ondergrens** voor spelinhoud. Een kind
   van 11 jaar start dus minimaal op Groep 8-inhoud en krijgt geen vroege sommen
   zoals `2 + 8` als plaatsingsopgave.
+- Als een verjaardag bekend is, berekent Monkey Grove de huidige leeftijd opnieuw
+  bij latere speelsessies. Wanneer het kind in een hogere leeftijdsband komt,
+  schuift de automatische ondergrens mee omhoog en kan de warming-up opnieuw
+  worden geopend voor die nieuwe band.
+- Als alleen een leeftijd is ingevuld, bewaart het spel de datum waarop die
+  leeftijd is vastgelegd. Daardoor kunnen ook leeftijdsprofielen na verstreken
+  jaren omhoog meegroeien, al is een verjaardag nauwkeuriger.
 
 **Bovengrens mag omhoog**:
 - De korte warming-up kan laten zien dat het kind meer aankan.
@@ -81,6 +89,9 @@ vaardigheidskoppelingen.
 - Dit is bewust de enige manier om onder de leeftijdsinschatting te spelen,
   omdat ouders vaak weten of een kind in een andere groep zit of extra herhaling
   nodig heeft.
+- Verjaardagen verhogen een ouder-override niet stilzwijgend. Het spel kan wel
+  een nieuwe voorgestelde groep tonen, maar de door de ouder bevestigde groep
+  blijft de ondergrens totdat de ouder die opnieuw wijzigt.
 
 **Huidige speelbare dekking**:
 - Groep 3-5: optellen/aftrekken, ontbrekende termen, tafels en delen/verdelen

@@ -5,7 +5,8 @@ import {
 } from '../src/curriculum/index.js';
 import {
   createCurriculumState, estimateStageFromAge, scoreWarmup,
-  eligibleSkillIds, retargetCurriculumPack,
+  eligibleSkillIds, retargetCurriculumPack, ageOnDate, currentCurriculumAge,
+  refreshCurriculumForDate,
 } from '../src/curriculum/placement.js';
 
 test('NL_PO pack uses English internal identifiers', () => {
@@ -112,12 +113,71 @@ test('createCurriculumState stores estimate with soft targeting', () => {
   assert.deepEqual(createCurriculumState({ age: 8 }), {
     packId: 'NL_PO',
     ageAtStart: 8,
+    birthDate: null,
+    ageCapturedOn: null,
     estimatedStage: 'grade_5',
     confirmedStage: 'grade_5',
+    stageSource: 'auto',
+    lastPromotionCheck: null,
+    lastPromotion: null,
     placementBand: 'unknown',
     strictness: 'soft',
     warmup: { completed: false, results: [], skillIds: [] },
   });
+});
+
+test('birth date gives current age and initial curriculum stage', () => {
+  assert.equal(ageOnDate('2018-06-15', '2026-06-14'), 7);
+  assert.equal(ageOnDate('2018-06-15', '2026-06-15'), 8);
+
+  const curriculum = createCurriculumState({
+    birthDate: '2018-06-15',
+    today: '2026-06-15',
+  });
+  assert.equal(curriculum.ageAtStart, 8);
+  assert.equal(curriculum.birthDate, '2018-06-15');
+  assert.equal(curriculum.ageCapturedOn, '2026-06-15');
+  assert.equal(curriculum.estimatedStage, 'grade_5');
+  assert.equal(curriculum.confirmedStage, 'grade_5');
+});
+
+test('auto curriculum advances upward as a child ages and resets warmup for promotion', () => {
+  const curriculum = {
+    ...createCurriculumState({ birthDate: '2018-06-15', today: '2026-06-15' }),
+    warmup: { completed: true, results: [{ skill: 'tables_b', correct: true }], skillIds: ['tables_b'] },
+  };
+  const next = refreshCurriculumForDate(curriculum, '2027-06-15');
+
+  assert.equal(currentCurriculumAge(next, '2027-06-15'), 9);
+  assert.equal(next.estimatedStage, 'grade_6');
+  assert.equal(next.confirmedStage, 'grade_6');
+  assert.equal(next.stageSource, 'auto');
+  assert.equal(next.lastPromotion.fromStage, 'grade_5');
+  assert.equal(next.lastPromotion.toStage, 'grade_6');
+  assert.equal(next.lastPromotion.on, '2027-06-15');
+  assert.deepEqual(next.warmup, { completed: false, results: [], skillIds: [] });
+});
+
+test('age-only profiles can still advance using the captured age date', () => {
+  const curriculum = createCurriculumState({ age: 8, today: '2026-06-15' });
+  assert.equal(currentCurriculumAge(curriculum, '2027-06-14'), 8);
+  assert.equal(currentCurriculumAge(curriculum, '2027-06-15'), 9);
+  assert.equal(refreshCurriculumForDate(curriculum, '2027-06-15').estimatedStage, 'grade_6');
+});
+
+test('parent confirmed stage stays the lower bound when aging suggests a higher grade', () => {
+  const curriculum = {
+    ...createCurriculumState({ birthDate: '2018-06-15', today: '2026-06-15' }),
+    confirmedStage: 'grade_4',
+    stageSource: 'parent',
+  };
+  const next = refreshCurriculumForDate(curriculum, '2027-06-15');
+
+  assert.equal(next.estimatedStage, 'grade_6');
+  assert.equal(next.confirmedStage, 'grade_4');
+  assert.equal(next.stageSource, 'parent');
+  assert.ok(eligibleSkillIds(next).includes('add_100'));
+  assert.ok(!eligibleSkillIds(next).includes('mult_2digit'));
 });
 
 test('createCurriculumState normalizes unknown pack ids to the default pack', () => {
@@ -174,6 +234,7 @@ test('retargetCurriculumPack recalculates age estimate and resets parent stage t
     const oldState = {
       ...createCurriculumState({ age: 11 }),
       confirmedStage: 'grade_5',
+      stageSource: 'parent',
       placementBand: 'ahead',
       warmup: { completed: true, results: [{ correct: true }], skillIds: ['mult_2digit'] },
     };
@@ -182,6 +243,7 @@ test('retargetCurriculumPack recalculates age estimate and resets parent stage t
     assert.equal(next.ageAtStart, 11);
     assert.equal(next.estimatedStage, 'level_b');
     assert.equal(next.confirmedStage, 'level_b');
+    assert.equal(next.stageSource, 'auto');
     assert.equal(next.placementBand, 'unknown');
     assert.deepEqual(next.warmup, { completed: false, results: [], skillIds: [] });
   } finally {

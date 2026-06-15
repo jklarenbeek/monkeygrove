@@ -35,15 +35,23 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
 
 ## Explorer placement & curriculum spine
 - New Explorers choose a country/curriculum pack and can enter an optional age
-  (4-13). For the shipped `NL_PO` curriculum pack, that estimates a Dutch primary
-  stage (`grade_1`...`grade_8` internally, shown to parents as Groep 1...8).
+  (4-13) or birthday. For the shipped `NL_PO` curriculum pack, current age
+  estimates a Dutch primary stage (`grade_1`...`grade_8` internally, shown to
+  parents as Groep 1...8).
 - A short warm-up after the intro story gives Mimi a few tiny number quests
   before the hub. It adjusts the placement band (`below`, `on_track`, `ahead`)
   without putting a permanent label on the child.
-- The age-estimated stage is the default lower bound. Warm-up can open the upper
-  side of the window, but it may not send a child below the age/curriculum floor.
+- The current-age-estimated stage is the default lower bound. Warm-up can open
+  the upper side of the window, but it may not send a child below the
+  age/curriculum floor.
+- Children age quickly, so birthday-based profiles re-check the automatic floor
+  on later sessions. When the child reaches a higher age band, the automatic
+  lower bound may promote upward and the warm-up can run again for the new band.
 - Parent-selected stage/group is the explicit override. If a parent chooses a
   different group, that confirmed stage becomes the lower bound for play.
+  Parent overrides are not silently raised by birthdays; the suggested stage can
+  keep moving, but the confirmed group remains the floor until the parent changes
+  it.
 - Targeting is soft by default: playable objectives from the lower bound upward
   into the next stage feed the adaptive engine as eligible game skills. Strict
   targeting keeps play close to the confirmed stage. If no eligible skills exist,
@@ -118,6 +126,8 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   Changing the pack recalculates the age estimate for that pack and resets
   warm-up placement so old probes from a different curriculum do not leak into
   the new path.
+- Parents can also edit the birthday. That affects the automatic suggested
+  stage immediately, while any parent-confirmed stage/group remains the override.
 - Coverage is objective-based: covered, started, ready to play, or planned.
   Planned objectives are visible so parents can see the broader `NL_PO` map even
   before every requirement has a game mechanic.

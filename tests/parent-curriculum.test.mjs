@@ -66,15 +66,19 @@ test('task 7 i18n keys exist in english and dutch', () => {
 
 test('parent curriculum controls expose stage and strictness change wiring', () => {
   assert.match(screensSource, /data-pack/);
+  assert.match(screensSource, /data-birth-date/);
   assert.match(screensSource, /data-stage/);
   assert.match(screensSource, /data-strictness/);
   assert.match(screensSource, /onCurriculumChange/);
+  assert.match(mainSource, /rest\.stageSource\s*=\s*patch\.confirmedStage === p\.curriculum\?\.estimatedStage\s*\?\s*'auto'\s*:\s*'parent'/);
 });
 
 test('new player form sends selected curriculum pack into profile creation', () => {
   assert.match(screensSource, /id="new-pack"/);
+  assert.match(screensSource, /id="new-birth-date"/);
+  assert.match(screensSource, /const birthDate = el\.querySelector\('#new-birth-date'\)\.value/);
   assert.match(screensSource, /const packId = el\.querySelector\('#new-pack'\)\.value/);
-  assert.match(screensSource, /createProfile\(name, \{ age, packId \}\)/);
+  assert.match(screensSource, /createProfile\(name, \{ age, birthDate, packId \}\)/);
 });
 
 test('showParents renders translated curriculum coverage without exposing internal ids', async () => {
@@ -142,6 +146,9 @@ test('showParents renders translated curriculum coverage without exposing intern
       name: 'Ari',
       curriculum: {
         packId: 'NL_PO',
+        birthDate: '2018-06-15',
+        ageAtStart: 8,
+        ageCapturedOn: '2026-06-15',
         estimatedStage: 'grade_5',
         confirmedStage: 'grade_5',
       },
@@ -169,6 +176,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     assert.match(currentHtml, /Curriculum/);
     assert.match(currentHtml, /Country: Netherlands/);
     assert.match(currentHtml, /Learning path: Dutch primary math \(NL_PO\)/);
+    assert.match(currentHtml, /Birthday: 2018-06-15/);
     assert.match(currentHtml, /Stage: Groep 5/);
     assert.match(currentHtml, /Operations/);
     assert.match(currentHtml, /Add and subtract to 20 · covered/);
@@ -240,6 +248,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     assert.match(currentHtml, /Leerlijn/);
     assert.match(currentHtml, /Land: Nederland/);
     assert.match(currentHtml, /Leerpad: Nederlands basisschoolrekenen \(NL_PO\)/);
+    assert.match(currentHtml, /Verjaardag: 2018-06-15/);
     assert.match(currentHtml, /Groep: Groep 5/);
     assert.match(currentHtml, /Bewerkingen/);
     assert.match(currentHtml, /Plussommen en minsommen tot 20 · beheerst/);

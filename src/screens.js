@@ -182,12 +182,14 @@ export function showTitle({ onPlay, onParents, onDuel }) {
           style="flex:1;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
         <input id="new-age" type="number" min="4" max="13" inputmode="numeric" placeholder="${t('title.age_prompt')}"
           style="width:140px;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
+        <input id="new-birth-date" type="date" aria-label="${esc(t('title.birthday_prompt'))}"
+          style="min-width:168px;font-family:inherit;font-size:16px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
         <select id="new-pack" aria-label="${esc(t('title.curriculum_prompt'))}"
           style="min-width:220px;font-family:inherit;font-size:16px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto">
           ${packs.map((pack) => `<option value="${esc(pack.id)}">${esc(curriculumPackLabel(pack))}</option>`).join('')}
         </select>
         <button class="btn green" id="new-go">${t('title.start')}</button>
-        <div class="form-help">${t('title.age_help')} ${t('title.curriculum_help')}</div>
+        <div class="form-help">${t('title.age_help')} ${t('title.birthday_help')} ${t('title.curriculum_help')}</div>
       </div>
     </div>
     <div class="menu-row">
@@ -218,14 +220,16 @@ export function showTitle({ onPlay, onParents, onDuel }) {
     const name = el.querySelector('#new-name').value.trim() || 'Monkey';
     const ageValue = Number(el.querySelector('#new-age').value);
     const age = Number.isFinite(ageValue) && ageValue >= 4 && ageValue <= 13 ? ageValue : null;
+    const birthDate = el.querySelector('#new-birth-date').value;
     const packId = el.querySelector('#new-pack').value;
-    const p = createProfile(name, { age, packId });
+    const p = createProfile(name, { age, birthDate, packId });
     audio.sfx('correct');
     onPlay(p.id, true);
   };
   el.querySelector('#new-go').addEventListener('click', go);
   el.querySelector('#new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   el.querySelector('#new-age').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  el.querySelector('#new-birth-date').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
       setLang(b.dataset.lang); persistNow();
@@ -1012,6 +1016,7 @@ function curriculumCoverageHtml(profile, report, businessReport = null, showCont
       <div class="curriculum-meta">
         <div class="chip">${esc(t('parents.country'))}: ${esc(pack.countryKey ? t(pack.countryKey) : pack.countryCode || pack.id)}</div>
         <div class="chip">${esc(t('parents.curriculum_pack'))}: ${esc(t(pack.titleKey))}</div>
+        ${profile.curriculum.birthDate ? `<div class="chip">${esc(t('parents.birthday'))}: ${esc(profile.curriculum.birthDate)}</div>` : ''}
         <div class="chip">${esc(t('parents.stage'))}: ${esc(stageLabel(pack, stage))}</div>
       </div>
       ${showControls ? `<div class="curriculum-controls">
@@ -1020,6 +1025,10 @@ function curriculumCoverageHtml(profile, report, businessReport = null, showCont
           <select data-pack>
             ${packs.map((p) => `<option value="${esc(p.id)}" ${p.id === pack.id ? 'selected' : ''}>${esc(curriculumPackLabel(p))}</option>`).join('')}
           </select>
+        </label>
+        <label>
+          <span>${esc(t('parents.birthday'))}</span>
+          <input type="date" data-birth-date value="${esc(profile.curriculum.birthDate || '')}">
         </label>
         <label>
           <span>${esc(t('parents.stage'))}</span>
@@ -1094,6 +1103,9 @@ export function showParents({ report, profile, businessReport = null, onClose, o
   el.querySelector('#scr-back').addEventListener('click', onClose);
   el.querySelector('[data-pack]')?.addEventListener('change', (e) => {
     onCurriculumChange?.({ packId: e.target.value });
+  });
+  el.querySelector('[data-birth-date]')?.addEventListener('change', (e) => {
+    onCurriculumChange?.({ birthDate: e.target.value });
   });
   el.querySelector('[data-stage]')?.addEventListener('change', (e) => {
     onCurriculumChange?.({ confirmedStage: e.target.value });

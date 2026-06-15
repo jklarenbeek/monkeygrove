@@ -9,8 +9,9 @@ const i18n = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
 
 test('task 5 wiring exists for explorer age and warmup flow', () => {
   assert.match(screens, /id="new-age"/);
+  assert.match(screens, /id="new-birth-date"/);
   assert.match(screens, /id="new-pack"/);
-  assert.match(screens, /createProfile\(name, \{ age, packId \}\)/);
+  assert.match(screens, /createProfile\(name, \{ age, birthDate, packId \}\)/);
   assert.match(screens, /export function showWarmup/);
   assert.match(main, /needsWarmup\(profile = this\.profile\)/);
   assert.match(main, /startWarmupThenHub\(\)/);

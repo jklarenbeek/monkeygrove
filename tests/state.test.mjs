@@ -25,11 +25,21 @@ beforeEach(() => {
 
 test('createProfile accepts age and creates curriculum state', async () => {
   const state = await freshStateModule();
-  const p = state.createProfile('Ari', { age: 8 });
+  const p = state.createProfile('Ari', { age: 8, today: '2026-06-15' });
   assert.equal(p.curriculum.packId, 'NL_PO');
   assert.equal(p.curriculum.ageAtStart, 8);
+  assert.equal(p.curriculum.ageCapturedOn, '2026-06-15');
   assert.equal(p.curriculum.estimatedStage, 'grade_5');
   assert.equal(p.curriculum.confirmedStage, 'grade_5');
+});
+
+test('createProfile accepts birthday for long-term age progression', async () => {
+  const state = await freshStateModule();
+  const p = state.createProfile('Ari', { birthDate: '2018-06-15', today: '2026-06-15' });
+  assert.equal(p.curriculum.birthDate, '2018-06-15');
+  assert.equal(p.curriculum.ageAtStart, 8);
+  assert.equal(p.curriculum.ageCapturedOn, '2026-06-15');
+  assert.equal(p.curriculum.estimatedStage, 'grade_5');
 });
 
 test('createProfile carries the selected curriculum pack into profile state', async () => {
@@ -59,10 +69,37 @@ test('createProfile carries the selected curriculum pack into profile state', as
   }
 });
 
+test('refreshProfileCurriculum advances auto profiles when birthday moves the child up', async () => {
+  const state = await freshStateModule();
+  const p = state.createProfile('Ari', { birthDate: '2018-06-15', today: '2026-06-15' });
+  p.curriculum.warmup = { completed: true, results: [{ correct: true }], skillIds: ['tables_b'] };
+
+  const changed = state.refreshProfileCurriculum(p, '2027-06-15');
+
+  assert.equal(changed, true);
+  assert.equal(p.curriculum.estimatedStage, 'grade_6');
+  assert.equal(p.curriculum.confirmedStage, 'grade_6');
+  assert.equal(p.curriculum.lastPromotion.toStage, 'grade_6');
+  assert.equal(p.curriculum.warmup.completed, false);
+});
+
+test('refreshProfileCurriculum preserves parent override while updating suggested stage', async () => {
+  const state = await freshStateModule();
+  const p = state.createProfile('Ari', { birthDate: '2018-06-15', today: '2026-06-15' });
+  p.curriculum.confirmedStage = 'grade_4';
+  p.curriculum.stageSource = 'parent';
+
+  state.refreshProfileCurriculum(p, '2027-06-15');
+
+  assert.equal(p.curriculum.estimatedStage, 'grade_6');
+  assert.equal(p.curriculum.confirmedStage, 'grade_4');
+  assert.equal(p.curriculum.stageSource, 'parent');
+});
+
 test('old saves heal curriculum fields additively', async () => {
   localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
-    profiles: [{ id: 'p1', name: 'Old', created: 1 }],
+    profiles: [{ id: 'p1', name: 'Old', created: Date.parse('2026-06-15T00:00:00') }],
     activeProfile: 'p1',
     settings: { lang: 'en', sfx: true, music: true },
   }));
@@ -71,12 +108,13 @@ test('old saves heal curriculum fields additively', async () => {
   assert.equal(p.curriculum.packId, 'NL_PO');
   assert.equal(p.curriculum.strictness, 'soft');
   assert.equal(p.curriculum.estimatedStage, null);
+  assert.equal(p.curriculum.stageSource, 'auto');
 });
 
 test('old saves with null stats and avatar keep the profile and heal objects', async () => {
   localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
-    profiles: [{ id: 'p1', name: 'Old', created: 1, stats: null, avatar: null }],
+    profiles: [{ id: 'p1', name: 'Old', created: Date.parse('2026-06-15T00:00:00'), stats: null, avatar: null }],
     activeProfile: 'p1',
     settings: { lang: 'en', sfx: true, music: true },
   }));
@@ -95,7 +133,7 @@ test('partial curriculum preserves placement choices and warmup detail', async (
     profiles: [{
       id: 'p1',
       name: 'Old',
-      created: 1,
+      created: Date.parse('2026-06-15T00:00:00'),
       curriculum: {
         ageAtStart: 9,
         confirmedStage: 'grade_4',
@@ -112,12 +150,41 @@ test('partial curriculum preserves placement choices and warmup detail', async (
   const p = state.activeProfile();
   assert.equal(p.curriculum.packId, 'NL_PO');
   assert.equal(p.curriculum.ageAtStart, 9);
+  assert.equal(p.curriculum.ageCapturedOn, '2026-06-15');
   assert.equal(p.curriculum.estimatedStage, 'grade_6');
   assert.equal(p.curriculum.confirmedStage, 'grade_4');
+  assert.equal(p.curriculum.stageSource, 'parent');
   assert.equal(p.curriculum.strictness, 'soft');
   assert.equal(p.curriculum.warmup.completed, false);
   assert.deepEqual(p.curriculum.warmup.results, [{ correct: true }]);
   assert.deepEqual(p.curriculum.warmup.scored, { band: 'ahead' });
+});
+
+test('migration uses profile creation date to age old age-only profiles', async () => {
+  localStorage.setItem('monkeygrove.save', JSON.stringify({
+    v: 1,
+    profiles: [{
+      id: 'p1',
+      name: 'Old',
+      created: Date.parse('2024-06-15T00:00:00'),
+      curriculum: {
+        ageAtStart: 8,
+        estimatedStage: 'grade_5',
+        confirmedStage: 'grade_5',
+      },
+    }],
+    activeProfile: 'p1',
+    settings: { lang: 'en', sfx: true, music: true },
+  }));
+
+  const state = await freshStateModule();
+  const save = state.loadSave();
+  const p = save.profiles[0];
+
+  assert.equal(p.curriculum.ageCapturedOn, '2024-06-15');
+  state.refreshProfileCurriculum(p, '2026-06-15');
+  assert.equal(p.curriculum.estimatedStage, 'grade_7');
+  assert.equal(p.curriculum.confirmedStage, 'grade_7');
 });
 
 test('migration preserves and normalizes saved curriculum pack ids', async () => {
@@ -126,7 +193,7 @@ test('migration preserves and normalizes saved curriculum pack ids', async () =>
     profiles: [{
       id: 'p1',
       name: 'Old',
-      created: 1,
+      created: Date.parse('2026-06-15T00:00:00'),
       curriculum: {
         packId: 'UNKNOWN',
         ageAtStart: 8,

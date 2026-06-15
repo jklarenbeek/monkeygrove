@@ -127,8 +127,11 @@ listPacks() -> registered curriculum packs for onboarding/parent selectors
 listObjectives(packId, filters?) -> objectives by status/stage/domain
 coverageForReport(packId, masteryReport, { business? }) -> parent-facing coverage
 
-createCurriculumState({ packId?, age? }) -> profile.curriculum defaults
+createCurriculumState({ packId?, age?, birthDate?, today? }) -> profile.curriculum defaults
 estimateStageFromAge(packId, age) -> 'grade_1'..'grade_8' | null
+ageOnDate(birthDate, onDate) -> current age from YYYY-MM-DD
+currentCurriculumAge(curriculum, onDate) -> birthday age or captured age + elapsed years
+refreshCurriculumForDate(curriculum, onDate) -> promote automatic floor if current age advanced
 retargetCurriculumPack(curriculum, packId) -> state for a newly selected pack
 scoreWarmup(results) -> { band: 'below'|'on_track'|'ahead', correct, total, rate }
 applyWarmupResult(curriculum, results, opts?) -> updated curriculum state
@@ -140,12 +143,17 @@ metadata, stage age bands, objectives, playable skill mappings, and translated
 labels. Stage and domain IDs stay English internally (`grade_5`, `operations`,
 `measurement_geometry`); Dutch and English labels live in `i18n.js`.
 
-The age-estimated stage is the default lower bound for play. Warm-up placement
-can open the upper side of the soft window, but cannot move eligibility below
-that lower bound. Parent-selected stage/group is the override: once the parent
-confirms a different stage, that confirmed stage becomes the lower bound. Strict
-targeting keeps eligibility at the current lower-bound/placement center instead
-of including the next stage.
+The current-age-estimated stage is the default lower bound for play. Warm-up
+placement can open the upper side of the soft window, but cannot move eligibility
+below that lower bound. Birthday-based profiles refresh that estimate when the
+profile is loaded for play; age-only profiles use `ageCapturedOn` to advance by
+elapsed years. Automatic progression only moves the lower bound upward, and a
+promotion resets warm-up so Mimi can probe the new band. Parent-selected
+stage/group is the override: once the parent confirms a different stage, that
+confirmed stage becomes the lower bound. The suggested stage can still advance
+in the background, but the confirmed stage remains the floor until the parent
+changes it. Strict targeting keeps eligibility at the current lower-bound/
+placement center instead of including the next stage.
 
 Business-mode progress can also contribute to objective coverage for mapped
 money, measurement, fraction, ratio, percentage, profit, and data objectives.
@@ -166,7 +174,10 @@ monkeygrove.save = {
     curriculum: {
       packId: 'NL_PO',
       ageAtStart,
+      birthDate, ageCapturedOn,              // birthday preferred; age-only profiles age from capture date
       estimatedStage, confirmedStage,       // English internal ids, e.g. 'grade_5'
+      stageSource,                          // auto | parent
+      lastPromotionCheck, lastPromotion,
       placementBand,                        // unknown | below | on_track | ahead
       strictness,                           // soft by default
       warmup: { completed, results, skillIds, scored? },
@@ -194,12 +205,18 @@ stay additive); corrupt JSON falls back to a fresh save after stashing the broke
 blob in `monkeygrove.backup`.
 
 ## Runtime flow additions
-- New Explorer creation accepts an optional age from 4-13 plus the selected
-  country/curriculum pack and calls `createProfile(name, { age, packId })`.
+- New Explorer creation accepts an optional age from 4-13, optional birthday,
+  and the selected country/curriculum pack, then calls
+  `createProfile(name, { age, birthDate, packId })`.
 - Age-created profiles go through story -> warm-up -> hub. If interrupted after
   the story or mid-warm-up, `needsWarmup()` routes them back through warm-up
   before the hub. Old migrated profiles with no `ageAtStart` are not forced into
   warm-up.
+- Active profiles call `refreshProfileCurriculum(...)` before play. If current
+  age now maps to a higher curriculum stage and the profile is in automatic
+  placement, `estimatedStage` and `confirmedStage` advance together and warm-up
+  is reopened for the new band. If `stageSource` is `parent`, only the suggested
+  `estimatedStage` advances; `confirmedStage` remains the lower bound.
 - The warm-up problems are chosen from `eligibleSkillIds(profile.curriculum)`,
   so age 11 on `NL_PO` starts with upper-primary probes such as multi-digit
   multiplication, division with remainders, and fraction comparison rather than
@@ -215,8 +232,10 @@ blob in `monkeygrove.backup`.
   eligible skill and `main.js` updates the chamber world to match.
 - The parent screen renders `coverageForReport(...)` beside the existing skill
   overview, with translated country, pack, stage, domain, objective, and status
-  labels. Parent controls can change pack, stage/group, and targeting strictness;
-  changing pack recalculates the age estimate and resets warm-up placement.
+  labels. Parent controls can change birthday, pack, stage/group, and targeting
+  strictness; changing birthday refreshes the suggested stage, while changing
+  pack recalculates the current-age estimate for that pack and resets warm-up
+  placement.
 - Once the bakery is built, tapping it opens the pizzeria/bakery simulation.
   Business orders use the existing helper animal models as customers, mutate
   only `profile.business`, and report mapped objective progress back to the

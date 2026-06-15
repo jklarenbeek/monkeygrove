@@ -2,7 +2,7 @@
 import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
-import { createCurriculumState } from './curriculum/placement.js';
+import { createCurriculumState, refreshCurriculumForDate } from './curriculum/placement.js';
 import { getPack } from './curriculum/index.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
 
@@ -23,7 +23,12 @@ function freshProfile(name, opts = {}) {
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
-    curriculum: createCurriculumState({ age: opts.age, packId: opts.packId }),
+    curriculum: createCurriculumState({
+      age: opts.age,
+      birthDate: opts.birthDate,
+      packId: opts.packId,
+      today: opts.today || dayString(),
+    }),
     business: createBusinessState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
@@ -75,7 +80,13 @@ function migrate(s) {
     for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
     for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
     if (!isObject(p.curriculum)) p.curriculum = createCurriculumState();
-    const cref = createCurriculumState({ age: p.curriculum.ageAtStart, packId: p.curriculum.packId });
+    const ageCapturedOn = p.curriculum.ageCapturedOn || dayFromTimestamp(p.created);
+    const cref = createCurriculumState({
+      age: p.curriculum.ageAtStart,
+      birthDate: p.curriculum.birthDate,
+      packId: p.curriculum.packId,
+      today: ageCapturedOn,
+    });
     for (const k of Object.keys(cref)) {
       if (p.curriculum[k] === undefined) p.curriculum[k] = structuredClone(cref[k]);
     }
@@ -89,6 +100,9 @@ function migrate(s) {
     const stageIds = new Set(getPack(p.curriculum.packId).stages.map((stage) => stage.id));
     if (!stageIds.has(p.curriculum.estimatedStage)) p.curriculum.estimatedStage = cref.estimatedStage;
     if (!stageIds.has(p.curriculum.confirmedStage)) p.curriculum.confirmedStage = cref.confirmedStage;
+    p.curriculum.stageSource = p.curriculum.confirmedStage !== p.curriculum.estimatedStage
+      ? 'parent'
+      : (p.curriculum.stageSource || 'auto');
     if (!isObject(p.curriculum.warmup)) p.curriculum.warmup = {};
     if (p.curriculum.warmup.completed === undefined) p.curriculum.warmup.completed = false;
     if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
@@ -101,6 +115,14 @@ function migrate(s) {
 
 function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function dayFromTimestamp(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  const d = new Date(n);
+  if (Number.isNaN(d.getTime())) return null;
+  return dayString(d);
 }
 
 export function persist() {
@@ -122,7 +144,16 @@ export function profiles() { return loadSave().profiles; }
 
 export function activeProfile() {
   const s = loadSave();
-  return s.profiles.find((p) => p.id === s.activeProfile) || null;
+  const p = s.profiles.find((profile) => profile.id === s.activeProfile) || null;
+  if (p && refreshProfileCurriculum(p)) persist();
+  return p;
+}
+
+export function refreshProfileCurriculum(p, today = dayString()) {
+  if (!p?.curriculum) return false;
+  const before = JSON.stringify(p.curriculum);
+  p.curriculum = refreshCurriculumForDate(p.curriculum, today);
+  return JSON.stringify(p.curriculum) !== before;
 }
 
 export function createProfile(name, opts = {}) {

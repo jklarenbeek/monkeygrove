@@ -16,7 +16,9 @@ import {
   loadSave, settings, activeProfile, selectProfile, touchDailyStreak,
   addBananas, addEggPoints, hatchEgg, persist, persistNow, todayString,
 } from './state.js';
-import { applyWarmupResult, eligibleSkillIds, retargetCurriculumPack } from './curriculum/placement.js';
+import {
+  applyWarmupResult, eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
+} from './curriculum/placement.js';
 import { BusinessPlace } from './business/scene.js';
 import { BUSINESS_CUSTOMERS } from './business/data.js';
 import {
@@ -161,11 +163,17 @@ class Game {
         businessReport: p?.business ? dailyBusinessReport(p.business) : null,
         onCurriculumChange: (patch) => {
           if (!p) return;
-          const { packId, ...rest } = patch;
+          const { birthDate, packId, ...rest } = patch;
           const currentPack = p.curriculum?.packId;
-          const base = packId && packId !== currentPack
+          let base = packId && packId !== currentPack
             ? retargetCurriculumPack(p.curriculum, packId)
             : p.curriculum;
+          if (birthDate !== undefined) {
+            base = refreshCurriculumForDate({ ...base, birthDate: birthDate || null }, todayString());
+          }
+          if (patch.confirmedStage !== undefined) {
+            rest.stageSource = patch.confirmedStage === p.curriculum?.estimatedStage ? 'auto' : 'parent';
+          }
           p.curriculum = { ...base, ...rest };
           persistNow();
           showParents();

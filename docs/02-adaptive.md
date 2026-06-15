@@ -73,11 +73,15 @@ Here are the most relevant categories, from simplest to more advanced, with suit
 
 Monkey Grove currently uses the recommended hybrid approach:
 
-- **Curriculum gate first**: the selected curriculum pack and starting age create
+- **Curriculum gate first**: the selected curriculum pack and current age create
   a lower bound for eligible skills. For the shipped `NL_PO` pack, an
   11-year-old starts at Groep 8-level probes rather than early addition.
+- **Aging over years**: birthday-based profiles recompute current age on later
+  sessions and can promote the automatic lower bound upward. Age-only profiles
+  store the date the age was captured so they can still advance by elapsed years.
 - **Parent override**: parents can change the confirmed stage/group. That stage
-  becomes the lower bound when it differs from the age estimate.
+  becomes the lower bound when it differs from the age estimate, and it stays in
+  control until the parent changes it again.
 - **Soft upper window**: warm-up and normal play may move upward into harder
   eligible stages, but the warm-up does not push the player below the selected
   curriculum lower bound.
