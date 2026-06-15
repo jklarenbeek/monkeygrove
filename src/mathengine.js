@@ -91,6 +91,23 @@ function coprimes(d) {
   return out;
 }
 
+function mixedNumberLabel(whole, numerator, denominator) {
+  if (!numerator) return whole;
+  const carry = Math.floor(numerator / denominator);
+  const remainder = numerator % denominator;
+  const w = whole + carry;
+  if (!remainder) return w;
+  const g = gcd(remainder, denominator);
+  const frac = `${remainder / g}/${denominator / g}`;
+  return w ? `${w} ${frac}` : frac;
+}
+
+function divisionAnswerLabel(total, divisor) {
+  const quotient = Math.floor(total / divisor);
+  const remainder = total % divisor;
+  return mixedNumberLabel(quotient, remainder, divisor);
+}
+
 // Numeric fetch choices (default 6 — a proper stone hunt): answer +
 // misconception candidates (in priority order), deduped and kept plausible,
 // padded with near misses.
@@ -137,6 +154,31 @@ function buildFracChoices(rng, answer, candidates, fill) {
   for (const c of candidates) push(c.value, c.tag);
   let j = 0;
   while (out.length < 4 && j < 50) push(fill(j++), 'random');
+  return rng.shuffle(out);
+}
+
+function buildMixedDivisionChoices(rng, { total, baskets, quotient, remainder }) {
+  const answer = divisionAnswerLabel(total, baskets);
+  const out = [{ value: answer, tag: 'correct' }];
+  const used = new Set([String(answer)]);
+  const push = (value, tag) => {
+    if (out.length >= 6 || value == null) return;
+    if (typeof value === 'number' && (!Number.isFinite(value) || value < 0)) return;
+    const key = String(value);
+    if (!key || used.has(key)) return;
+    used.add(key);
+    out.push({ value, tag });
+  };
+
+  push(quotient, 'remainder_ignored');
+  push(quotient + 1, 'near_miss');
+  push(mixedNumberLabel(quotient, remainder + 1, baskets), 'near_miss');
+  push(mixedNumberLabel(quotient, Math.max(1, remainder - 1), baskets), 'near_miss');
+  push(mixedNumberLabel(quotient, remainder, baskets + 1), 'random');
+
+  for (const off of [1, -1, 2, -2, 3, -3]) {
+    push(divisionAnswerLabel(total + off, baskets), 'random');
+  }
   return rng.shuffle(out);
 }
 
@@ -437,12 +479,16 @@ function shareProblem(rng, kind, { total, baskets, quotient, remainder, d, meta,
     kind: 'fetch',
     equation: `${total} ÷ ${baskets} = ?`,
     prompt: { key: remainder > 0 ? 'q.share_fetch' : 'q.fetch', vars: { total, baskets } },
-    answer: quotient,
-    choices: buildChoices(rng, quotient, candidates),
+    answer: remainder > 0 ? divisionAnswerLabel(total, baskets) : quotient,
+    choices: remainder > 0
+      ? buildMixedDivisionChoices(rng, { total, baskets, quotient, remainder })
+      : buildChoices(rng, quotient, candidates),
     model,
-    explain,
+    explain: remainder > 0
+      ? { ...explain, vars: { ...(explain.vars || {}), answer: divisionAnswerLabel(total, baskets) } }
+      : explain,
     difficulty: d,
-    meta,
+    meta: remainder > 0 ? { ...meta, answerLabel: divisionAnswerLabel(total, baskets) } : meta,
   };
 }
 

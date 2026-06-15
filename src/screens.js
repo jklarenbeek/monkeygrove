@@ -383,7 +383,7 @@ function warmupPromptKey(promptKey) {
 
 // ---------- settings ----------
 
-export function showSettings({ onClose, onSwitchPlayer, onLangChange }) {
+export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }) {
   const s = settings();
   const el = render(`
     ${backBtn()}
@@ -402,25 +402,31 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange }) {
           <button class="btn soft" id="tg-music">${s.music ? '🎵' : '🚫'} ${t('settings.music')}</button>
         </div>
         <button class="btn soft" id="switch-player">👥 ${t('settings.switch_player')}</button>
+        ${devTools?.toggleHtml || ''}
       </div>
     </div>
+    ${devTools?.panelHtml || ''}
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
       setLang(b.dataset.lang); persistNow(); onLangChange?.();
-      showSettings({ onClose, onSwitchPlayer, onLangChange });
+      showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
     });
   }
   el.querySelector('#tg-sfx').addEventListener('click', () => {
     s.sfx = !s.sfx; audio.setSfx(s.sfx); persist();
-    showSettings({ onClose, onSwitchPlayer, onLangChange });
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
   el.querySelector('#tg-music').addEventListener('click', () => {
     s.music = !s.music; audio.setMusic(s.music); persist();
-    showSettings({ onClose, onSwitchPlayer, onLangChange });
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
   el.querySelector('#switch-player').addEventListener('click', onSwitchPlayer);
+  el.querySelector('#settings-extra-toggle')?.addEventListener('click', () => devTools?.onToggle?.(!devTools.open));
+  for (const btn of el.querySelectorAll('[data-settings-preset]')) {
+    btn.addEventListener('click', () => devTools?.onApply?.(btn.dataset.settingsPreset));
+  }
 }
 
 // ---------- shop ----------

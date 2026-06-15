@@ -7,6 +7,7 @@ import {
 } from '../src/mathengine.js';
 
 const FRAC_RE = /^\d+\/\d+$/;
+const MIXED_RE = /^\d+ \d+\/\d+$/;
 const KINDS = ['fetch', 'array', 'numberline', 'share'];
 
 function stateWithRating(skillId, rating, n = 20) {
@@ -57,7 +58,7 @@ function validateProblem(p) {
       if (typeof c.value === 'number') {
         assert.ok(Number.isFinite(c.value) && c.value >= 0, `${ctx} value ${c.value}`);
       } else {
-        assert.match(c.value, FRAC_RE, ctx);
+        assert.match(c.value, new RegExp(`${FRAC_RE.source}|${MIXED_RE.source}`), ctx);
       }
     }
   } else {
@@ -345,6 +346,32 @@ test('div_facts feed the underlying multiplication fact', () => {
   const third = recordResult(m, p, { correct: true, usedHint: false, ms: 1 });
   const { a, b } = p.meta;
   assert.deepEqual(new Set(third.newGems), new Set([`${a}x${b}`, `${b}x${a}`]));
+});
+
+test('div_remainder fetch answers use simplified mixed numbers', () => {
+  const label = ({ total, baskets, quotient, remainder }) => {
+    const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+    const g = gcd(remainder, baskets);
+    return `${quotient} ${remainder / g}/${baskets / g}`;
+  };
+  let sawSimplified = false;
+
+  for (let seed = 0; seed < 200; seed++) {
+    const m = stateWithRating('div_remainder', 700);
+    const p = nextProblem(m, { skill: 'div_remainder', kind: 'fetch', rng: new Rng(seed) });
+    validateProblem(p);
+    const expected = label(p.meta);
+
+    assert.equal(p.answer, expected, `${p.equation} should answer ${expected}`);
+    assert.equal(p.choices.filter((c) => c.value === expected && c.tag === 'correct').length, 1);
+    assert.ok(
+      p.choices.some((c) => c.value === p.meta.quotient && c.tag === 'remainder_ignored'),
+      `${p.equation} should keep ${p.meta.quotient} as the remainder-ignored distractor`,
+    );
+    if (p.meta.remainder > 1 && p.meta.baskets % p.meta.remainder === 0) sawSimplified = true;
+  }
+
+  assert.equal(sawSimplified, true, 'sample should include a reducible remainder fraction');
 });
 
 test('tide and vines problems never touch facts', () => {

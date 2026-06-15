@@ -1194,12 +1194,42 @@ class Game {
     }
   }
 
-  openSettings() {
+  async openSettings(devOpen = false) {
+    hud.hideBubble();
+    let devTools = null;
+    if (import.meta.env.DEV) {
+      const mod = await import('./devtools.js');
+      const summary = mod.describeDevState(this.profile, this.profile ? masteryReport(this.profile.math) : null);
+      devTools = {
+        open: devOpen,
+        ...mod.renderDevTools({ summary, presets: mod.DEV_PRESETS, open: devOpen }),
+        onToggle: (open) => this.openSettings(open),
+        onApply: (id) => {
+          const preset = mod.applyDevPreset(this.profile, id);
+          if (!preset) return;
+          persistNow();
+          this.afterDevPresetApplied(preset);
+          this.openSettings(true);
+        },
+      };
+    }
     screens.showSettings({
       onClose: () => screens.closeScreen(),
       onSwitchPlayer: () => this.showTitle(),
       onLangChange: () => {},
+      devTools,
     });
+  }
+
+  afterDevPresetApplied(preset) {
+    hud.toast(`Dev preset: ${preset.label}`);
+    if (this.mode === 'hub') {
+      this.buildHub();
+      hud.showHud(true);
+      this.refreshHudCounts();
+      return;
+    }
+    if (this.mode !== 'title') this.startHub();
   }
 
   confirmHome() {
