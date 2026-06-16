@@ -15,5 +15,7 @@ test('settings screen gates developer tools behind an explicit reveal button', (
   assert.match(screensSource, /export function showSettings\(\{ onClose, onSwitchPlayer, onLangChange, devTools \}\)/);
   assert.match(screensSource, /settings-extra-toggle/);
   assert.match(screensSource, /data-settings-preset/);
+  assert.match(screensSource, /settings-manual-devtools/);
+  assert.match(screensSource, /devTools\?\.onManual\?/);
   assert.doesNotMatch(screensSource, /Developer tools|Warmup done|Bakery built|Festival complete|devtools-panel/);
 });

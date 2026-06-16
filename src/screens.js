@@ -427,6 +427,20 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   for (const btn of el.querySelectorAll('[data-settings-preset]')) {
     btn.addEventListener('click', () => devTools?.onApply?.(btn.dataset.settingsPreset));
   }
+  el.querySelector('#settings-manual-devtools')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    devTools?.onManual?.({
+      bananas: el.querySelector('#dev-bananas')?.value,
+      stage: el.querySelector('#dev-stage')?.value,
+      buildCount: el.querySelector('#dev-build-count')?.value,
+      worlds: {
+        tide: el.querySelector('#dev-tide')?.value,
+        garden: el.querySelector('#dev-garden')?.value,
+        stump: el.querySelector('#dev-stump')?.value,
+        vines: el.querySelector('#dev-vines')?.value,
+      },
+    });
+  });
 }
 
 // ---------- shop ----------

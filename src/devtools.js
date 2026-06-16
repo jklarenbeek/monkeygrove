@@ -1,5 +1,6 @@
 import { createMathState, SKILLS } from './mathengine.js';
 import { BUILDS, freshIsland } from './island.js';
+import { getPack } from './curriculum/index.js';
 import { createCurriculumState } from './curriculum/placement.js';
 import { BALANCE } from './config.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
@@ -22,10 +23,52 @@ const STYLE = `<style>
 .mg-devtools-panel{border-color:#f4b942}
 .mg-devtools-summary,.mg-devtools-worlds{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .mg-devtools-summary span,.mg-devtools-worlds span{background:#fff;border:2px solid var(--cream-2);border-radius:999px;color:var(--ink-soft);font-size:13px;font-weight:900;padding:5px 10px}
+.mg-devtools-manual{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:10px 0 14px}
+.mg-devtools-manual label{display:flex;flex-direction:column;gap:4px;color:var(--ink-soft);font-size:12px;font-weight:900}
+.mg-devtools-manual input,.mg-devtools-manual select{border:2px solid var(--cream-2);border-radius:10px;font-family:var(--font);font-size:14px;font-weight:900;padding:7px 8px;pointer-events:auto}
 .mg-devtools-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .mg-devtools-preset{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;width:100%}
 .mg-devtools-preset small{color:var(--ink-soft);font-family:var(--font);font-size:12px;font-weight:800;line-height:1.25}
 </style>`;
+
+function pctValue(summary, world) {
+  const raw = summary?.worldValues?.[world] ?? summary?.worlds?.[world] ?? 0;
+  if (typeof raw === 'number') return Math.round(raw);
+  const n = Number(String(raw).replace('%', ''));
+  return Number.isFinite(n) ? Math.round(n) : 0;
+}
+
+function manualControlsHtml(summary) {
+  if (!summary) return '';
+  const pack = getPack(summary.packId || 'NL_PO');
+  const stage = summary.stage || pack.stages[0]?.id || 'grade_1';
+  const buildCount = Number(summary.buildCount || 0);
+  return `
+    <form id="settings-manual-devtools" class="mg-devtools-manual">
+      <label>Bananas
+        <input id="dev-bananas" type="number" min="0" step="1" value="${esc(summary.bananas || 0)}">
+      </label>
+      <label>Stage
+        <select id="dev-stage">
+          ${pack.stages.map((s) => `<option value="${esc(s.id)}" ${s.id === stage ? 'selected' : ''}>${esc(s.id)}</option>`).join('')}
+        </select>
+      </label>
+      <label>Builds
+        <select id="dev-build-count">
+          ${Array.from({ length: BUILDS.length + 1 }, (_, n) => {
+            const label = n === 0 ? `0/${BUILDS.length} none` : `${n}/${BUILDS.length} ${BUILDS[n - 1].id}`;
+            return `<option value="${n}" ${n === buildCount ? 'selected' : ''}>${esc(label)}</option>`;
+          }).join('')}
+        </select>
+      </label>
+      ${Object.keys(WORLD_SKILLS).map((world) => `
+        <label>${esc(world)}
+          <input id="dev-${esc(world)}" type="number" min="0" max="100" step="1" value="${esc(pctValue(summary, world))}">
+        </label>
+      `).join('')}
+      <button class="btn green" id="dev-apply-manual" type="submit">Apply manual state</button>
+    </form>`;
+}
 
 export function renderDevTools({ summary, presets = DEV_PRESETS, open = false } = {}) {
   const toggleHtml = `<button class="btn soft" id="settings-extra-toggle">${open ? 'Hide developer tools' : 'Developer tools'}</button>`;
@@ -46,6 +89,7 @@ export function renderDevTools({ summary, presets = DEV_PRESETS, open = false } 
           ${Object.entries(summary.worlds || {}).map(([world, pct]) => `<span>${esc(world)} ${esc(pct)}</span>`).join('')}
         </div>
       ` : ''}
+      ${manualControlsHtml(summary)}
       <div class="mg-devtools-presets">
         ${presets.map((preset) => `
           <button class="btn soft mg-devtools-preset" data-settings-preset="${esc(preset.id)}">
@@ -80,6 +124,16 @@ function markSkill(skill, mastered) {
   skill.hist = mastered ? Array(10).fill(1) : [];
 }
 
+function markSkillProgress(skill, fraction) {
+  if (fraction >= 1) {
+    markSkill(skill, true);
+    return;
+  }
+  skill.r = Math.round(600 + Math.max(0, Math.min(1, fraction)) * 250);
+  skill.n = fraction > 0 ? 10 : 0;
+  skill.hist = [];
+}
+
 function setMastery(profile, countsByWorld) {
   profile.math = createMathState();
   for (const [world, ids] of Object.entries(WORLD_SKILLS)) {
@@ -92,6 +146,16 @@ function setAllMastered(profile) {
   setMastery(profile, Object.fromEntries(
     Object.entries(WORLD_SKILLS).map(([world, ids]) => [world, ids.length]),
   ));
+}
+
+function setWorldMasteryPercent(math, world, percent) {
+  const ids = WORLD_SKILLS[world] || [];
+  const n = Number(percent);
+  const progress = Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0)) / 100 * ids.length;
+  ids.forEach((id, index) => {
+    const fraction = Math.max(0, Math.min(1, progress - index));
+    markSkillProgress(math.skills[id], fraction);
+  });
 }
 
 function ensureBasics(profile, stage = profile.curriculum?.confirmedStage || 'grade_5') {
@@ -185,17 +249,46 @@ export function applyDevPreset(profile, id) {
   return DEV_PRESETS.find((preset) => preset.id === id) || null;
 }
 
+export function applyManualDevState(profile, values = {}) {
+  if (!profile) return null;
+  const bananas = Math.max(0, Math.floor(Number(values.bananas)));
+  if (Number.isFinite(bananas)) profile.bananas = bananas;
+
+  const pack = getPack(profile.curriculum?.packId || 'NL_PO');
+  const stage = pack.stages.some((s) => s.id === values.stage)
+    ? values.stage
+    : (profile.curriculum?.confirmedStage || profile.curriculum?.estimatedStage || pack.stages[0]?.id);
+  ensureBasics(profile, stage);
+
+  const buildCount = Math.max(0, Math.min(BUILDS.length, Math.floor(Number(values.buildCount))));
+  if (Number.isFinite(buildCount)) setBuilt(profile, BUILD_ORDER.slice(0, buildCount));
+
+  if (!profile.math) profile.math = createMathState();
+  for (const world of Object.keys(WORLD_SKILLS)) {
+    if (values.worlds?.[world] !== undefined) setWorldMasteryPercent(profile.math, world, values.worlds[world]);
+  }
+
+  if (profile.island?.built?.includes('bakery')) stockBusiness(profile);
+  profile.flags.festivalDone = profile.island?.built?.includes('plaza') || false;
+  return { id: 'manual', label: 'Manual state' };
+}
+
 export function describeDevState(profile, report) {
   if (!profile) return null;
-  const worlds = Object.fromEntries(Object.entries(report?.worlds || {})
-    .map(([world, info]) => [world, `${Math.round((info.pct || 0) * 100)}%`]));
+  const worldValues = Object.fromEntries(Object.entries(report?.worlds || {})
+    .map(([world, info]) => [world, Math.round((info.pct || 0) * 100)]));
+  const worlds = Object.fromEntries(Object.entries(worldValues)
+    .map(([world, pct]) => [world, `${pct}%`]));
   return {
     name: profile.name || 'Explorer',
     bananas: profile.bananas || 0,
+    packId: profile.curriculum?.packId || 'NL_PO',
     stage: profile.curriculum?.confirmedStage || profile.curriculum?.estimatedStage || 'unknown',
     warmup: profile.curriculum?.warmup?.completed ? 'done' : 'pending',
+    buildCount: profile.island?.built?.length || 0,
     builds: `${profile.island?.built?.length || 0}/${BUILDS.length}`,
     business: profile.island?.built?.includes('bakery') ? 'open' : 'closed',
+    worldValues,
     worlds,
   };
 }

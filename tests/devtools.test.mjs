@@ -4,7 +4,13 @@ import { createMathState, masteryReport } from '../src/mathengine.js';
 import { BUILDS, freshIsland, islandStatus } from '../src/island.js';
 import { createCurriculumState } from '../src/curriculum/placement.js';
 import { createBusinessState } from '../src/business/engine.js';
-import { applyDevPreset, describeDevState, DEV_PRESETS } from '../src/devtools.js';
+import {
+  applyDevPreset,
+  applyManualDevState,
+  describeDevState,
+  DEV_PRESETS,
+  renderDevTools,
+} from '../src/devtools.js';
 
 function setupProfile() {
   return {
@@ -75,4 +81,57 @@ test('festival_complete builds everything and reports a useful summary', () => {
   assert.equal(summary.builds, `${BUILDS.length}/${BUILDS.length}`);
   assert.equal(summary.warmup, 'done');
   assert.equal(summary.stage, 'grade_8');
+});
+
+test('developer tools render manual state controls from the current profile summary', () => {
+  const profile = setupProfile();
+  applyDevPreset(profile, 'bakery_built');
+  profile.bananas = 42;
+  const summary = describeDevState(profile, masteryReport(profile.math));
+
+  const { panelHtml } = renderDevTools({ summary, open: true });
+
+  for (const id of [
+    'dev-bananas',
+    'dev-stage',
+    'dev-build-count',
+    'dev-tide',
+    'dev-garden',
+    'dev-stump',
+    'dev-vines',
+    'dev-apply-manual',
+  ]) {
+    assert.match(panelHtml, new RegExp(`id="${id}"`));
+  }
+  assert.match(panelHtml, /value="42"/);
+  assert.match(panelHtml, /value="grade_5" selected/);
+  assert.match(panelHtml, /value="5" selected/);
+});
+
+test('applyManualDevState sets bananas stage builds and world mastery percentages', () => {
+  const profile = setupProfile();
+
+  const result = applyManualDevState(profile, {
+    bananas: '321',
+    stage: 'grade_7',
+    buildCount: '5',
+    worlds: {
+      tide: '100',
+      garden: '60',
+      stump: '25',
+      vines: '0',
+    },
+  });
+  const report = masteryReport(profile.math);
+
+  assert.equal(result.label, 'Manual state');
+  assert.equal(profile.bananas, 321);
+  assert.equal(profile.curriculum.estimatedStage, 'grade_7');
+  assert.equal(profile.curriculum.confirmedStage, 'grade_7');
+  assert.deepEqual(profile.island.built, ['lanterns', 'fruitstand', 'garden', 'stage', 'bakery']);
+  assert.equal(profile.island.seen.includes('bakery'), true);
+  assert.equal(Math.round(report.worlds.tide.pct * 100), 100);
+  assert.equal(Math.round(report.worlds.garden.pct * 100), 60);
+  assert.equal(Math.round(report.worlds.stump.pct * 100), 25);
+  assert.equal(Math.round(report.worlds.vines.pct * 100), 0);
 });

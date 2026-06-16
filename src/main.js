@@ -1211,6 +1211,13 @@ class Game {
           this.afterDevPresetApplied(preset);
           this.openSettings(true);
         },
+        onManual: (values) => {
+          const result = mod.applyManualDevState(this.profile, values);
+          if (!result) return;
+          persistNow();
+          this.afterDevPresetApplied(result);
+          this.openSettings(true);
+        },
       };
     }
     screens.showSettings({
