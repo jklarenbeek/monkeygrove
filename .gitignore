@@ -4,3 +4,4 @@ dist/
 .agents/
 .superpowers/
 docs/superpowers/
+.vite-smoke*.log

@@ -4,37 +4,70 @@ import { Place } from '../chamber.js';
 import { makeCharacter, makeProp, makeTextSprite } from '../entities.js';
 import { PETS, PROPS } from '../models.js';
 import { t } from '../i18n.js';
-import { BUSINESS_CUSTOMERS } from './data.js';
+import { BUSINESS_CUSTOMERS, RECIPES } from './data.js';
 
 const BUSINESS_ROWS = [
-  '#################',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#...............#',
-  '#################',
+  '#####################',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#...................#',
+  '#####################',
 ];
 
-const STATIONS = [
-  { name: 'counter', x: 5, z: 3, prop: 'counter', height: 0.65 },
-  { name: 'coinTray', x: 8, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
-  { name: 'orderBoard', x: 12, z: 3, prop: 'orderBoard', height: 1.05 },
-  { name: 'prep', x: 5, z: 6, prop: 'prepBoard', height: 0.18, extras: ['pizzaPan', 'doughBowl'] },
-  { name: 'oven', x: 9, z: 7, prop: 'oven', height: 0.95 },
-  { name: 'pantry', x: 13, z: 7, prop: 'toppingCrate', height: 0.46, extras: ['shopTable'] },
-];
+const STATION_NAMES = ['counter', 'prep', 'oven', 'pantry', 'coinTray', 'orderBoard'];
 
-const QUEUE_MARKERS = [
-  { x: 5, z: 9 },
-  { x: 6, z: 9 },
-  { x: 7, z: 9 },
-  { x: 8, z: 9 },
+const ZONES = {
+  bakery: {
+    titleKey: 'business.zone.bakery',
+    sign: 'Bakery',
+    signX: 5,
+    signZ: 1,
+    props: ['counter', 'prepBoard', 'doughBowl', 'basket', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
+    stations: {
+      counter: { x: 4, z: 3, prop: 'counter', height: 0.65 },
+      coinTray: { x: 7, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
+      orderBoard: { x: 9, z: 2, prop: 'orderBoard', height: 1.05 },
+      prep: { x: 4, z: 6, prop: 'prepBoard', height: 0.18 },
+      oven: { x: 7, z: 8, prop: 'oven', height: 0.95 },
+      pantry: { x: 2, z: 7, prop: 'shopTable', height: 0.38 },
+    },
+    queue: [{ x: 3, z: 10 }, { x: 4, z: 10 }, { x: 5, z: 10 }, { x: 6, z: 10 }],
+  },
+  pizzeria: {
+    titleKey: 'business.zone.pizzeria',
+    sign: 'Pizzeria',
+    signX: 15,
+    signZ: 1,
+    props: ['counter', 'prepBoard', 'pizzaPan', 'toppingCrate', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
+    stations: {
+      counter: { x: 16, z: 3, prop: 'counter', height: 0.65 },
+      coinTray: { x: 13, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
+      orderBoard: { x: 11, z: 2, prop: 'orderBoard', height: 1.05 },
+      prep: { x: 16, z: 6, prop: 'prepBoard', height: 0.18 },
+      oven: { x: 13, z: 8, prop: 'oven', height: 0.95 },
+      pantry: { x: 18, z: 7, prop: 'toppingCrate', height: 0.46 },
+    },
+    queue: [{ x: 17, z: 10 }, { x: 16, z: 10 }, { x: 15, z: 10 }, { x: 14, z: 10 }],
+  },
+};
+
+const DECOR = [
+  { key: 'basket', zone: 'bakery', x: 2, z: 4, targetH: 0.34, dx: 0.1, dz: 0.15 },
+  { key: 'doughBowl', zone: 'bakery', x: 5, z: 6, targetH: 0.24, lift: 0.18 },
+  { key: 'basket', zone: 'bakery', x: 7, z: 4, targetH: 0.34, dx: -0.2 },
+  { key: 'shopTable', zone: 'bakery', x: 5, z: 8, targetH: 0.38 },
+  { key: 'pizzaPan', zone: 'pizzeria', x: 15, z: 6, targetH: 0.18, lift: 0.18 },
+  { key: 'toppingCrate', zone: 'pizzeria', x: 18, z: 5, targetH: 0.34 },
+  { key: 'pizzaPan', zone: 'pizzeria', x: 13, z: 4, targetH: 0.18, lift: 0.38 },
+  { key: 'shopTable', zone: 'pizzeria', x: 15, z: 8, targetH: 0.38 },
 ];
 
 function propHeight(key, fallback) {
@@ -47,16 +80,33 @@ export class BusinessPlace extends Place {
     this.buildFrom(BUSINESS_ROWS, { seed: opts.seed ?? 404 });
     this.stations = {};
     this.stationMarkers = {};
-    this.queueMarkers = QUEUE_MARKERS.map((spot) => ({ ...spot }));
+    this.miniGameZones = cloneZones();
+    this.stationHits = [];
+    this.queueMarkers = this.miniGameZones.bakery.queue.map((spot) => ({ ...spot }));
+    this.activeMiniGame = 'bakery';
+    this.activeStations = this.miniGameZones.bakery.stations;
     this.customers = [];
     this._customerEntities = new Set();
-    this._placeStations();
+    this._placeZones();
+    this.setActiveRecipe(opts.recipeId || 'flatbread');
   }
 
-  _placeStations() {
-    for (const def of STATIONS) {
-      this.stations[def.name] = { x: def.x, z: def.z };
-      this.stationMarkers[def.name] = { x: def.x, z: def.z };
+  _placeZones() {
+    for (const [zoneId, zone] of Object.entries(this.miniGameZones)) {
+      this._placeZone(zoneId, zone);
+    }
+    this._placeSharedDecor();
+    this._activateStations('bakery');
+  }
+
+  _placeZone(zoneId, zone) {
+    const title = makeTextSprite(t(zone.titleKey) || zone.sign, { bg: '#fff8ecdd', scale: 0.58, fontSize: 40 });
+    title.position.copy(this.worldPos(zone.signX, zone.signZ, 1.2));
+    this.group.add(title);
+
+    for (const [name, def] of Object.entries(zone.stations)) {
+      const station = { x: def.x, z: def.z };
+      this.stationHits.push({ name, zone: zoneId, ...station });
       const cell = this.cellAt(def.x, def.z);
       if (cell) cell.walk = false;
 
@@ -65,17 +115,17 @@ export class BusinessPlace extends Place {
         lift: def.lift ?? 0,
       });
 
-      if (def.name === 'prep') {
-        this._prop('pizzaPan', def.x, def.z, { targetH: 0.18, dx: 0.3, dz: 0.18, lift: 0.18 });
-        this._prop('doughBowl', def.x, def.z, { targetH: 0.24, dx: -0.3, dz: 0.15, lift: 0.18 });
-        this._prop('toppingCrate', def.x - 1, def.z, { targetH: 0.34, dx: -0.2 });
-      } else if (def.name === 'pantry') {
-        this._prop('shopTable', def.x, def.z + 1, { targetH: 0.38 });
-      }
-
-      const label = makeTextSprite(def.name, { bg: '#fff8ecdd', scale: 0.42, fontSize: 36 });
+      const label = makeTextSprite(name, { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 });
       label.position.copy(this.worldPos(def.x, def.z, 1.15));
       this.group.add(label);
+    }
+  }
+
+  _placeSharedDecor() {
+    for (const item of DECOR) this._prop(item.key, item.x, item.z, item);
+    for (let z = 1; z < this.size.d - 1; z++) {
+      const cell = this.cellAt(10, z);
+      if (cell) this.tintCell(10, z, 0xf7e6b5);
     }
   }
 
@@ -89,10 +139,26 @@ export class BusinessPlace extends Place {
   }
 
   stationAt(x, z) {
-    for (const [name, spot] of Object.entries(this.stations)) {
+    for (const { name, ...spot } of this.stationHits) {
       if (Math.abs(spot.x - x) + Math.abs(spot.z - z) <= 1) return name;
     }
     return null;
+  }
+
+  _activateStations(kind) {
+    const zone = this.miniGameZones[kind] || this.miniGameZones.bakery;
+    this.activeMiniGame = kind in this.miniGameZones ? kind : 'bakery';
+    this.activeStations = zone.stations;
+    this.queueMarkers = zone.queue.map((spot) => ({ ...spot }));
+    for (const name of STATION_NAMES) {
+      this.stations[name] = { ...zone.stations[name] };
+      this.stationMarkers[name] = { ...zone.stations[name] };
+    }
+  }
+
+  setActiveRecipe(recipeId) {
+    const kind = RECIPES[recipeId]?.kind === 'pizza' ? 'pizzeria' : 'bakery';
+    this._activateStations(kind);
   }
 
   spawnCustomer(customerId, queueIndex = 0) {
@@ -155,4 +221,19 @@ export class BusinessPlace extends Place {
     this.entities = this.entities.filter((entity) => !this._customerEntities.has(entity));
     this._customerEntities.clear();
   }
+}
+
+function cloneZones() {
+  return Object.fromEntries(Object.entries(ZONES).map(([id, zone]) => [
+    id,
+    {
+      ...zone,
+      props: [...zone.props],
+      queue: zone.queue.map((spot) => ({ ...spot })),
+      stations: Object.fromEntries(Object.entries(zone.stations).map(([name, station]) => [
+        name,
+        { ...station },
+      ])),
+    },
+  ]));
 }

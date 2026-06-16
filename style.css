@@ -210,6 +210,11 @@ html, body {
 @keyframes screen-in { from { opacity: 0; } to { opacity: 1; } }
 .screen.opaque { background: linear-gradient(#bfe8f7, #7ec8e3); }
 
+.screen.business-screen {
+  background: linear-gradient(rgba(191, 232, 247, .18), rgba(126, 200, 227, .12));
+  backdrop-filter: none;
+}
+
 .screen h1 {
   font-size: clamp(40px, 9vw, 64px); margin: 12px 0 2px; color: #fff;
   text-shadow: 0 4px 0 var(--sun-deep), 0 7px 10px var(--shadow); letter-spacing: 1px; text-align: center;
@@ -419,6 +424,12 @@ html, body {
 
 .business-order-card {
   margin-top: 8px;
+}
+
+.business-order-card .tagline {
+  color: var(--ink-soft);
+  text-shadow: none;
+  margin: 8px 0 0;
 }
 
 .business-price {

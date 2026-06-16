@@ -30,8 +30,9 @@ export function closeScreen() {
   host().innerHTML = '';
 }
 
-function render(html) {
-  host().innerHTML = `<div class="screen">${html}</div>`;
+function render(html, extraClass = '') {
+  const className = ['screen', extraClass].filter(Boolean).join(' ');
+  host().innerHTML = `<div class="${className}">${html}</div>`;
   return host().firstElementChild;
 }
 
@@ -730,13 +731,14 @@ export function showBusinessOrder({
   order, customerName, activeTask, onPrep, onPay, onServe, onExit,
 }) {
   const recipe = RECIPES[order.recipeId];
+  const titleKey = recipe.kind === 'pizza' ? 'business.zone.pizzeria' : 'business.zone.bakery';
   const task = activeTask || order.tasks[0];
   const canPrep = task && task.kind === 'prep';
   const canPay = task && task.kind === 'payment';
   const el = render(`
     <div class="business-panel">
       <div class="business-head">
-        <h2>${t('business.title')}</h2>
+        <h2>${t(titleKey)}</h2>
         <button class="round-btn" id="business-close">x</button>
       </div>
       <div class="card business-order-card">
@@ -751,7 +753,7 @@ export function showBusinessOrder({
         <div class="tagline">${esc(businessTaskLabel(task))}</div>
       </div>
     </div>
-  `);
+  `, 'business-screen');
   el.querySelector('#business-prep').addEventListener('click', () => { if (canPrep) onPrep?.(task); });
   el.querySelector('#business-pay').addEventListener('click', () => { if (canPay) onPay?.(task); });
   el.querySelector('#business-serve').addEventListener('click', onServe);

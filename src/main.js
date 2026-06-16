@@ -1318,9 +1318,10 @@ class Game {
     business.queue = [order];
     this.businessAttempts = [];
     this.place?.clearCustomers?.();
+    this.place?.setActiveRecipe?.(order.recipeId);
     this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
     persist();
-    this.showBusinessOrderPanel();
+    this.announceBusinessOrder(order);
   }
 
   startNextBusinessOrder() {
@@ -1339,9 +1340,15 @@ class Game {
     business.queue = [order];
     this.businessAttempts = [];
     this.place?.clearCustomers?.();
+    this.place?.setActiveRecipe?.(order.recipeId);
     this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
     persist();
-    this.showBusinessOrderPanel();
+    this.announceBusinessOrder(order);
+  }
+
+  announceBusinessOrder(order) {
+    if (!order) return;
+    hud.toast(t('business.order_ready'));
   }
 
   showBusinessOrderPanel() {

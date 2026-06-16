@@ -70,6 +70,9 @@ const DICT = {
 
     // business
     'business.title': 'Bakery Pizzeria',
+    'business.zone.bakery': 'Bakery',
+    'business.zone.pizzeria': 'Pizzeria',
+    'business.order_ready': 'Order ready - tap a station',
     'business.order': 'Order',
     'business.stock': 'Stock',
     'business.upgrades': 'Upgrades',
@@ -463,6 +466,9 @@ const DICT = {
 
     // business
     'business.title': 'Bakkerij Pizzeria',
+    'business.zone.bakery': 'Bakkerij',
+    'business.zone.pizzeria': 'Pizzeria',
+    'business.order_ready': 'Bestelling klaar - tik op een werkplek',
     'business.order': 'Bestelling',
     'business.stock': 'Voorraad',
     'business.upgrades': 'Verbeteringen',
