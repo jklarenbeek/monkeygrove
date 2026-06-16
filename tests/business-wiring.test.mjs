@@ -204,10 +204,18 @@ test('business close-day flow does not discard active unfinished orders', () => 
   const requestEnd = source.slice(source.indexOf('  requestEndBusinessDay()'), source.indexOf('  endBusinessDay()'));
   const endDay = source.slice(source.indexOf('  endBusinessDay()'), source.indexOf('  businessTap('));
 
-  assert.ok(showPanel.includes('onCloseDay: () => this.requestEndBusinessDay()'), 'order panel close uses guarded end-day request');
+  assert.ok(showPanel.includes('onExit: () => this.leaveBusiness()'), 'order panel x exits to the island');
   assert.match(requestEnd, /business\.activeOrder[\s\S]*this\.showBusinessOrderPanel\(\)/, 'guard keeps live order panel open');
   assert.match(requestEnd, /hud\.toast/, 'guard gives feedback when close-day is blocked');
   assert.match(endDay, /business\.activeOrder[\s\S]*return/, 'endBusinessDay defensively refuses live active orders');
+});
+
+test('business order close button is separate from guarded close-day flow', () => {
+  const source = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
+  const orderScreen = source.slice(source.indexOf('export function showBusinessOrder'), source.indexOf('function choiceValues'));
+
+  assert.match(orderScreen, /onExit/, 'showBusinessOrder accepts an exit callback');
+  assert.match(orderScreen, /#business-close'\)\.addEventListener\('click', onExit\)/, 'x uses the exit callback');
 });
 
 test('future business screen entry points are declared', () => {

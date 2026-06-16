@@ -2,7 +2,7 @@
 import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
-import { createCurriculumState, refreshCurriculumForDate } from './curriculum/placement.js';
+import { createCurriculumState, estimateStageFromAge, refreshCurriculumForDate } from './curriculum/placement.js';
 import { getPack } from './curriculum/index.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
 
@@ -91,15 +91,17 @@ function migrate(s) {
       if (p.curriculum[k] === undefined) p.curriculum[k] = structuredClone(cref[k]);
     }
     p.curriculum.packId = cref.packId;
+    const fallbackStage = cref.estimatedStage
+      || estimateStageFromAge(cref.packId, p.curriculum.ageAtStart);
     if (p.curriculum.estimatedStage === undefined || p.curriculum.estimatedStage === null) {
-      p.curriculum.estimatedStage = cref.estimatedStage;
+      p.curriculum.estimatedStage = fallbackStage;
     }
     if (p.curriculum.confirmedStage === undefined || p.curriculum.confirmedStage === null) {
-      p.curriculum.confirmedStage = cref.confirmedStage;
+      p.curriculum.confirmedStage = cref.confirmedStage || fallbackStage;
     }
     const stageIds = new Set(getPack(p.curriculum.packId).stages.map((stage) => stage.id));
-    if (!stageIds.has(p.curriculum.estimatedStage)) p.curriculum.estimatedStage = cref.estimatedStage;
-    if (!stageIds.has(p.curriculum.confirmedStage)) p.curriculum.confirmedStage = cref.confirmedStage;
+    if (!stageIds.has(p.curriculum.estimatedStage)) p.curriculum.estimatedStage = fallbackStage;
+    if (!stageIds.has(p.curriculum.confirmedStage)) p.curriculum.confirmedStage = cref.confirmedStage || fallbackStage;
     p.curriculum.stageSource = p.curriculum.confirmedStage !== p.curriculum.estimatedStage
       ? 'parent'
       : (p.curriculum.stageSource || 'auto');

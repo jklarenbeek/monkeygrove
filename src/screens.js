@@ -713,7 +713,7 @@ function businessTaskLabel(task) {
 }
 
 export function showBusinessOrder({
-  order, customerName, activeTask, onPrep, onPay, onServe, onCloseDay,
+  order, customerName, activeTask, onPrep, onPay, onServe, onExit,
 }) {
   const recipe = RECIPES[order.recipeId];
   const task = activeTask || order.tasks[0];
@@ -741,7 +741,7 @@ export function showBusinessOrder({
   el.querySelector('#business-prep').addEventListener('click', () => { if (canPrep) onPrep?.(task); });
   el.querySelector('#business-pay').addEventListener('click', () => { if (canPay) onPay?.(task); });
   el.querySelector('#business-serve').addEventListener('click', onServe);
-  el.querySelector('#business-close').addEventListener('click', onCloseDay);
+  el.querySelector('#business-close').addEventListener('click', onExit);
 }
 
 function choiceValues(expected, deltas, fallback) {

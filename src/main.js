@@ -1352,7 +1352,7 @@ class Game {
       onPrep: (task) => this.handleBusinessPrep(task),
       onPay: (task) => this.handleBusinessPayment(task),
       onServe: () => this.serveBusinessOrder(),
-      onCloseDay: () => this.requestEndBusinessDay(),
+      onExit: () => this.leaveBusiness(),
     });
   }
 
@@ -1463,6 +1463,16 @@ class Game {
       },
       onClose: () => this.showBusinessOrderPanel(),
     });
+  }
+
+  leaveBusiness() {
+    const business = ensureBusinessState(this.profile);
+    business.queue = business.activeOrder ? [business.activeOrder] : [];
+    persistNow();
+    this.businessAttempts = [];
+    this.businessCustomer = null;
+    this.startHub();
+    return true;
   }
 
   requestEndBusinessDay() {
