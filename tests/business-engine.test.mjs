@@ -10,12 +10,14 @@ import {
 import {
   applyPrepAction,
   applyPaymentAction,
+  applyReviewAction,
   buyUpgrade,
   completeOrder,
   createBusinessState,
   dailyBusinessReport,
   ensureBusinessState,
   nextBusinessOrder,
+  nextBusinessReview,
   restockIngredient,
 } from '../src/business/engine.js';
 import { createCurriculumState } from '../src/curriculum/placement.js';
@@ -49,6 +51,56 @@ test('order generation chooses stage-appropriate tasks from curriculum', () => {
   assert.ok(order.tasks.every((task) => task.objectiveId.startsWith('nl_po.')));
   assert.ok(order.tasks.some((task) => task.kind === 'prep'));
   assert.ok(order.tasks.some((task) => task.kind === 'payment'));
+});
+
+test('orders never carry a task the serve flow cannot complete', () => {
+  const curriculum = createCurriculumState({ age: 11 }); // grade 8 — the old inert-task case
+  const state = createBusinessState();
+  for (let i = 0; i < 12; i++) {
+    const order = nextBusinessOrder(state, curriculum, { rng: new Rng(`order-${i}`) });
+    for (const task of order.tasks) {
+      assert.ok(task.kind === 'prep' || task.kind === 'payment',
+        `order task ${task.mode} is a completable prep/payment step`);
+    }
+  }
+});
+
+test('non-order modes surface as a graded end-of-day review (grade 6 and up)', () => {
+  const curriculum = createCurriculumState({ age: 11 }); // grade 8 -> all four review modes
+  const state = createBusinessState();
+  state.day = {
+    ordersServed: 3, revenueCents: 1350, costCents: 420, profitCents: 930, wasteCents: 0,
+    demand: { flatbread: 2, margherita: 1 },
+  };
+  const review = nextBusinessReview(state, curriculum, { rng: new Rng(7) });
+  const modes = review.map((task) => task.mode);
+  for (const m of ['unit_conversion_stock', 'price_compare', 'profit_margin', 'demand_chart']) {
+    assert.ok(modes.includes(m), `review includes ${m} at grade 8`);
+  }
+  for (const task of review) {
+    assert.equal(task.kind, 'review');
+    assert.ok(task.options.length >= 2, `${task.mode} offers choices`);
+    assert.ok(task.options.map(String).includes(String(task.answer)), `${task.mode} answer is on the board`);
+    assert.equal(applyReviewAction(state, task, task.answer).correct, true, `${task.mode} grades correct`);
+    const wrong = task.options.map(String).find((o) => o !== String(task.answer));
+    assert.equal(applyReviewAction(state, task, wrong).correct, false, `${task.mode} grades wrong`);
+  }
+  assert.equal(review.find((t) => t.mode === 'profit_margin').answer, 1350 - 420);
+  assert.equal(review.find((t) => t.mode === 'demand_chart').answer, 'flatbread');
+  // the graded answers accrue toward coverage in the daily report
+  assert.ok(dailyBusinessReport(state).modes.profit_margin.attempts > 0);
+});
+
+test('younger graders get no review modes, and summary modes need a played day', () => {
+  const young = createCurriculumState({ age: 8 }); // grade 5 -> review modes are grade 6+
+  assert.deepEqual(nextBusinessReview(createBusinessState(), young, { rng: new Rng(1) }), []);
+
+  const g8 = createCurriculumState({ age: 11 });
+  const modes = nextBusinessReview(createBusinessState(), g8, { rng: new Rng(1) }).map((t) => t.mode);
+  assert.ok(modes.includes('unit_conversion_stock'), 'synthetic stock question always available');
+  assert.ok(modes.includes('price_compare'), 'synthetic deal question always available');
+  assert.ok(!modes.includes('profit_margin'), 'profit needs a played day');
+  assert.ok(!modes.includes('demand_chart'), 'demand needs sales');
 });
 
 test('order generation filters recipes by the generated quantity stock', () => {

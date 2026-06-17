@@ -209,15 +209,9 @@ export function nextBusinessOrder(state, curriculum, opts = {}) {
   const paymentModes = modes.filter((mode) => mode.kind === 'payment');
   order.tasks.push(taskForMode(rng.pick(prepModes.length ? prepModes : [BUSINESS_MODES.portion_halves_quarters]), order, rng));
   order.tasks.push(taskForMode(rng.pick(paymentModes.length ? paymentModes : [BUSINESS_MODES.money_make_amounts]), order, rng));
-  if (stage >= 8) {
-    order.tasks.push({
-      id: `${order.id}:summary:demand`,
-      kind: 'summary',
-      mode: 'demand_chart',
-      objectiveId: BUSINESS_MODES.demand_chart.objectiveId,
-      expected: {},
-    });
-  }
+  // Stock / upgrade / summary modes are not order steps — they surface as the
+  // end-of-day shopkeeper review (see nextBusinessReview). An order only ever
+  // carries the prep + payment steps the serve flow can actually complete.
   return order;
 }
 
@@ -257,6 +251,86 @@ export function applyPaymentAction(state, order, task, action) {
   } else if (task.mode === 'percentage_discount') {
     correct = Number(action.finalCents) === task.expected.finalCents;
   }
+  return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id });
+}
+
+// ---------------------------------------------------------------------------
+// End-of-day shopkeeper review — the non-order math modes (stock / upgrade /
+// summary) surface here as quick questions about the day the child just played.
+// Pure data + math; the day-summary screen renders them (screens.js
+// REVIEW_VIEWS) and grades each via applyReviewAction.
+// ---------------------------------------------------------------------------
+
+const REVIEW_KINDS = ['stock', 'upgrade', 'summary'];
+
+function reviewModes(curriculum) {
+  const order = stageOrder(curriculumStage(curriculum));
+  return Object.values(BUSINESS_MODES)
+    .filter((mode) => REVIEW_KINDS.includes(mode.kind) && stageOrder(mode.minStage) <= order);
+}
+
+function uniq(values) {
+  return [...new Set(values)];
+}
+
+function shuffle(values, rng) {
+  const out = [...values];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = rng.int(0, i);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function reviewTaskForMode(mode, day, rng) {
+  const base = { id: `review:${mode.id}`, kind: 'review', mode: mode.id, objectiveId: mode.objectiveId };
+  if (mode.id === 'profit_margin') {
+    if (!day.ordersServed) return null; // no numbers to reflect on yet
+    const revenueCents = day.revenueCents || 0;
+    const costCents = day.costCents || 0;
+    const answer = Math.max(0, revenueCents - costCents);
+    const options = uniq([answer, answer + 100, Math.max(0, answer - 100), answer + 50])
+      .filter((c) => c >= 0).slice(0, 4);
+    return { ...base, revenueCents, costCents, answer, options: shuffle(options, rng) };
+  }
+  if (mode.id === 'demand_chart') {
+    const sold = Object.entries(day.demand || {}).sort((a, b) => b[1] - a[1]);
+    if (!sold.length) return null;
+    const answer = sold[0][0];
+    const options = uniq([...sold.map(([id]) => id), ...Object.keys(RECIPES)]).slice(0, 4);
+    return { ...base, answer, options: shuffle(options, rng) };
+  }
+  if (mode.id === 'unit_conversion_stock') {
+    const kg = rng.int(1, 5);
+    const answer = kg * 1000; // kg -> g
+    const options = uniq([answer, kg * 100, answer + 1000, kg * 10000]).slice(0, 4);
+    return { ...base, kg, answer, options: shuffle(options, rng) };
+  }
+  if (mode.id === 'price_compare') {
+    const a = { count: rng.int(2, 5), cents: 0 };
+    const b = { count: rng.int(2, 5), cents: 0 };
+    a.cents = a.count * rng.pick([40, 50, 60]);
+    b.cents = b.count * rng.pick([30, 45, 70]);
+    if (a.cents / a.count === b.cents / b.count) b.cents += b.count * 10; // keep a winner
+    const answer = a.cents / a.count <= b.cents / b.count ? 'A' : 'B';
+    return { ...base, a, b, answer, options: ['A', 'B'] };
+  }
+  return null;
+}
+
+export function nextBusinessReview(state, curriculum, opts = {}) {
+  const rng = opts.rng ?? {
+    pick: (xs) => xs[Math.floor(Math.random() * xs.length)],
+    int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+  };
+  const day = state.day || freshBusinessDay();
+  return reviewModes(curriculum)
+    .map((mode) => reviewTaskForMode(mode, day, rng))
+    .filter(Boolean);
+}
+
+export function applyReviewAction(state, task, value) {
+  const correct = String(value) === String(task.answer);
   return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id });
 }
 

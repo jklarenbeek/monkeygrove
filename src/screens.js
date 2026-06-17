@@ -706,7 +706,9 @@ export function showGems({ report, onClose }) {
 // ---------- business ----------
 
 function money(cents) {
-  return `${(Number(cents || 0) / 100).toFixed(2)}`;
+  const amount = (Number(cents || 0) / 100).toFixed(2);
+  // Dutch children write euros with a decimal comma (€4,50); English with a point.
+  return `€${(settings().lang || 'en') === 'en' ? amount : amount.replace('.', ',')}`;
 }
 
 function objectiveLabel(objectiveId) {
@@ -928,59 +930,98 @@ export function showBusinessPrep({ task, onSubmit, onClose }) {
   el.querySelector('#business-prep-done').addEventListener('click', () => onSubmit?.(view.submit(action)));
 }
 
-export function showBusinessPayment({ task, onSubmit, onClose }) {
-  const expected = task?.expected || {};
-  const action = {};
-  const amountChoices = choiceValues(expected.amountCents ?? expected.finalCents, [-100, -50, 50, 100], [100, 250, 500, 1000]);
-  const paidChoices = choiceValues(expected.paidCents, [-500, 500, 1000], [500, 1000, 2000]);
-  const changeChoices = choiceValues(expected.changeCents, [-100, -50, 50, 100], [0, 50, 100, 250]);
+// Payment panels — one small view per task mode, mirroring PREP_VIEWS. Submit shapes
+// must stay in sync with src/business/engine.js applyPaymentAction().
+// Euro coins/notes (in cents); any multiple of 5 is composable, which covers every
+// recipe price. Used by the make-the-amount panel.
+const PAY_COINS = [500, 200, 100, 50, 20, 10, 5];
 
+const PAYMENT_VIEWS = {
+  // Make the amount: tap coins to build up to the price, with a live running total.
+  money_make_amounts: {
+    controls(task) {
+      const target = task.expected?.amountCents ?? 0;
+      return `
+        <p class="business-prompt">${esc(t('business.pay.make', { amount: money(target) }))}</p>
+        <div class="business-price">${t('business.pay.total')}:
+          <span id="pay-total">${money(0)}</span> / ${money(target)}</div>
+        <div class="business-money-row">
+          ${PAY_COINS.map((c) => `<button class="btn soft" data-money="${c}">${money(c)}</button>`).join('')}
+        </div>
+        <div class="menu-row">
+          <button class="btn soft" id="pay-reset">${t('business.pay.reset')}</button>
+        </div>`;
+    },
+    bind(el, action) {
+      action.amountCents = 0;
+      const total = el.querySelector('#pay-total');
+      const refresh = () => { total.textContent = money(action.amountCents); };
+      for (const btn of el.querySelectorAll('[data-money]')) {
+        btn.addEventListener('click', () => { action.amountCents += Number(btn.dataset.money); refresh(); });
+      }
+      el.querySelector('#pay-reset').addEventListener('click', () => { action.amountCents = 0; refresh(); });
+    },
+    submit: (a) => ({ amountCents: a.amountCents || 0 }),
+  },
+
+  // Make change: the customer pays a given amount — how much change comes back?
+  decimal_money_change: {
+    controls(task) {
+      const e = task.expected || {};
+      const price = (e.paidCents ?? 0) - (e.changeCents ?? 0);
+      const changes = choiceValues(e.changeCents, [-100, -50, 50, 100], [0, 50, 100, 250]);
+      return `
+        <div class="business-price">${t('business.order')}: ${money(price)}</div>
+        <p class="business-prompt">${esc(t('business.pay.change', { paid: money(e.paidCents ?? 0) }))}</p>
+        <div class="business-money-row">
+          ${changes.map((c) => `<button class="btn soft" data-change="${c}">${money(c)}</button>`).join('')}
+        </div>`;
+    },
+    bind(el, action, task) {
+      action.paidCents = task.expected?.paidCents;
+      pickOne(el, '[data-change]', (b) => { action.changeCents = Number(b.dataset.change); });
+    },
+    submit: (a) => ({ paidCents: a.paidCents, changeCents: a.changeCents }),
+  },
+
+  // Percentage discount: take the percent off and pick the new price.
+  percentage_discount: {
+    controls(task) {
+      const e = task.expected || {};
+      const finals = choiceValues(e.finalCents, [-100, -50, 50, 100], [100, 250, 500, 1000]);
+      return `
+        <p class="business-prompt">${esc(t('business.pay.discount', {
+          percent: e.percent ?? 10,
+          was: money(e.originalCents ?? 0),
+        }))}</p>
+        <div class="business-money-row">
+          ${finals.map((c) => `<button class="btn soft" data-final="${c}">${money(c)}</button>`).join('')}
+        </div>`;
+    },
+    bind(el, action) {
+      pickOne(el, '[data-final]', (b) => { action.finalCents = Number(b.dataset.final); });
+    },
+    submit: (a) => ({ finalCents: a.finalCents }),
+  },
+};
+
+export function showBusinessPayment({ task, onSubmit, onClose }) {
+  const view = PAYMENT_VIEWS[task?.mode] || PAYMENT_VIEWS.money_make_amounts;
+  const action = {};
   const el = render(`
     ${backBtn(onClose, '←')}
     <h2>${t('business.pay')}</h2>
     <div class="tagline">${esc(businessTaskLabel(task))}</div>
     <div class="card">
-      <div class="business-money-row">
-        ${amountChoices.map((cents) => `<button class="btn soft" data-money="${cents}">${money(cents)}</button>`).join('')}
-      </div>
-      <div class="business-price">${t('business.pay')}: <span id="business-paid-total">${money(0)}</span></div>
-      <div class="business-money-row">
-        ${paidChoices.map((cents) => `<button class="btn soft" data-paid="${cents}">${money(cents)}</button>`).join('')}
-      </div>
-      <div class="business-money-row">
-        ${changeChoices.map((cents) => `<button class="btn soft" data-change="${cents}">${money(cents)}</button>`).join('')}
-      </div>
+      ${view.controls(task)}
       <div class="menu-row">
         <button class="btn green" id="business-payment-done">${t('business.done')}</button>
       </div>
     </div>
   `);
-  const paidTotal = el.querySelector('#business-paid-total');
-  const updatePaidTotal = () => { paidTotal.textContent = money(action.paidCents || action.amountCents || action.finalCents || 0); };
   el.querySelector('#scr-back').addEventListener('click', onClose);
-  for (const btn of el.querySelectorAll('[data-money]')) {
-    btn.addEventListener('click', () => {
-      const cents = Number(btn.dataset.money);
-      action.amountCents = cents;
-      action.finalCents = cents;
-      setSelected(btn, '[data-money]');
-      updatePaidTotal();
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-paid]')) {
-    btn.addEventListener('click', () => {
-      action.paidCents = Number(btn.dataset.paid);
-      setSelected(btn, '[data-paid]');
-      updatePaidTotal();
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-change]')) {
-    btn.addEventListener('click', () => {
-      action.changeCents = Number(btn.dataset.change);
-      setSelected(btn, '[data-change]');
-    });
-  }
-  el.querySelector('#business-payment-done').addEventListener('click', () => onSubmit?.({ ...action }));
+  view.bind(el, action, task);
+  el.querySelector('#business-payment-done').addEventListener('click', () => onSubmit?.(view.submit(action)));
 }
 
 export function showBusinessStock({ business, onRestock, onClose }) {
@@ -1032,7 +1073,46 @@ export function showBusinessUpgrades({ business, onBuy, onClose }) {
   }
 }
 
-export function showBusinessDaySummary({ report, onDone }) {
+// End-of-day shopkeeper review — one small descriptor per non-order mode, used to
+// render the questions nextBusinessReview() produced. Grading lives in the engine
+// (applyReviewAction); these only turn a task into a prompt + option labels.
+const REVIEW_VIEWS = {
+  profit_margin: {
+    prompt: (task) => t('business.review.profit', { rev: money(task.revenueCents), cost: money(task.costCents) }),
+    label: (value) => money(value),
+  },
+  demand_chart: {
+    prompt: () => t('business.review.demand'),
+    label: (value) => t(RECIPES[value]?.titleKey || value),
+  },
+  unit_conversion_stock: {
+    prompt: (task) => t('business.review.convert', { kg: task.kg }),
+    label: (value) => t('business.review.grams', { n: value }),
+  },
+  price_compare: {
+    prompt: () => t('business.review.compare'),
+    label: (value, task) => {
+      const pack = value === 'A' ? task.a : task.b;
+      return t('business.review.pack', { count: pack.count, price: money(pack.cents) });
+    },
+  },
+};
+
+export function showBusinessDaySummary({ report, review = [], onReview, onDone }) {
+  const reviewHtml = review.map((task, i) => {
+    const view = REVIEW_VIEWS[task.mode];
+    if (!view) return '';
+    return `
+      <div class="card business-review" data-review-index="${i}">
+        <p class="business-prompt">${esc(view.prompt(task))}</p>
+        <div class="business-money-row">
+          ${task.options.map((value) => `
+            <button class="btn soft" data-review-value="${esc(value)}">${esc(view.label(value, task))}</button>
+          `).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
   const el = render(`
     <div style="flex:1"></div>
     <h2>${t('business.summary')}</h2>
@@ -1040,9 +1120,23 @@ export function showBusinessDaySummary({ report, onDone }) {
       <div class="reward-item">${t('business.orders_served', { n: report.ordersServed })}</div>
       <div class="reward-item">${t('business.profit')}: ${money(report.profitCents)}</div>
     </div>
+    ${reviewHtml}
     <button class="btn green" id="business-done">${t('business.done')}</button>
     <div style="flex:2"></div>
   `);
+
+  for (const card of el.querySelectorAll('[data-review-index]')) {
+    const task = review[Number(card.dataset.reviewIndex)];
+    for (const btn of card.querySelectorAll('[data-review-value]')) {
+      btn.addEventListener('click', () => {
+        if (card.dataset.answered) return; // one tap per question, then it locks
+        card.dataset.answered = '1';
+        const correct = onReview?.(task, btn.dataset.reviewValue);
+        for (const b of card.querySelectorAll('[data-review-value]')) b.disabled = true;
+        btn.classList.add(correct ? 'correct' : 'wrong');
+      });
+    }
+  }
   el.querySelector('#business-done').addEventListener('click', onDone);
 }
 

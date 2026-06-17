@@ -115,7 +115,7 @@ export class BusinessPlace extends Place {
         lift: def.lift ?? 0,
       });
 
-      const label = makeTextSprite(name, { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 });
+      const label = makeTextSprite(t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 });
       label.position.copy(this.worldPos(def.x, def.z, 1.15));
       this.group.add(label);
     }

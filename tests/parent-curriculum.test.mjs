@@ -200,7 +200,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     });
     assert.match(currentHtml, /Bakery\/pizzeria practice/);
     assert.match(currentHtml, /3 orders served/);
-    assert.match(currentHtml, /Profit: 4\.50/);
+    assert.match(currentHtml, /Profit: €4\.50/);
     assert.match(currentHtml, /Money amounts to 100 · covered/);
     assert.match(currentHtml, /Measurement units · started/);
     assert.ok(!currentHtml.includes('money_make_amounts'));

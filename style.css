@@ -444,6 +444,9 @@ html, body {
   margin: 4px 0 12px;
 }
 
+.business-review .correct { border-color: var(--leaf); background: #eaffea; }
+.business-review .wrong { border-color: #e8918a; background: #ffecec; }
+
 .business-choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));

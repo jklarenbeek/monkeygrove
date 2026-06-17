@@ -130,6 +130,18 @@ test('business scene source names all station markers and business props', () =>
   }
 });
 
+test('business scene localizes station labels in both locales', () => {
+  const scene = sceneSource();
+  const i18n = i18nSource();
+
+  assert.ok(scene.includes("'business.station.' + name"),
+    'station labels resolve through t(business.station.*), not the raw English key');
+  for (const name of STATION_NAMES) {
+    assert.equal(countQuotedKey(i18n, `business.station.${name}`), 2,
+      `business.station.${name} is defined in both en and nl`);
+  }
+});
+
 test('BusinessPlace builds unwalkable stations and finds stations by nearby grid cells', async () => {
   const { BusinessPlace } = await import(/* @vite-ignore */ `../src/business/scene.js?task4=${Date.now()}${Math.random()}`);
   const place = new BusinessPlace(fakeWorld());
@@ -293,7 +305,7 @@ test('interactive business prep and payment panels collect explicit player choic
   for (const attr of ['data-slices', 'data-topping', 'data-total', 'data-ingredient', 'data-amount', 'data-scale-ingredient']) {
     assert.ok(screens.includes(attr), `prep panel exposes ${attr} controls`);
   }
-  for (const attr of ['data-money', 'data-paid', 'data-change']) {
+  for (const attr of ['data-money', 'data-change', 'data-final']) {
     assert.ok(screens.includes(attr), `payment panel exposes ${attr} controls`);
   }
   assert.ok(!main.includes('correctBusinessAction(task)'), 'main no longer submits generated correct actions');
@@ -328,6 +340,53 @@ test('each prep mode has its own panel view and a localized prompt in both local
     'business.prep.total', 'business.unit.cups', 'business.unit.amount',
   ];
   for (const key of PREP_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
+test('each payment mode has its own panel view and a localized prompt in both locales', () => {
+  const screens = screensSource();
+  const i18n = i18nSource();
+
+  // One PAYMENT_VIEWS branch per payment mode — no silent fallback to make-amount.
+  const PAY_MODES = ['money_make_amounts', 'decimal_money_change', 'percentage_discount'];
+  const viewsBlock = screens.slice(
+    screens.indexOf('const PAYMENT_VIEWS'),
+    screens.indexOf('export function showBusinessPayment'),
+  );
+  assert.ok(viewsBlock.length > 0, 'screens.js defines a PAYMENT_VIEWS registry before showBusinessPayment');
+  for (const mode of PAY_MODES) {
+    assert.ok(viewsBlock.includes(`${mode}:`), `PAYMENT_VIEWS defines a dedicated panel for ${mode}`);
+  }
+
+  const PAY_KEYS = [
+    'business.pay.make', 'business.pay.total', 'business.pay.reset',
+    'business.pay.change', 'business.pay.discount',
+  ];
+  for (const key of PAY_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
+test('each review mode has its own day-summary view and a localized prompt in both locales', () => {
+  const screens = screensSource();
+  const i18n = i18nSource();
+
+  const REVIEW_MODES = ['profit_margin', 'demand_chart', 'unit_conversion_stock', 'price_compare'];
+  const viewsBlock = screens.slice(
+    screens.indexOf('const REVIEW_VIEWS'),
+    screens.indexOf('export function showBusinessDaySummary'),
+  );
+  assert.ok(viewsBlock.length > 0, 'screens.js defines a REVIEW_VIEWS registry before showBusinessDaySummary');
+  for (const mode of REVIEW_MODES) {
+    assert.ok(viewsBlock.includes(`${mode}:`), `REVIEW_VIEWS defines a panel for ${mode}`);
+  }
+
+  const REVIEW_KEYS = [
+    'business.review.profit', 'business.review.demand', 'business.review.convert',
+    'business.review.grams', 'business.review.compare', 'business.review.pack',
+  ];
+  for (const key of REVIEW_KEYS) {
     assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
   }
 });

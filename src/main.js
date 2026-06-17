@@ -24,11 +24,13 @@ import { BUSINESS_CUSTOMERS } from './business/data.js';
 import {
   applyPaymentAction,
   applyPrepAction,
+  applyReviewAction,
   buyUpgrade,
   completeOrder,
   dailyBusinessReport,
   ensureBusinessState,
   nextBusinessOrder,
+  nextBusinessReview,
   restockIngredient,
 } from './business/engine.js';
 import {
@@ -1514,8 +1516,17 @@ class Game {
     business.queue = [];
     this.businessAttempts = [];
     this.place?.clearCustomers?.();
+    const reviewRng = new Rng(`business-review:${this.profile.id}:${business.currentDay}`);
+    const review = nextBusinessReview(business, this.profile.curriculum, { rng: reviewRng });
     screens.showBusinessDaySummary({
       report,
+      review,
+      onReview: (task, value) => {
+        const result = applyReviewAction(business, task, value);
+        audio.sfx(result.correct ? 'correct' : 'boop');
+        persist();
+        return result.correct;
+      },
       onDone: () => {
         business.currentDay = (business.currentDay || 1) + 1;
         business.day = {
