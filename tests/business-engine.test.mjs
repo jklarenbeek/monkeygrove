@@ -18,6 +18,7 @@ import {
   ensureBusinessState,
   nextBusinessOrder,
   nextBusinessReview,
+  orderIsMakeable,
   restockIngredient,
 } from '../src/business/engine.js';
 import { createCurriculumState } from '../src/curriculum/placement.js';
@@ -63,6 +64,33 @@ test('orders never carry a task the serve flow cannot complete', () => {
         `order task ${task.mode} is a completable prep/payment step`);
     }
   }
+});
+
+test('the shop can never soft-lock: a broke, empty shop still gets makeable orders', () => {
+  const curriculum = createCurriculumState({ age: 11 }); // grade 8 — biggest quantities
+  const state = createBusinessState();
+  for (let i = 0; i < 60; i++) {
+    state.stock = {};     // worst case: nothing on the shelves
+    state.shopCoins = 0;  // and no coins to restock with
+    const order = nextBusinessOrder(state, curriculum, { rng: new Rng(`lock-${i}`) });
+    assert.ok(orderIsMakeable(state, order),
+      `order ${i} (${order.recipeId} x${order.quantity}) is completable from empty + broke`);
+    assert.equal(order.supplied, true, 'the supplier steps in when the child would be stuck');
+  }
+});
+
+test('a stocked shop earns its own restocks — no free supply needed', () => {
+  const curriculum = createCurriculumState({ age: 8 });
+  const state = createBusinessState(); // starting stock, 0 coins
+  const order = nextBusinessOrder(state, curriculum, { rng: new Rng('econ-1') });
+  assert.equal(order.supplied, false, 'a freshly stocked shop is not handed free crates');
+  assert.ok(orderIsMakeable(state, order));
+
+  const before = state.shopCoins;
+  const result = completeOrder(state, order, {});
+  assert.ok(result.profitCents > 0, 'orders turn a profit');
+  assert.ok(state.shopCoins > before, 'profit is banked as shop coins');
+  assert.ok(state.shopCoins >= 100, 'one sale funds several restocks (cheapest ingredient ~25c)');
 });
 
 test('non-order modes surface as a graded end-of-day review (grade 6 and up)', () => {

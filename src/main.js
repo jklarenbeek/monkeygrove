@@ -29,6 +29,7 @@ import {
   completeOrder,
   dailyBusinessReport,
   ensureBusinessState,
+  ensureOrderMakeable,
   nextBusinessOrder,
   nextBusinessReview,
   restockIngredient,
@@ -1317,6 +1318,7 @@ class Game {
 
   resumeBusinessOrder(business) {
     const order = business.activeOrder;
+    ensureOrderMakeable(business, order); // legacy/saved orders can't soft-lock either
     business.queue = [order];
     this.businessAttempts = [];
     this.place?.clearCustomers?.();
@@ -1350,7 +1352,7 @@ class Game {
 
   announceBusinessOrder(order) {
     if (!order) return;
-    hud.toast(t('business.order_ready'));
+    hud.toast(order.supplied ? t('business.supplied') : t('business.order_ready'));
   }
 
   showBusinessOrderPanel() {

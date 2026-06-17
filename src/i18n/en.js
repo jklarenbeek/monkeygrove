@@ -135,6 +135,7 @@ export const en = {
   'business.hint.money_make_amounts': 'Add coins until the total matches the price.',
   'business.hint.decimal_money_change': 'Change is what they paid minus the price.',
   'business.hint.percentage_discount': '10% is one tenth — take that off the price.',
+  'business.supplied': 'A supply crate arrived to help! 📦',
 
   // chamber & play
   'play.chamber': 'Chamber {n} of {total}',

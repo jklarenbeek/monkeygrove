@@ -132,6 +132,7 @@ export const nl = {
   'business.hint.money_make_amounts': 'Voeg munten toe tot het totaal klopt.',
   'business.hint.decimal_money_change': 'Wisselgeld is wat ze betaalden min de prijs.',
   'business.hint.percentage_discount': '10% is een tiende — haal dat van de prijs af.',
+  'business.supplied': 'Er kwam een voorraadkrat om te helpen! 📦',
 
   'play.chamber': 'Kamer {n} van {total}',
   'play.correct.1': 'JA! Gelukt!',

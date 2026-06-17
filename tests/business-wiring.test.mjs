@@ -417,6 +417,15 @@ test('prep and payment panels offer a hint and keep the child on the panel to re
   }
 });
 
+test('the anti-soft-lock supply message is wired and localized', () => {
+  const main = mainSource();
+  const i18n = i18nSource();
+
+  assert.ok(main.includes('ensureOrderMakeable'), 'main guarantees orders are makeable');
+  assert.ok(main.includes('business.supplied'), 'a supplied order is announced to the child');
+  assert.equal(countQuotedKey(i18n, 'business.supplied'), 2, 'business.supplied exists in both locales');
+});
+
 test('business order panel gates prep and payment callbacks by task kind', () => {
   const source = screensSource();
 

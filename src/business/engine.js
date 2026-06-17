@@ -109,6 +109,41 @@ function consumeStock(state, recipe, quantity = 1) {
   for (const [id, n] of Object.entries(recipe.ingredients)) state.stock[id] -= n * quantity;
 }
 
+function shortfallCostCents(state, recipe, quantity = 1) {
+  return Object.entries(recipe.ingredients).reduce((sum, [id, n]) => {
+    const missing = Math.max(0, n * quantity - (state.stock[id] ?? 0));
+    return sum + missing * INGREDIENTS[id].unitCostCents;
+  }, 0);
+}
+
+function topUpStock(state, recipe, quantity = 1) {
+  for (const [id, n] of Object.entries(recipe.ingredients)) {
+    const need = n * quantity;
+    if ((state.stock[id] ?? 0) < need) state.stock[id] = need;
+  }
+}
+
+// An order is completable if its ingredients are in stock now, or the shop has
+// enough coins to restock the shortfall.
+export function orderIsMakeable(state, order) {
+  const recipe = RECIPES[order.recipeId];
+  if (!recipe) return false;
+  return hasStock(state, recipe, order.quantity)
+    || state.shopCoins >= shortfallCostCents(state, recipe, order.quantity);
+}
+
+// Anti-soft-lock floor: a child must never face an order they can neither make
+// nor afford to restock. In that corner case the supplier tops up the shortfall
+// for free (order.supplied flags it for a friendly message). Returns true if it
+// stepped in.
+export function ensureOrderMakeable(state, order) {
+  const recipe = RECIPES[order.recipeId];
+  if (!recipe || orderIsMakeable(state, order)) return false;
+  topUpStock(state, recipe, order.quantity);
+  order.supplied = true;
+  return true;
+}
+
 function taskForMode(mode, order, rng) {
   if (mode.id === 'portion_halves_quarters') {
     return {
@@ -203,6 +238,7 @@ export function nextBusinessOrder(state, curriculum, opts = {}) {
     priceCents: recipe.basePriceCents * quantity,
     costCents: recipeCostCents(recipe, quantity),
     tasks: [],
+    supplied: false,
   };
   const modes = allowedModes(curriculum);
   const prepModes = modes.filter((mode) => mode.kind === 'prep');
@@ -212,6 +248,7 @@ export function nextBusinessOrder(state, curriculum, opts = {}) {
   // Stock / upgrade / summary modes are not order steps — they surface as the
   // end-of-day shopkeeper review (see nextBusinessReview). An order only ever
   // carries the prep + payment steps the serve flow can actually complete.
+  ensureOrderMakeable(state, order); // never hand out an order a broke child can't make
   return order;
 }
 
