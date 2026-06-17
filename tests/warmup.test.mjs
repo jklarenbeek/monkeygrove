@@ -5,7 +5,9 @@ import { applyWarmupResult, createCurriculumState } from '../src/curriculum/plac
 
 const screens = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
 const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-const i18n = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+const i18n = ['en', 'nl']
+  .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('task 5 wiring exists for explorer age and warmup flow', () => {
   assert.match(screens, /id="new-age"/);

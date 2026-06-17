@@ -12,7 +12,7 @@ const ROOT = dirname(HERE);
 const SCENE_PATH = join(ROOT, 'src', 'business', 'scene.js');
 const MAIN_PATH = join(ROOT, 'src', 'main.js');
 const SCREENS_PATH = join(ROOT, 'src', 'screens.js');
-const I18N_PATH = join(ROOT, 'src', 'i18n.js');
+const I18N_PATHS = [join(ROOT, 'src', 'i18n', 'en.js'), join(ROOT, 'src', 'i18n', 'nl.js')];
 const STYLE_PATH = join(ROOT, 'style.css');
 const STATION_NAMES = ['counter', 'prep', 'oven', 'pantry', 'coinTray', 'orderBoard'];
 const BUSINESS_SCREEN_NAMES = ['showBusinessOrder', 'showBusinessStock', 'showBusinessUpgrades'];
@@ -43,7 +43,9 @@ function screensSource() {
 }
 
 function i18nSource() {
-  return readFileSync(I18N_PATH, 'utf8');
+  // Per-language dictionaries are separate files now; concatenate so a key shared
+  // by both locales still counts as 2.
+  return I18N_PATHS.map((p) => readFileSync(p, 'utf8')).join('\n');
 }
 
 function styleSource() {
@@ -387,6 +389,30 @@ test('each review mode has its own day-summary view and a localized prompt in bo
     'business.review.grams', 'business.review.compare', 'business.review.pack',
   ];
   for (const key of REVIEW_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
+test('prep and payment panels offer a hint and keep the child on the panel to retry', () => {
+  const screens = screensSource();
+  const i18n = i18nSource();
+  const main = mainSource();
+
+  assert.ok(screens.includes('id="business-hint"'), 'panels include a hint button');
+  assert.ok(screens.includes('business-feedback'), 'panels include a feedback/hint area');
+  assert.ok(screens.includes("'business.hint.' + task.mode"), 'hints are mode-specific');
+  // A wrong answer is reported back (panel stays); only a correct answer advances.
+  assert.match(main, /return \{ correct: true \}/, 'a correct answer advances the flow');
+  assert.match(main, /return \{ correct: false \}/, 'a wrong answer is reported so the panel can stay open');
+
+  const HINT_KEYS = [
+    'business.almost',
+    'business.hint.portion_halves_quarters', 'business.hint.repeated_addition_orders',
+    'business.hint.recipe_measure_whole', 'business.hint.fraction_of_quantity_recipe',
+    'business.hint.scale_recipe', 'business.hint.money_make_amounts',
+    'business.hint.decimal_money_change', 'business.hint.percentage_discount',
+  ];
+  for (const key of HINT_KEYS) {
     assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
   }
 });

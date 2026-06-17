@@ -94,7 +94,9 @@ test('she always has something to say (cozy chatter closes the list)', () => {
 });
 
 test('every line key has EN and NL copy in i18n.js', () => {
-  const src = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+  const src = ['en', 'nl']
+    .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
+    .join('\n');
   const keys = [
     'mimi.meet', 'mimi.build_ready', 'mimi.need_bananas', 'mimi.almost_blueprint',
     'mimi.world_hint', 'mimi.egg_soon', 'mimi.streak', 'mimi.festival',

@@ -910,6 +910,22 @@ const PREP_VIEWS = {
   },
 };
 
+// Shared wiring for the prep/payment panels: bind the view, the 💡 hint, and the
+// done button. A wrong answer keeps the panel open and reveals a mode-specific
+// nudge so the child can try again in place (onSubmit returns { correct }).
+function wireBusinessPanel(el, { task, view, action, doneId, onSubmit, onClose }) {
+  el.querySelector('#scr-back').addEventListener('click', onClose);
+  view.bind(el, action, task);
+  const feedback = el.querySelector('#business-feedback');
+  const reveal = (msg) => { feedback.textContent = msg; feedback.hidden = false; };
+  const hint = () => t('business.hint.' + task.mode);
+  el.querySelector('#business-hint').addEventListener('click', () => reveal(hint()));
+  el.querySelector('#' + doneId).addEventListener('click', () => {
+    const res = onSubmit?.(view.submit(action));
+    if (res && res.correct === false && !res.handled) reveal(`${t('business.almost')} ${hint()}`);
+  });
+}
+
 export function showBusinessPrep({ task, onSubmit, onClose }) {
   const view = PREP_VIEWS[task?.mode] || PREP_VIEWS.portion_halves_quarters;
   const action = {};
@@ -920,14 +936,14 @@ export function showBusinessPrep({ task, onSubmit, onClose }) {
     <div class="card">
       <p class="business-prompt">${esc(view.prompt(task))}</p>
       ${view.controls(task)}
+      <div class="business-feedback" id="business-feedback" hidden></div>
       <div class="menu-row">
+        <button class="btn soft" id="business-hint">💡</button>
         <button class="btn green" id="business-prep-done">${t('business.done')}</button>
       </div>
     </div>
   `);
-  el.querySelector('#scr-back').addEventListener('click', onClose);
-  view.bind(el, action, task);
-  el.querySelector('#business-prep-done').addEventListener('click', () => onSubmit?.(view.submit(action)));
+  wireBusinessPanel(el, { task, view, action, doneId: 'business-prep-done', onSubmit, onClose });
 }
 
 // Payment panels — one small view per task mode, mirroring PREP_VIEWS. Submit shapes
@@ -1014,14 +1030,14 @@ export function showBusinessPayment({ task, onSubmit, onClose }) {
     <div class="tagline">${esc(businessTaskLabel(task))}</div>
     <div class="card">
       ${view.controls(task)}
+      <div class="business-feedback" id="business-feedback" hidden></div>
       <div class="menu-row">
+        <button class="btn soft" id="business-hint">💡</button>
         <button class="btn green" id="business-payment-done">${t('business.done')}</button>
       </div>
     </div>
   `);
-  el.querySelector('#scr-back').addEventListener('click', onClose);
-  view.bind(el, action, task);
-  el.querySelector('#business-payment-done').addEventListener('click', () => onSubmit?.(view.submit(action)));
+  wireBusinessPanel(el, { task, view, action, doneId: 'business-payment-done', onSubmit, onClose });
 }
 
 export function showBusinessStock({ business, onRestock, onClose }) {

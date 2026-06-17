@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const screensSource = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
-const i18nSource = readFileSync(new URL('../src/i18n.js', import.meta.url), 'utf8');
+const i18nSource = ['en', 'nl']
+  .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
+  .join('\n');
 const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 
 function mockStorage() {

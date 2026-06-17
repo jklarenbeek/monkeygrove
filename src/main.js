@@ -1386,19 +1386,25 @@ class Game {
       onSubmit: (action) => {
         const business = ensureBusinessState(this.profile);
         const order = business.activeOrder;
-        if (!order || task.kind !== 'prep') return;
+        if (!order || task.kind !== 'prep') return { correct: false, handled: true };
         const result = applyPrepAction(business, order, task, action);
         this.businessAttempts.push(result);
+        persist();
         if (result.correct) {
           task.businessDone = true;
           audio.sfx('correct');
           hud.toast(t('business.done'));
-        } else {
-          audio.sfx('boop');
-          hud.toast(t(result.reason === 'stock' ? 'business.stock' : 'business.prep'));
+          this.showBusinessOrderPanel();
+          return { correct: true };
         }
-        persist();
-        this.showBusinessOrderPanel();
+        audio.sfx('boop');
+        if (result.reason === 'stock') {
+          // Out of stock isn't a math mistake — send them out to restock.
+          hud.toast(t('business.stock'));
+          this.showBusinessOrderPanel();
+          return { correct: false, handled: true };
+        }
+        return { correct: false }; // wrong answer: panel stays and offers a hint
       },
     });
   }
@@ -1411,19 +1417,19 @@ class Game {
       onSubmit: (action) => {
         const business = ensureBusinessState(this.profile);
         const order = business.activeOrder;
-        if (!order || task.kind !== 'payment') return;
+        if (!order || task.kind !== 'payment') return { correct: false, handled: true };
         const result = applyPaymentAction(business, order, task, action);
         this.businessAttempts.push(result);
+        persist();
         if (result.correct) {
           task.businessDone = true;
           audio.sfx('correct');
           hud.toast(t('business.done'));
-        } else {
-          audio.sfx('boop');
-          hud.toast(t('business.pay'));
+          this.showBusinessOrderPanel();
+          return { correct: true };
         }
-        persist();
-        this.showBusinessOrderPanel();
+        audio.sfx('boop');
+        return { correct: false }; // wrong answer: panel stays and offers a hint
       },
     });
   }
