@@ -5,3 +5,5 @@ dist/
 .superpowers/
 docs/superpowers/
 .vite-smoke*.log
+
+TODO*.md
