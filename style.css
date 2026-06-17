@@ -438,6 +438,12 @@ html, body {
   margin: 8px 0;
 }
 
+.business-prompt {
+  font-size: 17px;
+  font-weight: 800;
+  margin: 4px 0 12px;
+}
+
 .business-choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));

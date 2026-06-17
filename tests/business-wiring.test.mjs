@@ -300,6 +300,38 @@ test('interactive business prep and payment panels collect explicit player choic
   assert.ok(!main.includes('correctBusinessAction('), 'main removes the correctBusinessAction helper entirely');
 });
 
+test('each prep mode has its own panel view and a localized prompt in both locales', () => {
+  const screens = screensSource();
+  const i18n = i18nSource();
+
+  // One PREP_VIEWS branch per prep mode — no silent fallback to the portion panel.
+  const PREP_MODES = [
+    'portion_halves_quarters',
+    'repeated_addition_orders',
+    'recipe_measure_whole',
+    'fraction_of_quantity_recipe',
+    'scale_recipe',
+  ];
+  const viewsBlock = screens.slice(
+    screens.indexOf('const PREP_VIEWS'),
+    screens.indexOf('export function showBusinessPrep'),
+  );
+  assert.ok(viewsBlock.length > 0, 'screens.js defines a PREP_VIEWS registry before showBusinessPrep');
+  for (const mode of PREP_MODES) {
+    assert.ok(viewsBlock.includes(`${mode}:`), `PREP_VIEWS defines a dedicated panel for ${mode}`);
+  }
+
+  // Every prep/unit string the panels render must exist in BOTH en and nl.
+  const PREP_KEYS = [
+    'business.prep.portion', 'business.prep.repeat', 'business.prep.measure',
+    'business.prep.fraction', 'business.prep.scale', 'business.prep.pieces',
+    'business.prep.total', 'business.unit.cups', 'business.unit.amount',
+  ];
+  for (const key of PREP_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
 test('business order panel gates prep and payment callbacks by task kind', () => {
   const source = screensSource();
 

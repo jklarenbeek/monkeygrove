@@ -773,126 +773,159 @@ function setSelected(button, selector) {
   button.classList.add('equipped');
 }
 
-export function showBusinessPrep({ task, onSubmit, onClose }) {
-  const expected = task?.expected || {};
-  const action = { ingredients: {} };
-  const sliceChoices = [...new Set([2, 4, 6, 8, Number(expected.slices)].filter((n) => Number.isFinite(n)))].sort((a, b) => a - b);
-  const toppings = [...new Set(['cheese', 'tomato', expected.topping].filter(Boolean))];
-  const totalChoices = choiceValues((expected.trays || 0) * (expected.perTray || 0), [-2, -1, 1, 2], [4, 6, 8, 12]);
-  const amountChoices = choiceValues(
-    expected.amount ?? ((expected.of || 0) * (expected.numerator || 0)) / (expected.denominator || 1),
-    [-2, -1, 1, 2],
-    [1, 2, 3, 4],
-  );
-  const ingredients = [...new Set(['flour', 'dough', 'sauce', 'cheese', expected.ingredient].filter(Boolean))];
-  const scaleRows = Object.entries(expected.base || {});
+// Prep panels — one small view per task mode. Each renders only the controls its
+// math needs and submits the exact `action` shape applyPrepAction() grades. Keep
+// these submit shapes in sync with src/business/engine.js applyPrepAction().
+function prepTile(attr, value, icon, name) {
+  return `
+    <button class="tile pressable" data-${attr}="${esc(value)}">
+      <div class="t-icon">${esc(icon)}</div>
+      ${name ? `<div class="t-name">${esc(name)}</div>` : ''}
+    </button>`;
+}
 
+function pickOne(el, selector, onPick) {
+  for (const btn of el.querySelectorAll(selector)) {
+    btn.addEventListener('click', () => { onPick(btn); setSelected(btn, selector); });
+  }
+}
+
+const PREP_VIEWS = {
+  // Halves & quarters: how many equal pieces, and which topping.
+  portion_halves_quarters: {
+    prompt: () => t('business.prep.portion'),
+    controls(task) {
+      const e = task.expected || {};
+      const slices = [...new Set([2, 4, 6, 8, Number(e.slices)].filter(Number.isFinite))].sort((a, b) => a - b);
+      const toppings = [...new Set(['cheese', 'tomato', e.topping].filter(Boolean))];
+      return `
+        <div class="business-choice-grid">
+          ${slices.map((n) => prepTile('slices', n, n, t('business.prep.pieces'))).join('')}
+        </div>
+        <div class="business-choice-grid">
+          ${toppings.map((top) => prepTile('topping', top, top === 'tomato' ? '🍅' : '🧀', t('business.ingredient.' + top))).join('')}
+        </div>`;
+    },
+    bind(el, action) {
+      pickOne(el, '[data-slices]', (b) => { action.slices = Number(b.dataset.slices); });
+      pickOne(el, '[data-topping]', (b) => { action.topping = b.dataset.topping; });
+    },
+    submit: (a) => ({ slices: a.slices, topping: a.topping }),
+  },
+
+  // Repeated addition: trays × per-tray → total.
+  repeated_addition_orders: {
+    prompt: (task) => t('business.prep.repeat', {
+      trays: task.expected?.trays ?? 0,
+      perTray: task.expected?.perTray ?? 0,
+    }),
+    controls(task) {
+      const e = task.expected || {};
+      const totals = choiceValues((e.trays || 0) * (e.perTray || 0), [-2, -1, 1, 2], [4, 6, 8, 12]);
+      return `
+        <div class="business-choice-grid">
+          ${totals.map((n) => prepTile('total', n, n, t('business.prep.total'))).join('')}
+        </div>`;
+    },
+    bind(el, action) {
+      pickOne(el, '[data-total]', (b) => { action.total = Number(b.dataset.total); });
+    },
+    submit: (a) => ({ total: a.total }),
+  },
+
+  // Measurement: pick the right ingredient and the whole amount to measure.
+  recipe_measure_whole: {
+    prompt: () => t('business.prep.measure'),
+    controls(task) {
+      const e = task.expected || {};
+      const ingredients = [...new Set(['flour', 'dough', 'milk', e.ingredient].filter(Boolean))];
+      const amounts = choiceValues(e.amount, [-2, -1, 1, 2], [1, 2, 3, 4]);
+      const unit = t('business.unit.' + (e.unit || 'amount'));
+      return `
+        <div class="business-choice-grid">
+          ${ingredients.map((id) => prepTile('ingredient', id, '🥣', t('business.ingredient.' + id))).join('')}
+        </div>
+        <div class="business-choice-grid">
+          ${amounts.map((n) => prepTile('amount', n, n, unit)).join('')}
+        </div>`;
+    },
+    bind(el, action, task) {
+      action.unit = task.expected?.unit;
+      pickOne(el, '[data-ingredient]', (b) => { action.ingredient = b.dataset.ingredient; });
+      pickOne(el, '[data-amount]', (b) => { action.amount = Number(b.dataset.amount); });
+    },
+    submit: (a) => ({ ingredient: a.ingredient, amount: a.amount, unit: a.unit }),
+  },
+
+  // Fraction of a quantity: how many is num/den of the order amount.
+  fraction_of_quantity_recipe: {
+    prompt: (task) => {
+      const e = task.expected || {};
+      return t('business.prep.fraction', { num: e.numerator ?? 1, den: e.denominator ?? 1, of: e.of ?? 0 });
+    },
+    controls(task) {
+      const e = task.expected || {};
+      const answer = ((e.of || 0) * (e.numerator || 0)) / (e.denominator || 1);
+      const amounts = choiceValues(answer, [-2, -1, 1, 2], [1, 2, 3, 4]);
+      return `
+        <div class="business-choice-grid">
+          ${amounts.map((n) => prepTile('amount', n, n, t('business.prep.total'))).join('')}
+        </div>`;
+    },
+    bind(el, action) {
+      pickOne(el, '[data-amount]', (b) => { action.amount = Number(b.dataset.amount); });
+    },
+    submit: (a) => ({ amount: a.amount }),
+  },
+
+  // Scale the recipe: set each ingredient to base × factor.
+  scale_recipe: {
+    prompt: (task) => t('business.prep.scale', { factor: task.expected?.factor ?? 1 }),
+    controls(task) {
+      const e = task.expected || {};
+      const factor = e.factor || 1;
+      return Object.entries(e.base || {}).map(([id, n]) => `
+        <div class="tagline">${esc(t('business.ingredient.' + id))}</div>
+        <div class="business-choice-grid">
+          ${choiceValues(n * factor, [-1, 1], [n]).map((choice) => `
+            <button class="tile pressable" data-scale-ingredient="${esc(id)}" data-scale-amount="${choice}">
+              <div class="t-icon">${choice}</div>
+            </button>`).join('')}
+        </div>`).join('');
+    },
+    bind(el, action) {
+      action.ingredients = {};
+      for (const btn of el.querySelectorAll('[data-scale-ingredient]')) {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.scaleIngredient;
+          action.ingredients[id] = Number(btn.dataset.scaleAmount);
+          for (const other of el.querySelectorAll(`[data-scale-ingredient="${id}"]`)) other.classList.remove('equipped');
+          btn.classList.add('equipped');
+        });
+      }
+    },
+    submit: (a) => ({ ingredients: { ...(a.ingredients || {}) } }),
+  },
+};
+
+export function showBusinessPrep({ task, onSubmit, onClose }) {
+  const view = PREP_VIEWS[task?.mode] || PREP_VIEWS.portion_halves_quarters;
+  const action = {};
   const el = render(`
     ${backBtn(onClose, '←')}
     <h2>${t('business.prep')}</h2>
     <div class="tagline">${esc(businessTaskLabel(task))}</div>
     <div class="card">
-      <h3>${t('business.prep')}</h3>
-      <div class="business-choice-grid">
-        ${sliceChoices.map((slices) => `
-          <button class="tile pressable" data-slices="${slices}">
-            <div class="t-icon">${slices}</div>
-            <div class="t-name">slices</div>
-          </button>
-        `).join('')}
-      </div>
-      <div class="business-choice-grid">
-        ${toppings.map((topping) => `
-          <button class="tile pressable" data-topping="${esc(topping)}">
-            <div class="t-icon">${topping === 'tomato' ? '🍅' : '🧀'}</div>
-            <div class="t-name">${esc(topping)}</div>
-          </button>
-        `).join('')}
-      </div>
-      <div class="business-choice-grid">
-        ${totalChoices.map((total) => `
-          <button class="tile pressable" data-total="${total}">
-            <div class="t-icon">${total}</div>
-            <div class="t-name">total</div>
-          </button>
-        `).join('')}
-      </div>
-      <div class="business-choice-grid">
-        ${ingredients.map((ingredient) => `
-          <button class="tile pressable" data-ingredient="${esc(ingredient)}">
-            <div class="t-icon">🥣</div>
-            <div class="t-name">${esc(ingredient)}</div>
-          </button>
-        `).join('')}
-        ${amountChoices.map((amount) => `
-          <button class="tile pressable" data-amount="${amount}">
-            <div class="t-icon">${amount}</div>
-            <div class="t-name">${esc(expected.unit || 'amount')}</div>
-          </button>
-        `).join('')}
-      </div>
-      ${scaleRows.length ? `
-        <div class="business-choice-grid">
-          ${scaleRows.map(([ingredient, amount]) => choiceValues(amount * (expected.factor || 1), [-1, 1], [amount]).map((choice) => `
-            <button class="tile pressable" data-scale-ingredient="${esc(ingredient)}" data-scale-amount="${choice}">
-              <div class="t-icon">${choice}</div>
-              <div class="t-name">${esc(ingredient)}</div>
-            </button>
-          `).join('')).join('')}
-        </div>
-      ` : ''}
+      <p class="business-prompt">${esc(view.prompt(task))}</p>
+      ${view.controls(task)}
       <div class="menu-row">
         <button class="btn green" id="business-prep-done">${t('business.done')}</button>
       </div>
     </div>
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
-  for (const btn of el.querySelectorAll('[data-slices]')) {
-    btn.addEventListener('click', () => {
-      action.slices = Number(btn.dataset.slices);
-      setSelected(btn, '[data-slices]');
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-topping]')) {
-    btn.addEventListener('click', () => {
-      action.topping = btn.dataset.topping;
-      setSelected(btn, '[data-topping]');
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-total]')) {
-    btn.addEventListener('click', () => {
-      action.total = Number(btn.dataset.total);
-      setSelected(btn, '[data-total]');
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-ingredient]')) {
-    btn.addEventListener('click', () => {
-      action.ingredient = btn.dataset.ingredient;
-      action.unit = expected.unit;
-      setSelected(btn, '[data-ingredient]');
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-amount]')) {
-    btn.addEventListener('click', () => {
-      action.amount = Number(btn.dataset.amount);
-      action.unit = expected.unit;
-      setSelected(btn, '[data-amount]');
-    });
-  }
-  for (const btn of el.querySelectorAll('[data-scale-ingredient]')) {
-    btn.addEventListener('click', () => {
-      action.ingredients[btn.dataset.scaleIngredient] = Number(btn.dataset.scaleAmount);
-      for (const other of el.querySelectorAll('[data-scale-ingredient]')) {
-        if (other.dataset.scaleIngredient === btn.dataset.scaleIngredient) other.classList.remove('equipped');
-      }
-      btn.classList.add('equipped');
-    });
-  }
-  el.querySelector('#business-prep-done').addEventListener('click', () => {
-    const submitted = { ...action, ingredients: { ...action.ingredients } };
-    if (!Object.keys(submitted.ingredients).length) delete submitted.ingredients;
-    onSubmit?.(submitted);
-  });
+  view.bind(el, action, task);
+  el.querySelector('#business-prep-done').addEventListener('click', () => onSubmit?.(view.submit(action)));
 }
 
 export function showBusinessPayment({ task, onSubmit, onClose }) {
