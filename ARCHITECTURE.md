@@ -43,8 +43,10 @@ src/
   audio.js              procedural WebAudio: pentatonic SFX + music loops, no samples
   voxel.js              ASCII voxel models -> merged BufferGeometry with vertex colors
                         and baked AO; geometry cache; one shared material
-  models.js             voxel model data: characters, props, pets, hats, portal vine
-                        overlays, ambient critters (pure data, zero imports)
+  mesh/                 one file per character & pet voxel model; index.js
+                        assembles the CHARS / PETS registries
+  models.js             re-exports CHARS/PETS, plus props, hats, portal vine
+                        overlays, ambient critters
   world.js              renderer, fixed-angle iso ortho camera rig, lighting, picking
   chamber.js            diorama builder: ASCII templates + variation, hub island (HubPlace)
   player.js             grid-hop movement w/ squash & stretch, BFS tap-to-walk, carrying
@@ -66,7 +68,8 @@ tests/                  vitest: mathengine, curriculum, state migration, warm-up
 - **Orthographic camera** at one fixed isometric-ish angle (view dir ≈ (1, 1.15, 1),
   no rotation): smooth exponential follow of the player, a "fit board" mode that keeps
   a whole chamber visible at any aspect ratio, camera micro-shake for juice.
-- **Voxel models**: defined as layered ASCII grids + palette in `models.js`; `voxel.js`
+- **Voxel models**: defined as layered ASCII grids + palette in `models.js` and
+  `mesh/`; `voxel.js`
   converts each to a single merged `BufferGeometry` with **vertex colors and baked
   ambient occlusion** — one shared Lambert material for every voxel mesh keeps draw
   state tiny. Geometries are cached by key and reused across scenes (palette variants

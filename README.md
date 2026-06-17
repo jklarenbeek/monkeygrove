@@ -146,7 +146,8 @@ src/
   player.js         grid-hop movement, tap-to-walk, carrying, pet follower
   entities.js       stones, pots, crabs, portals, particles, props, labels
   voxel.js          ASCII voxel data to cached Three.js geometry
-  models.js         voxel models, props, pets, cosmetics, ambient critters
+  mesh/             one file per character & pet voxel model
+  models.js         props, cosmetics, ambient critters; re-exports mesh/
   anim.js           tweening and easing
   audio.js          procedural WebAudio music and SFX
 
