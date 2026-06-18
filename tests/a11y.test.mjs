@@ -1,6 +1,6 @@
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
 const read = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
 
@@ -24,9 +24,14 @@ function fakeClassList() {
   };
 }
 
+function fakeStyle() {
+  const props = {};
+  return { setProperty: (k, v) => { props[k] = String(v); }, getPropertyValue: (k) => props[k] ?? '', _props: props };
+}
+
 beforeEach(() => {
   globalThis.localStorage = mockStorage();
-  globalThis.document = { documentElement: { classList: fakeClassList() } };
+  globalThis.document = { documentElement: { classList: fakeClassList(), style: fakeStyle() } };
   globalThis.matchMedia = () => ({ matches: false });
 });
 
@@ -66,6 +71,16 @@ test('applyComfortSettings mirrors settings onto the root element classes', asyn
   applyComfortSettings();
   assert.ok(!cl.contains('dyslexia'), 'toggling off removes the class');
   assert.ok(cl.contains('high-contrast'));
+
+  // colour-blind palette + text scale
+  s.colorblind = true; s.textScale = 1.3;
+  applyComfortSettings();
+  assert.ok(cl.contains('colorblind'), 'colour-blind palette is opt-in via a class');
+  assert.equal(globalThis.document.documentElement.style.getPropertyValue('--text-scale'), '1.3', 'text scale drives --text-scale');
+  s.colorblind = false; s.textScale = 1;
+  applyComfortSettings();
+  assert.ok(!cl.contains('colorblind'), 'normal mode has no colour-blind class');
+  assert.equal(globalThis.document.documentElement.style.getPropertyValue('--text-scale'), '1');
 });
 
 test('fresh and migrated saves both get the comfort settings keys', async () => {
@@ -89,14 +104,21 @@ test('the 3D juice is gated by reducedMotion()', () => {
 
 test('settings screen exposes the comfort toggles, localized in both languages', () => {
   const screens = read('screens.js');
-  for (const id of ['tg-motion', 'tg-font', 'tg-contrast']) {
+  for (const id of ['tg-motion', 'tg-font', 'tg-contrast', 'tg-colorblind', 'tg-textsize']) {
     assert.ok(screens.includes(`id="${id}"`), `settings has a ${id} toggle`);
   }
   const dict = read('i18n/en.js') + '\n' + read('i18n/nl.js');
-  for (const key of ['settings.reduce_motion', 'settings.dyslexia_font', 'settings.high_contrast']) {
+  for (const key of ['settings.reduce_motion', 'settings.dyslexia_font', 'settings.high_contrast', 'settings.colorblind', 'settings.text_size']) {
     const n = dict.split(`'${key}'`).length - 1;
     assert.equal(n, 2, `${key} is defined in both en and nl`);
   }
+});
+
+test('text-scale and the colour-blind palette are opt-in and wired in CSS', () => {
+  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+  assert.match(css, /--text-scale:\s*1\b/, 'normal mode is 1× (unchanged)');
+  assert.ok(css.includes('font-size: calc(') && css.includes('* var(--text-scale))'), 'font-sizes scale with --text-scale');
+  assert.match(css, /:root\.colorblind\s*\{/, 'colour-blind palette is a class (opt-in, normal mode untouched)');
 });
 
 test('opening a screen moves focus into it for keyboard/screen-reader users', () => {
@@ -104,6 +126,14 @@ test('opening a screen moves focus into it for keyboard/screen-reader users', ()
   const render = screens.slice(screens.indexOf('function render('), screens.indexOf('function backBtn('));
   assert.match(render, /\.tabIndex\s*=\s*-1/, 'screen container is focusable');
   assert.match(render, /\.focus\?\./, 'render moves focus into the new screen');
+});
+
+test('OpenDyslexic is bundled and wired to the easy-read font option', () => {
+  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+  assert.match(css, /@font-face[\s\S]*?font-family:\s*'OpenDyslexic'[\s\S]*?\.woff2/i, 'OpenDyslexic @font-face is declared');
+  assert.match(css, /:root\.dyslexia[\s\S]*?'OpenDyslexic'/, 'the dyslexia option uses OpenDyslexic first');
+  assert.ok(existsSync(new URL('../assets/fonts/OpenDyslexic-Regular.woff2', import.meta.url)), 'Regular woff2 is in the repo');
+  assert.ok(existsSync(new URL('../assets/fonts/OpenDyslexic-Bold.woff2', import.meta.url)), 'Bold woff2 is in the repo');
 });
 
 test('toasts and Mimi dialogue are announced to screen readers', () => {

@@ -39,7 +39,11 @@ function freshProfile(name, opts = {}) {
 
 // reduceMotion null = follow the OS (prefers-reduced-motion); true/false = explicit.
 function settingsDefaults() {
-  return { lang: detectLang(), sfx: true, music: true, reduceMotion: null, dyslexiaFont: false, highContrast: false };
+  return {
+    lang: detectLang(), sfx: true, music: true,
+    reduceMotion: null, dyslexiaFont: false, highContrast: false,
+    colorblind: false, textScale: 1,
+  };
 }
 
 function freshSave() {

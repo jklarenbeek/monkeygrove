@@ -425,6 +425,8 @@ export const en = {
   'settings.reduce_motion': 'Calm motion',
   'settings.dyslexia_font': 'Easy-read font',
   'settings.high_contrast': 'High contrast',
+  'settings.colorblind': 'Colour-friendly',
+  'settings.text_size': 'Text size',
   'settings.switch_player': 'Switch explorer',
   'nav.back': 'Back',
   'nav.close': 'Close',

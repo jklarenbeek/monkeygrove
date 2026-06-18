@@ -22,4 +22,7 @@ export function applyComfortSettings() {
   root.classList.toggle('reduce-motion', reducedMotion());
   root.classList.toggle('dyslexia', !!s.dyslexiaFont);
   root.classList.toggle('high-contrast', !!s.highContrast);
+  root.classList.toggle('colorblind', !!s.colorblind);
+  // font-sizes are calc(<px> * var(--text-scale)); 1 = normal
+  root.style.setProperty('--text-scale', String(Number(s.textScale) > 0 ? s.textScale : 1));
 }

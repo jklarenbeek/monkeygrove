@@ -412,6 +412,8 @@ export const nl = {
   'settings.reduce_motion': 'Rustige beweging',
   'settings.dyslexia_font': 'Leesvriendelijk lettertype',
   'settings.high_contrast': 'Hoog contrast',
+  'settings.colorblind': 'Kleurvriendelijk',
+  'settings.text_size': 'Tekstgrootte',
   'settings.switch_player': 'Andere ontdekker',
   'nav.back': 'Terug',
   'nav.close': 'Sluiten',

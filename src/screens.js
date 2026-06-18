@@ -411,6 +411,8 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
           <button class="btn soft" id="tg-motion" aria-pressed="${reducedMotion()}">${reducedMotion() ? '🐢' : '🏃'} ${t('settings.reduce_motion')}</button>
           <button class="btn soft" id="tg-font" aria-pressed="${!!s.dyslexiaFont}">🔤 ${t('settings.dyslexia_font')}</button>
           <button class="btn soft" id="tg-contrast" aria-pressed="${!!s.highContrast}">${s.highContrast ? '◑' : '○'} ${t('settings.high_contrast')}</button>
+          <button class="btn soft" id="tg-colorblind" aria-pressed="${!!s.colorblind}">${s.colorblind ? '◑' : '○'} ${t('settings.colorblind')}</button>
+          <button class="btn soft" id="tg-textsize">🔠 ${t('settings.text_size')}: ${Math.round((s.textScale || 1) * 100)}%</button>
         </div>
         <button class="btn soft" id="switch-player">👥 ${t('settings.switch_player')}</button>
         ${devTools?.toggleHtml || ''}
@@ -443,6 +445,17 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   });
   el.querySelector('#tg-contrast').addEventListener('click', () => {
     s.highContrast = !s.highContrast; applyComfortSettings(); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-colorblind').addEventListener('click', () => {
+    s.colorblind = !s.colorblind; applyComfortSettings(); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-textsize').addEventListener('click', () => {
+    const steps = [1, 1.15, 1.3];
+    const i = steps.findIndex((v) => Math.abs(v - (s.textScale || 1)) < 0.01);
+    s.textScale = steps[(i + 1) % steps.length];
+    applyComfortSettings(); persist();
     showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
   el.querySelector('#switch-player').addEventListener('click', onSwitchPlayer);
