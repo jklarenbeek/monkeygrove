@@ -421,6 +421,11 @@ export const en = {
   'settings.dyslexia_font': 'Easy-read font',
   'settings.high_contrast': 'High contrast',
   'settings.switch_player': 'Switch explorer',
+  'nav.back': 'Back',
+  'nav.close': 'Close',
+  'hud.hint': 'Hint',
+  'hud.action': 'Action',
+  'hud.home': 'Home',
 
   // duel
   'duel.title': 'Banana Duel',

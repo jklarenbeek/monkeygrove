@@ -42,7 +42,7 @@ function render(html, extraClass = '') {
 }
 
 function backBtn(onBack, label = null) {
-  return `<button class="round-btn screen-close" id="scr-back">${label || '✖️'}</button>`;
+  return `<button class="round-btn screen-close" id="scr-back" aria-label="${esc(t('nav.back'))}">${label || '✖️'}</button>`;
 }
 
 // ---------- title ----------
@@ -763,7 +763,7 @@ export function showBusinessOrder({
     <div class="business-panel">
       <div class="business-head">
         <h2>${t(titleKey)}</h2>
-        <button class="round-btn" id="business-close">x</button>
+        <button class="round-btn" id="business-close" aria-label="${esc(t('nav.close'))}">x</button>
       </div>
       <div class="card business-order-card">
         <div class="chip">${esc(customerName)}</div>

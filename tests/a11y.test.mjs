@@ -105,3 +105,17 @@ test('opening a screen moves focus into it for keyboard/screen-reader users', ()
   assert.match(render, /\.tabIndex\s*=\s*-1/, 'screen container is focusable');
   assert.match(render, /\.focus\?\./, 'render moves focus into the new screen');
 });
+
+test('icon-only controls carry accessible names for screen readers', () => {
+  const screens = read('screens.js');
+  const hud = read('hud.js');
+
+  assert.match(screens, /id="scr-back"[^>]*aria-label=/, 'the back/close button has an accessible name');
+  assert.match(screens, /id="business-close"[^>]*aria-label=/, 'the shop close button has an accessible name');
+  assert.match(hud, /setAttribute\('aria-label'/, 'HUD round buttons get accessible names in initHud');
+
+  const dict = read('i18n/en.js') + '\n' + read('i18n/nl.js');
+  for (const key of ['nav.back', 'nav.close', 'hud.hint', 'hud.action', 'hud.home']) {
+    assert.equal(dict.split(`'${key}'`).length - 1, 2, `${key} is defined in both en and nl`);
+  }
+});

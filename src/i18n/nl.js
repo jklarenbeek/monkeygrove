@@ -408,6 +408,11 @@ export const nl = {
   'settings.dyslexia_font': 'Leesvriendelijk lettertype',
   'settings.high_contrast': 'Hoog contrast',
   'settings.switch_player': 'Andere ontdekker',
+  'nav.back': 'Terug',
+  'nav.close': 'Sluiten',
+  'hud.hint': 'Tip',
+  'hud.action': 'Actie',
+  'hud.home': 'Home',
 
   'duel.title': 'Bananenduel',
   'duel.sub': 'Twee ontdekkers, dezelfde kamers — wie verzamelt meer bananen?',
