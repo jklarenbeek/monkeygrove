@@ -9,6 +9,7 @@ import * as hud from './hud.js';
 import { t } from './i18n.js';
 import { delay } from './anim.js';
 import { TILE, IS_TOUCH, MOBILE_DEFAULT_ZOOM } from './config.js';
+import { screenDirToGridStep } from './world.js';
 
 export class InputController {
   constructor(game) {
@@ -29,15 +30,23 @@ export class InputController {
         return;
       }
       if (game.verb?.onKey?.(code)) { e.preventDefault(); return; }
+      // Screen-relative movement on the iso diamond. The board's rows/columns
+      // run at 45°, so every single-cell hop travels on a screen diagonal —
+      // there is no cell-to-cell move that goes dead-straight up (see
+      // world.GRID_STEP_SCREEN). Rather than fight that, each arrow is assigned
+      // the hop that carries its own label's screen component: Up steps toward
+      // the top of the screen (the up-and-right hop), Down toward the bottom,
+      // Left/Right toward their edges. A deliberate four-key→four-hop bijection
+      // that lines up with the swipe buckets (world.screenDirToGridStep), so
+      // keyboard and touch send the monkey the same way for the same intent.
       const dirs = {
-        ArrowUp: [0, -1], KeyW: [0, -1],
-        ArrowDown: [0, 1], KeyS: [0, 1],
-        ArrowLeft: [-1, 0], KeyA: [-1, 0],
-        ArrowRight: [1, 0], KeyD: [1, 0],
+        ArrowUp: [0, -1], KeyW: [0, -1],     // top of screen  (up-right hop)
+        ArrowDown: [0, 1], KeyS: [0, 1],     // bottom         (down-left hop)
+        ArrowLeft: [-1, 0], KeyA: [-1, 0],   // left edge       (up-left hop)
+        ArrowRight: [1, 0], KeyD: [1, 0],    // right edge      (down-right hop)
       };
       if (dirs[code]) {
         e.preventDefault();
-        // camera-relative: iso view rotates input 45°; keep plain mapping (playtests fine)
         game.player?.tryStep(dirs[code][0], dirs[code][1]);
       } else if (code === 'Space' || code === 'Enter') {
         e.preventDefault();
@@ -110,12 +119,13 @@ export class InputController {
       } else {
         const dx = e.clientX - (start?.x ?? e.clientX), dy = e.clientY - (start?.y ?? e.clientY);
         if (Math.hypot(dx, dy) > 30) {
-          // swipe = one step
-          const ang = Math.atan2(dy, dx);
-          const oct = Math.round(ang / (Math.PI / 2));
-          const map = { 0: [1, 0], 1: [0, 1], 2: [-1, 0], '-1': [0, -1], '-2': [-1, 0] };
-          const d = map[oct] || [0, 0];
-          game.player?.tryStep(d[0], d[1]);
+          // swipe = one step, screen-relative. Hand the swipe direction (screen
+          // y points down, so negate it for "up+") to the same iso resolver the
+          // camera basis drives: it buckets the angle into the four grid hops
+          // 1:1 — a swipe up-left steps up-left — instead of the old octant
+          // round() that double-mapped left and could drop diagonals sideways.
+          const d = screenDirToGridStep(dx, -dy);
+          if (d) game.player?.tryStep(d[0], d[1]);
         }
       }
     };

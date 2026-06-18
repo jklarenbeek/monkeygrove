@@ -25,6 +25,37 @@ const SCREEN_UP_GROUND = new THREE.Vector3()
   .setComponent(1, 0)
   .normalize();
 
+// The four cardinal grid hops ([dx, dz]) and where each one travels on screen
+// under the iso camera (screen x = right+, screen y = up+). The board is a
+// 45°-rotated diamond, so its rows/columns run diagonally and every single-cell
+// hop lands on a screen diagonal (≈±45°, ±135°) — there is no cell-to-cell move
+// that goes dead-straight up/down/left/right. Derived from the same basis as the
+// camera so they rotate with ISO_DIR instead of being hand-tuned magic numbers.
+const GRID_STEP_SCREEN = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => [
+  dx, dz,
+  dx * SCREEN_RIGHT_GROUND.x + dz * SCREEN_RIGHT_GROUND.z, // screen x (right+)
+  dx * SCREEN_UP_GROUND.x + dz * SCREEN_UP_GROUND.z,       // screen y (up+)
+]);
+
+// Resolve a screen-space direction (sx = toward the right edge, sy = toward the
+// top edge) into the single grid hop whose on-screen travel points most nearly
+// the same way. This is the screen-relative input map: a swipe up-left always
+// steps up-left, a drag down-right always steps down-right. It is total and
+// gap-free — every non-zero direction picks exactly one of the four hops and
+// all four stay reachable, so there are no duplicate or dead buckets. A
+// perfectly diagonal input (a dead-straight vertical/horizontal swipe, equally
+// close to two hops) falls to a fixed first match, so it still resolves rather
+// than stalling. Returns null only for a zero vector.
+export function screenDirToGridStep(sx, sy) {
+  if (sx === 0 && sy === 0) return null;
+  let best = null, bestDot = -Infinity;
+  for (const [dx, dz, gx, gy] of GRID_STEP_SCREEN) {
+    const dot = gx * sx + gy * sy;
+    if (dot > bestDot) { bestDot = dot; best = [dx, dz]; }
+  }
+  return best;
+}
+
 // User zoom range: 1 = the auto fit/follow framing; >1 zooms in. Below 1 just
 // pulls back a touch for breathing room.
 const ZOOM_MIN = 0.8;
