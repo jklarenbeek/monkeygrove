@@ -609,3 +609,130 @@ test('nextProblem + recordResult are reproducible from inputs', () => {
   assert.equal(a.log[0].t, 5000);
   assert.equal(a.log[7].t, 5007);
 });
+
+// ---------- ≈65% success-targeting guard (TODO_08) ----------
+//
+// The pedagogical promise is that problems target ≈0.65 expected success so a
+// math-anxious child stays in the "I can do this" zone. That rests on two
+// hand-tuned magic numbers — TARGET_OFFSET and the per-generator `d:` tiers —
+// with nothing guarding them. These tests drive a *simulated learner* of known
+// true ability against every generator and assert the realized success rate
+// actually lands in the productive-struggle band.
+//
+// All randomness is seeded and `now` is fixed, so every run is byte-identical:
+// these tests are deterministic, not statistical, despite simulating thousands
+// of attempts.
+
+// Mirror of the engine's own logistic (mathengine.js: expectedFor) and the
+// TARGET_OFFSET constant (mathengine.js:46). expectedFor(r, r - 108) ≈ 0.65.
+const TARGET_OFFSET = 108;
+const TARGET_SUCCESS = 0.65;
+const expectedFor = (rating, difficulty) => 1 / (1 + 10 ** ((difficulty - rating) / 400));
+
+// Band the realized rate must stay inside once ratings have converged. This is
+// the documented "productive struggle" zone — wide enough to absorb Elo noise
+// and the discreteness of the difficulty ladder, tight enough that a generator
+// quietly feeding 50%-success problems trips it.
+const REALIZED_LO = 0.55;
+const REALIZED_HI = 0.75;
+
+// Discover a generator's declared difficulty tiers empirically rather than
+// hard-coding them: force 'fetch' so we read the clean base difficulty (the
+// 'array' kind adds +30 to some problems), warm the skill past the cold-start
+// window, and sweep ratings wide so pickTier surfaces every tier.
+function probeTiers(skillId) {
+  const seen = new Set();
+  for (let r = 350; r <= 1350; r += 15) {
+    const m = createMathState();
+    m.skills[skillId].r = r;
+    m.skills[skillId].n = 20;
+    for (let i = 0; i < 6; i++) {
+      const p = nextProblem(m, { skill: skillId, kind: 'fetch', rng: new Rng(`tier:${skillId}:${r}:${i}`) });
+      seen.add(Math.round(p.difficulty));
+    }
+  }
+  return [...seen].sort((a, b) => a - b);
+}
+
+const TIERS = Object.fromEntries(Object.keys(SKILLS).map((id) => [id, probeTiers(id)]));
+
+// The learner's true ability is unknown to the engine; a real child sits at
+// each tier's design rating (tier + TARGET_OFFSET) at some point in their climb,
+// and also *between* tiers as their rating drifts. Test both: tier centers catch
+// a mis-placed tier, the midpoints catch a ladder with gaps too wide to keep a
+// learner in the band.
+function ladderAbilities(tiers) {
+  const points = [];
+  for (let i = 0; i < tiers.length; i++) {
+    points.push(tiers[i]);
+    if (i + 1 < tiers.length) points.push(Math.round((tiers[i] + tiers[i + 1]) / 2));
+  }
+  return points.map((d) => d + TARGET_OFFSET);
+}
+
+// A simulated learner of fixed true ability. Each served problem is answered
+// correct with the *true* probability expectedFor(trueAbility, difficulty); the
+// engine only ever sees the boolean, exactly like a real child. The realized
+// rate and average rating are measured over the converged tail (well past
+// COLD_N = 8), never the cold-start ramp.
+function simulateLearner(skillId, trueAbility, { total = 1400, tail = 800 } = {}) {
+  const m = createMathState();
+  const genRng = new Rng(`gen:${skillId}:${trueAbility}`);
+  const ansRng = new Rng(`ans:${skillId}:${trueAbility}`);
+  let hits = 0;
+  let ratingSum = 0;
+  let n = 0;
+  for (let i = 0; i < total; i++) {
+    const p = nextProblem(m, { skill: skillId, rng: genRng });
+    const correct = ansRng.chance(expectedFor(trueAbility, p.difficulty));
+    recordResult(m, p, { correct, usedHint: false, ms: 2000 }, { now: i });
+    if (i >= total - tail) {
+      hits += correct ? 1 : 0;
+      ratingSum += m.skills[skillId].r;
+      n += 1;
+    }
+  }
+  return { realized: hits / n, rating: ratingSum / n };
+}
+
+test('simulated learner stays in the ≈65% band on every skill across its ladder', () => {
+  for (const skillId of Object.keys(SKILLS)) {
+    for (const trueAbility of ladderAbilities(TIERS[skillId])) {
+      const { realized, rating } = simulateLearner(skillId, trueAbility);
+      assert.ok(
+        realized > REALIZED_LO && realized < REALIZED_HI,
+        `${skillId} @ability ${trueAbility}: realized ${realized.toFixed(3)} outside [${REALIZED_LO}, ${REALIZED_HI}]`,
+      );
+      // The Elo rating chased the learner's true ability — proof the measured
+      // rate is a genuine steady state, not a cold-start artifact. The window is
+      // generous because Elo wobbles, but it still pins ratings that start at
+      // 600 to abilities hundreds of points away.
+      assert.ok(
+        Math.abs(rating - trueAbility) < 130,
+        `${skillId} @ability ${trueAbility}: rating ${rating.toFixed(0)} never converged`,
+      );
+    }
+  }
+});
+
+test('freshly generated problems target ≈65% expected success at every tier', () => {
+  for (const skillId of Object.keys(SKILLS)) {
+    for (const tier of TIERS[skillId]) {
+      const m = createMathState();
+      m.skills[skillId].r = tier + TARGET_OFFSET; // a learner sitting at this tier
+      m.skills[skillId].n = 20; // warmed past the cold-start window
+      const rng = new Rng(`expect:${skillId}:${tier}`);
+      let sum = 0;
+      const N = 2000;
+      for (let i = 0; i < N; i++) sum += expectedSuccess(m, nextProblem(m, { skill: skillId, rng }));
+      const avg = sum / N;
+      // The engine's own belief, averaged over the natural problem mix, must sit
+      // within ±0.03 of the target — the discrete ladder and kind-mix offsets
+      // pull it a hair below 0.65 but never out of "near target".
+      assert.ok(
+        Math.abs(avg - TARGET_SUCCESS) < 0.03,
+        `${skillId} @tier ${tier}: avg expectedSuccess ${avg.toFixed(3)} not near ${TARGET_SUCCESS}`,
+      );
+    }
+  }
+});
