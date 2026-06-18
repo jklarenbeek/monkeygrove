@@ -6,7 +6,8 @@
   "description": "Monkey Grove — a cozy island adventure that secretly teaches arithmetic",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-budget.mjs",
+    "build:check": "node scripts/check-budget.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",

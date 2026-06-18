@@ -306,6 +306,23 @@ duel-critical draws.
   ticker; the RAF hot path avoids per-frame allocations.
 - `renderer.setPixelRatio(min(devicePixelRatio, 2))`; shadows only at high QUALITY.
 
+### First-load bundle budget
+The first download has to stay light for kids on slow school Wi-Fi / cheap Android,
+so `npm run build` runs `scripts/check-budget.mjs` after `vite build` and **fails the
+build** if the first load re-bloats (re-run alone with `npm run build:check`). The
+guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
+- **First-load `index` JS ≤ 215 kB gzip** — today 210.09 kB. The bakery sim lives in a
+  lazily-fetched `business-*` chunk (13.78 kB / 4.44 kB gzip), and duels in `duel-*`.
+- **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
+  runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
+  `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
+- **PWA precache ≤ 1150 KiB** — today 15 entries / 1088.28 KiB.
+- **The `business-*` chunk stays lazy** — the check fails if it folds back into `index`
+  or the entry static-imports it (Vite would module-preload it into `index.html`).
+
+Move a threshold deliberately (here and in `scripts/check-budget.mjs`) when the
+baseline genuinely shifts — not to paper over a regression.
+
 ## Testing
 Two layers:
 - **`npm test` (vitest)** — the bulk of coverage. Pure logic (math engine, curriculum,
