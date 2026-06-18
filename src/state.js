@@ -56,19 +56,32 @@ function detectLang() {
   return l.startsWith('nl') ? 'nl' : 'en';
 }
 
+// A corrupt or unreadable save must never hand a child a blank screen. Any failure
+// path — storage disabled, bad JSON, wrong shape, or a migration that throws —
+// preserves the bad payload under BACKUP_KEY (for recovery/debugging) and falls back
+// to a clean, playable save.
+const BACKUP_KEY = 'monkeygrove.save.corrupt';
+
+function backupCorruptSave(raw) {
+  if (!raw) return;
+  try { localStorage.setItem(BACKUP_KEY, raw); } catch { /* storage may be unavailable */ }
+}
+
 export function loadSave() {
   if (save) return save;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); } catch { raw = null; } // storage can be disabled
+  if (raw) {
+    try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.v >= 1 && Array.isArray(parsed.profiles)) {
         save = migrate(parsed);
         return save;
       }
+      backupCorruptSave(raw); // parseable but not our shape — don't silently drop it
+    } catch {
+      backupCorruptSave(raw); // unreadable JSON, or migrate() threw
     }
-  } catch (e) {
-    try { localStorage.setItem('monkeygrove.backup', localStorage.getItem(KEY) || ''); } catch {}
   }
   save = freshSave();
   return save;

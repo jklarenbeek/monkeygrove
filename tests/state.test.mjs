@@ -211,3 +211,39 @@ test('migration preserves and normalizes saved curriculum pack ids', async () =>
   assert.equal(p.curriculum.estimatedStage, 'grade_5');
   assert.equal(p.curriculum.confirmedStage, 'grade_5');
 });
+
+test('a corrupt (unparseable) save recovers to a clean, playable state and backs up the bad data', async () => {
+  localStorage.setItem('monkeygrove.save', '{ this is not valid json ');
+  const state = await freshStateModule();
+
+  const save = state.loadSave();
+  assert.ok(Array.isArray(save.profiles), 'recovered to a valid save shape instead of crashing');
+  assert.equal(localStorage.getItem('monkeygrove.save.corrupt'), '{ this is not valid json ',
+    'the bad payload is preserved for recovery, not lost');
+  // and the game is genuinely playable after recovery
+  const p = state.createProfile('Ari', { age: 8, today: '2026-06-15' });
+  assert.ok(p.id, 'a child can still start a fresh profile');
+});
+
+test('a parseable save with the wrong shape is backed up, not silently dropped', async () => {
+  const junk = JSON.stringify({ hello: 'world' });
+  localStorage.setItem('monkeygrove.save', junk);
+  const state = await freshStateModule();
+
+  const save = state.loadSave();
+  assert.ok(Array.isArray(save.profiles), 'recovered to a clean save');
+  assert.equal(localStorage.getItem('monkeygrove.save.corrupt'), junk, 'wrong-shape data is backed up too');
+});
+
+test('loadSave never throws even when storage itself is unavailable', async () => {
+  globalThis.localStorage = {
+    getItem() { throw new Error('storage disabled'); },
+    setItem() { throw new Error('storage disabled'); },
+    removeItem() {}, clear() {},
+  };
+  const state = await freshStateModule();
+
+  let save;
+  assert.doesNotThrow(() => { save = state.loadSave(); }, 'boot survives unreadable storage');
+  assert.ok(Array.isArray(save.profiles), 'falls back to a clean in-memory save');
+});
