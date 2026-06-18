@@ -136,6 +136,11 @@ export const en = {
   'business.hint.decimal_money_change': 'Change is what they paid minus the price.',
   'business.hint.percentage_discount': '10% is one tenth — take that off the price.',
   'business.supplied': 'A supply crate arrived to help! 📦',
+  'business.bake.raw': 'Bake it at the oven 🔥',
+  'business.bake.baking': 'In the oven… 🍞',
+  'business.bake.ready': 'Baked! Serve it 🍞',
+  'business.bake.prep_first': 'Make the food before baking.',
+  'business.bake.first': 'Bake it at the oven first! 🔥',
 
   // chamber & play
   'play.chamber': 'Chamber {n} of {total}',

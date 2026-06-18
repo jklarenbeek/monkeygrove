@@ -6,7 +6,7 @@ import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { setLang } from '../src/i18n.js';
 import {
-  showBusinessPrep, showBusinessPayment, showBusinessDaySummary,
+  showBusinessOrder, showBusinessPrep, showBusinessPayment, showBusinessDaySummary,
 } from '../src/screens.js';
 
 const host = () => document.getElementById('screens');
@@ -106,6 +106,17 @@ test('the hint button reveals a mode-specific hint on demand', () => {
   assert.equal(q('#business-feedback').hidden, true, 'hint is hidden until asked');
   q('#business-hint').click();
   assert.equal(q('#business-feedback').hidden, false, 'tapping 💡 reveals the hint');
+});
+
+test('order panel shows the current bake status', () => {
+  const order = { recipeId: 'flatbread', priceCents: 375, tasks: [{ kind: 'prep', mode: 'portion_halves_quarters', objectiveId: 'nl_po.grade4.fair_sharing_intro' }] };
+  for (const status of ['raw', 'baking', 'ready']) {
+    showBusinessOrder({
+      order, customerName: 'Tuk', activeTask: order.tasks[0], bakeStatus: status,
+      onPrep() {}, onPay() {}, onServe() {}, onExit() {},
+    });
+    assert.ok(q(`.business-bake-${status}`), `bake status line reflects '${status}'`);
+  }
 });
 
 test('day-summary review: tapping an answer grades it and locks the question', () => {

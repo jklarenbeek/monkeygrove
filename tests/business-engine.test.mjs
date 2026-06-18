@@ -11,6 +11,7 @@ import {
   applyPrepAction,
   applyPaymentAction,
   applyReviewAction,
+  bakeDurationMs,
   buyUpgrade,
   completeOrder,
   createBusinessState,
@@ -64,6 +65,19 @@ test('orders never carry a task the serve flow cannot complete', () => {
         `order task ${task.mode} is a completable prep/payment step`);
     }
   }
+});
+
+test('extra ovens bake faster (the extra_oven upgrade has a real effect)', () => {
+  const state = createBusinessState();
+  const oneOven = bakeDurationMs(state);
+  assert.ok(oneOven > 0, 'a single oven has a positive bake time');
+
+  state.shopCoins = 99999;
+  buyUpgrade(state, 'extra_oven'); // grants ovenSlots
+  assert.equal(bakeDurationMs(state), Math.round(oneOven / 2), 'a second oven bakes twice as fast');
+
+  state.ovenSlots = 0; // a bad value must never divide by zero
+  assert.equal(bakeDurationMs(state), oneOven);
 });
 
 test('the shop can never soft-lock: a broke, empty shop still gets makeable orders', () => {

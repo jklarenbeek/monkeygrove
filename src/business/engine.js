@@ -125,6 +125,12 @@ function topUpStock(state, recipe, quantity = 1) {
 
 // An order is completable if its ingredients are in stock now, or the shop has
 // enough coins to restock the shortfall.
+// How long a dish bakes. One oven = BALANCE.bakeMs; each extra oven (the
+// extra_oven upgrade bumps state.ovenSlots) bakes proportionally faster.
+export function bakeDurationMs(state) {
+  return Math.round(BALANCE.bakeMs / Math.max(1, state.ovenSlots || 1));
+}
+
 export function orderIsMakeable(state, order) {
   const recipe = RECIPES[order.recipeId];
   if (!recipe) return false;

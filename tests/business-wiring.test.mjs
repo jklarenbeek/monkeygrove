@@ -428,6 +428,24 @@ test('the anti-soft-lock supply message is wired and localized', () => {
   assert.equal(countQuotedKey(i18n, 'business.supplied'), 2, 'business.supplied exists in both locales');
 });
 
+test('the oven bake step is wired, gated, and localized', () => {
+  const main = mainSource(); // main.js + business/controller.js
+  const i18n = i18nSource();
+
+  assert.ok(main.includes("station === 'oven'") && main.includes('tapOven'), 'tapping the oven starts the bake');
+  assert.ok(main.includes('bakeDurationMs'), 'bake time comes from the oven count');
+  assert.match(main, /bakeStatus\s*!==\s*'ready'/, 'serve is gated until the dish is baked');
+  assert.ok(main.includes('emit(') || main.includes('emitSteam'), 'baking puffs steam from the oven');
+
+  const BAKE_KEYS = [
+    'business.bake.raw', 'business.bake.baking', 'business.bake.ready',
+    'business.bake.prep_first', 'business.bake.first',
+  ];
+  for (const key of BAKE_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
 test('business order panel gates prep and payment callbacks by task kind', () => {
   const source = screensSource();
 

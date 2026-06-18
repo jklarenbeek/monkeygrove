@@ -133,6 +133,11 @@ export const nl = {
   'business.hint.decimal_money_change': 'Wisselgeld is wat ze betaalden min de prijs.',
   'business.hint.percentage_discount': '10% is een tiende — haal dat van de prijs af.',
   'business.supplied': 'Er kwam een voorraadkrat om te helpen! 📦',
+  'business.bake.raw': 'Bak het in de oven 🔥',
+  'business.bake.baking': 'In de oven… 🍞',
+  'business.bake.ready': 'Gebakken! Serveer het 🍞',
+  'business.bake.prep_first': 'Maak het eten eerst klaar.',
+  'business.bake.first': 'Bak het eerst in de oven! 🔥',
 
   'play.chamber': 'Kamer {n} van {total}',
   'play.correct.1': 'JA! Gelukt!',

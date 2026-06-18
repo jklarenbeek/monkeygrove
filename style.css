@@ -456,6 +456,10 @@ html, body {
   font-size: 15px;
 }
 
+.business-bake { font-weight: 800; font-size: 15px; margin: 2px 0 10px; color: var(--ink-soft); }
+.business-bake-baking { color: var(--sun-deep); }
+.business-bake-ready { color: var(--leaf-deep); }
+
 .business-choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));

@@ -61,6 +61,7 @@ export const BALANCE = {
   businessOrdersPerDay: 4,
   businessMaxQueue: 3,
   businessBananaReward: [2, 4],
+  bakeMs: 4500,                     // bake time for one oven; extra ovens bake faster
   businessStartingStock: {
     dough: 6,
     sauce: 6,

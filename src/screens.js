@@ -752,7 +752,7 @@ function businessTaskLabel(task) {
 }
 
 export function showBusinessOrder({
-  order, customerName, activeTask, onPrep, onPay, onServe, onExit,
+  order, customerName, activeTask, bakeStatus = 'raw', onPrep, onPay, onServe, onExit,
 }) {
   const recipe = RECIPES[order.recipeId];
   const titleKey = recipe.kind === 'pizza' ? 'business.zone.pizzeria' : 'business.zone.bakery';
@@ -769,6 +769,7 @@ export function showBusinessOrder({
         <div class="chip">${esc(customerName)}</div>
         <h3>${t('business.order')}: ${t(recipe.titleKey)}</h3>
         <div class="business-price">${t('business.pay')}: ${money(order.priceCents)}</div>
+        <div class="business-bake business-bake-${bakeStatus}">${t('business.bake.' + bakeStatus)}</div>
         <div class="menu-row">
           <button class="btn green" id="business-prep" ${canPrep ? '' : 'disabled'}>${t('business.prep')}</button>
           <button class="btn soft" id="business-pay" ${canPay ? '' : 'disabled'}>${t('business.pay')}</button>
