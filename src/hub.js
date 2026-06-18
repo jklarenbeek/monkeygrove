@@ -414,6 +414,11 @@ export class HubController {
   openGems() {
     audio.sfx('click');
     screens.showGems({
+      // the child's Gem Tree only ever rises (anti-anxiety, same contract as the
+      // gate bloom): pass NO clock so a faded skill's 🌟 never reverts to 🌱.
+      // Decay stays honest where decisions are made — the parent dashboard and
+      // the engine's selection/scoring. The faded skill is still quietly reviewed
+      // by Echo Doors and re-lights on its own.
       report: masteryReport(this.game.profile.math),
       onClose: () => screens.closeScreen(),
     });

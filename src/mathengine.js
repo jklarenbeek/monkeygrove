@@ -46,6 +46,19 @@ const LOG_MAX = 200;
 const TARGET_OFFSET = 108; // expected ≈ 0.65 when item sits this far under rating
 const COLD_N = 8;
 
+// Forgetting curve (TODO_09). A skill's rating drifts back toward the START
+// baseline the longer it goes unpracticed, so "mastered" comes to mean *recently*
+// mastered and Echo Doors re-target genuinely-fading skills. Deliberately gentle:
+// a grace window then a long half-life, so a week away barely nudges while a
+// couple of months clearly fades a once-mastered skill back into review range.
+// It only ever pulls DOWN toward the floor (a struggling skill below the floor is
+// never inflated), and never below a fresh start. Computed lazily from elapsed
+// days — never on a timer — so it behaves identically for offline play.
+const DAY_MS = 86400000;
+const DECAY_FLOOR = START_RATING;     // rust never drops a skill below a fresh start
+const DECAY_GRACE_DAYS = 2;           // just-practiced still counts as fresh
+const DECAY_HALFLIFE_DAYS = 60;       // slow on purpose — far slower than Elo gain
+
 export function createMathState() {
   const skills = {};
   for (const id of Object.keys(SKILLS)) skills[id] = { r: START_RATING, n: 0, hist: [] };
@@ -56,6 +69,16 @@ export function createMathState() {
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+// Pull `rating` toward DECAY_FLOOR after `days` of not practicing this skill.
+// Exponential (an Ebbinghaus-style forgetting curve), bounded below by the floor
+// and never raising a rating. A no-op inside the grace window or at/below the floor.
+function decayedRating(rating, days) {
+  if (rating <= DECAY_FLOOR) return rating;
+  const elapsed = days - DECAY_GRACE_DAYS;
+  if (elapsed <= 0) return rating;
+  return DECAY_FLOOR + (rating - DECAY_FLOOR) * 2 ** (-elapsed / DECAY_HALFLIFE_DAYS);
+}
 
 function expectedFor(rating, difficulty) {
   return 1 / (1 + 10 ** ((difficulty - rating) / 400));
@@ -73,8 +96,10 @@ function acc(hist) {
   return hist.length ? hist.reduce((a, b) => a + b, 0) / hist.length : 0;
 }
 
-function isMastered(s) {
-  return s.r >= MASTERY_RATING && s.n >= MASTERY_MIN_N
+// `rating` defaults to the stored rating; callers pass the time-decayed
+// effective rating so a long-unpracticed skill stops counting as mastered.
+function isMastered(s, rating = s.r) {
+  return rating >= MASTERY_RATING && s.n >= MASTERY_MIN_N
     && s.hist.length >= MASTERY_MIN_N && acc(s.hist) >= MASTERY_ACC;
 }
 
@@ -754,10 +779,10 @@ function allowedWorlds(allowedSkills) {
 }
 
 // Linear prereqs => the first unmastered skill in a world has its prereqs met.
-function focusSkill(math, world, allowedSkills = null) {
+function focusSkill(math, world, allowedSkills = null, now = 0) {
   const allowed = allowedSetForWorld(allowedSkills, world);
   const ids = LADDER[world].filter((id) => !allowed || allowed.has(id));
-  for (const id of ids) if (!isMastered(math.skills[id])) return id;
+  for (const id of ids) if (!isMastered(math.skills[id], effectiveRating(math, id, now))) return id;
   return ids[ids.length - 1] ?? LADDER[world][0];
 }
 
@@ -768,23 +793,42 @@ function lastPracticed(math, skillId) {
   return 0;
 }
 
-// Weakest stale skill: lowest rating among practiced skills; ties (within a
-// hair) go to the least recently practiced.
-function echoSkill(math, allowedSkills = null) {
+// Days since this skill was last practiced, per the caller-injected `now`. Zero
+// when the engine has no clock (now falsy) or the skill has no logged practice,
+// and clamped at 0 so an out-of-order `now` can never *add* mastery.
+function daysSincePractice(math, skillId, now) {
+  if (!now) return 0;
+  const last = lastPracticed(math, skillId);
+  if (!last) return 0;
+  return Math.max(0, (now - last) / DAY_MS);
+}
+
+// The rating a skill is actually worth right now, after any forgetting decay.
+function effectiveRating(math, skillId, now) {
+  return decayedRating(math.skills[skillId].r, daysSincePractice(math, skillId, now));
+}
+
+// Weakest stale skill: lowest *effective* (decay-adjusted) rating among practiced
+// skills; ties (within a hair) go to the least recently practiced. Because the
+// rating decays, a skill mastered long ago and left to fade sinks back to the
+// bottom and becomes Echo-eligible again.
+function echoSkill(math, allowedSkills = null, now = 0) {
   const allowed = Array.isArray(allowedSkills) && allowedSkills.length ? new Set(allowedSkills) : null;
   const practiced = Object.keys(SKILLS).filter((id) => math.skills[id].n > 0);
   const candidates = allowed ? practiced.filter((id) => allowed.has(id)) : practiced;
   if (!candidates.length) return null;
+  const eff = {};
+  for (const id of candidates) eff[id] = effectiveRating(math, id, now);
   candidates.sort((p, q) => {
-    const dr = math.skills[p].r - math.skills[q].r;
+    const dr = eff[p] - eff[q];
     if (Math.abs(dr) > 1) return dr;
     return lastPracticed(math, p) - lastPracticed(math, q);
   });
   return candidates[0];
 }
 
-function targetDifficulty(s, rng) {
-  let t = s.r - TARGET_OFFSET;
+function targetDifficulty(s, rng, baseRating = s.r) {
+  let t = baseRating - TARGET_OFFSET;
   if (s.n < COLD_N) {
     t -= (COLD_N - s.n) * 25; // cold start: open gently
     let streak = 0;
@@ -831,16 +875,19 @@ function spreadFractionMagnitude(initial, math, rng, target, kind, scaffold, s) 
   return best;
 }
 
-// opts: { world?, kind?, echo?, rng?, skill? } — skill is an extension used by
-// tests and duels to force a specific skill; the core game never passes it.
+// opts: { world?, kind?, echo?, rng?, skill?, now? } — skill is an extension used
+// by tests and duels to force a specific skill; the core game never passes it.
+// now (the caller's clock) drives the lazy forgetting decay; omit it (free-play
+// without a clock, duels) and selection/difficulty fall back to stored ratings.
 export function nextProblem(math, opts = {}) {
   const rng = opts.rng;
   if (!rng) throw new Error('nextProblem requires opts.rng — the engine sources no entropy of its own.');
+  const now = opts.now ?? 0;
   let skillId;
   if (opts.skill && SKILLS[opts.skill]) {
     skillId = opts.skill;
   } else if (opts.echo) {
-    skillId = echoSkill(math, opts.allowedSkills) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills);
+    skillId = echoSkill(math, opts.allowedSkills, now) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills, now);
   } else {
     const wantedWorld = opts.world && WORLDS.includes(opts.world) ? opts.world : rng.pick(WORLDS);
     const allowedInWantedWorld = allowedSetForWorld(opts.allowedSkills, wantedWorld);
@@ -848,7 +895,7 @@ export function nextProblem(math, opts = {}) {
     const world = allowedInWantedWorld || !constrainedWorlds
       ? wantedWorld
       : rng.pick(constrainedWorlds);
-    const focus = focusSkill(math, world, opts.allowedSkills);
+    const focus = focusSkill(math, world, opts.allowedSkills, now);
     const allowed = allowedSetForWorld(opts.allowedSkills, world);
     const roll = rng.float();
     if (roll < 0.7) {
@@ -858,15 +905,19 @@ export function nextProblem(math, opts = {}) {
       skillId = !allowed || allowed.has(prev) ? prev : focus;
     } else {
       const mastered = Object.keys(SKILLS).filter((id) => id !== focus
-        && isMastered(math.skills[id])
+        && isMastered(math.skills[id], effectiveRating(math, id, now))
         && (!allowed || allowed.has(id)));
       skillId = mastered.length ? rng.pick(mastered) : focus;
     }
   }
   const s = math.skills[skillId];
-  const scaffold = scaffoldFor(s.r);
+  // Serve the rusty learner gentler problems: scaffold and difficulty track the
+  // *effective* rating, so a returning child eases back in instead of being met
+  // at the wall they last touched two months ago.
+  const effR = effectiveRating(math, skillId, now);
+  const scaffold = scaffoldFor(effR);
   const kind = chooseKind(skillId, s, opts.kind, rng);
-  const target = targetDifficulty(s, rng);
+  const target = targetDifficulty(s, rng, effR);
   let inner = GEN[skillId](target, rng, kind, scaffold);
   if (skillId === 'frac_magnitude') {
     inner = spreadFractionMagnitude(inner, math, rng, target, kind, scaffold, s);
@@ -918,6 +969,11 @@ function updateFacts(math, problem, correct) {
 // engine never reads the clock, so the log replays byte-identically from inputs.
 export function recordResult(math, problem, res, { now = 0 } = {}) {
   const s = math.skills[problem.skillId];
+  // Bake in any forgetting since this skill was last practiced *before* scoring,
+  // so a returning child is graded from their current (rusty) rating and the Elo
+  // gain that follows genuinely recovers it. This is the engine's only mutation
+  // of a decayed rating — selection and reports stay pure views of it.
+  s.r = decayedRating(s.r, daysSincePractice(math, problem.skillId, now));
   const wasMastered = isMastered(s);
   const expected = expectedFor(s.r, problem.difficulty);
   const K = s.n < 20 ? 32 : 16;
@@ -945,18 +1001,24 @@ export function recordResult(math, problem, res, { now = 0 } = {}) {
   return { delta, rating: s.r, masteredSkill, newGems };
 }
 
-export function masteryReport(math) {
+// Pass `now` for an honest, decay-adjusted snapshot (the Gem Tree and the parent
+// dashboard do, so "mastered" means *recently* mastered). Omit it and the report
+// reflects stored ratings unchanged — which is exactly what the hub passes when
+// it drives the living-gate / island bloom, so a fading rating can never wilt the
+// visible reward (that only ever rises, via flags.portalStages).
+export function masteryReport(math, { now = 0 } = {}) {
   const worlds = {};
   for (const world of WORLDS) {
     const skills = LADDER[world].map((id) => {
       const s = math.skills[id];
+      const rating = effectiveRating(math, id, now);
       return {
         id,
         nameKey: SKILLS[id].nameKey,
-        rating: Math.round(s.r),
+        rating: Math.round(rating),
         acc10: acc(s.hist),
         n: s.n,
-        mastered: isMastered(s),
+        mastered: isMastered(s, rating),
       };
     });
     const pct = skills.reduce((sum, sk) => sum + (sk.mastered ? 1
@@ -967,7 +1029,7 @@ export function masteryReport(math) {
   const lit = Object.keys(math.facts).filter((key) => gemLit(math.facts[key]));
   const weakest = Object.keys(SKILLS)
     .filter((id) => math.skills[id].n > 0)
-    .sort((p, q) => math.skills[p].r - math.skills[q].r)
+    .sort((p, q) => effectiveRating(math, p, now) - effectiveRating(math, q, now))
     .slice(0, 3);
   return { worlds, gems: { lit, total: 100 }, weakest };
 }

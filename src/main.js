@@ -146,7 +146,7 @@ class Game {
   showParents() {
     const p = activeProfile();
     screens.showParents({
-      report: p ? masteryReport(p.math) : null,
+      report: p ? masteryReport(p.math, { now: Date.now() }) : null,
       profile: p,
       businessReport: p?.business ? dailyBusinessReport(p.business) : null,
       onCurriculumChange: (patch) => {
@@ -222,6 +222,7 @@ class Game {
       skill,
       kind: 'fetch',
       rng: new Rng(`warmup:${this.profile.id}:${skill}:${i}`),
+      now: Date.now(),
     })).slice(results.length);
 
     screens.showWarmup({
@@ -284,7 +285,7 @@ class Game {
     let devTools = null;
     if (import.meta.env.DEV) {
       const mod = await import('./devtools.js');
-      const summary = mod.describeDevState(this.profile, this.profile ? masteryReport(this.profile.math) : null);
+      const summary = mod.describeDevState(this.profile, this.profile ? masteryReport(this.profile.math, { now: Date.now() }) : null);
       devTools = {
         open: devOpen,
         ...mod.renderDevTools({ summary, presets: mod.DEV_PRESETS, open: devOpen }),

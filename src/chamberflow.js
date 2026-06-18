@@ -51,8 +51,8 @@ export class ChamberFlow {
     } else {
       const allowedSkills = eligibleSkillIds(g.profile.curriculum);
       const opts = g.isEcho
-        ? { echo: true, allowedSkills, rng: g.rng }
-        : { world: g.currentWorld, allowedSkills, rng: g.rng };
+        ? { echo: true, allowedSkills, rng: g.rng, now: Date.now() }
+        : { world: g.currentWorld, allowedSkills, rng: g.rng, now: Date.now() };
       problem = ensureHostable(nextProblem(g.profile.math, opts), g.profile.math, opts);
       if (problem?.world) g.currentWorld = problem.world;
     }
@@ -275,8 +275,8 @@ export class ChamberFlow {
         } else {
           const allowedSkills = eligibleSkillIds(g.profile.curriculum);
           const opts = g.isEcho
-            ? { echo: true, kind: g.problem.kind, allowedSkills, rng: g.rng }
-            : { world: g.currentWorld, kind: g.problem.kind, allowedSkills, rng: g.rng };
+            ? { echo: true, kind: g.problem.kind, allowedSkills, rng: g.rng, now: Date.now() }
+            : { world: g.currentWorld, kind: g.problem.kind, allowedSkills, rng: g.rng, now: Date.now() };
           next = ensureHostable(nextProblem(g.profile.math, opts), g.profile.math, opts);
         }
         this.presentProblem(this.pickNextHostableProblem(next));
@@ -305,8 +305,9 @@ export class ChamberFlow {
         kind: 'fetch',
         allowedSkills,
         rng: g.rng,
+        now: Date.now(),
       }),
-      g.profile.math, { world: next.world, allowedSkills, rng: g.rng },
+      g.profile.math, { world: next.world, allowedSkills, rng: g.rng, now: Date.now() },
     );
   }
 
@@ -389,8 +390,8 @@ export class ChamberFlow {
   debugChamber(skill, kind) {
     const g = this.game;
     const p = ensureHostable(
-      nextProblem(g.profile.math, { skill, kind, rng: g.rng }),
-      g.profile.math, { rng: g.rng },
+      nextProblem(g.profile.math, { skill, kind, rng: g.rng, now: Date.now() }),
+      g.profile.math, { rng: g.rng, now: Date.now() },
     );
     g.currentWorld = p.world;
     g.mode = 'chamber';

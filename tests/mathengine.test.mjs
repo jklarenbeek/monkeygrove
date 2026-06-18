@@ -5,6 +5,7 @@ import {
   WORLDS, SKILLS, createMathState, nextProblem, recordResult,
   masteryReport, expectedSuccess,
 } from '../src/mathengine.js';
+import { portalStage } from '../src/config.js';
 
 const FRAC_RE = /^\d+\/\d+$/;
 const MIXED_RE = /^\d+ \d+\/\d+$/;
@@ -735,4 +736,147 @@ test('freshly generated problems target ≈65% expected success at every tier', 
       );
     }
   }
+});
+
+// ---------- spaced-retrieval forgetting curve / rating decay (TODO_09) ----------
+//
+// README/DESIGN promise spaced review, but mastery never used to fade: a skill
+// untouched for two months still read "mastered" and Echo Doors never re-targeted
+// it. A gentle, lazy time-decay fixes that — "mastered" now means *recently*
+// mastered. The decay is a pure view (selection + reports) computed from the
+// caller's clock; the only mutation is recordResult baking forgetting in before
+// it scores. With no clock (now omitted / 0) every path above stays byte-identical,
+// which is why the whole suite already passes unchanged.
+
+const DAY = 86400000;
+// A realistic wall-clock epoch (~2023). In real play `now` is always Date.now(),
+// never 0 — and the engine treats t=0 as "never practiced", so tests must anchor
+// practice at a non-zero time for the decay clock to have something to measure.
+const BASE = 1_700_000_000_000;
+const tideSkill = (m, id, now) =>
+  masteryReport(m, { now }).worlds[SKILLS[id].world].skills.find((s) => s.id === id);
+
+// A skill mastered (or graded) at a chosen moment: high rating, warmed past the
+// K-halving point, a clean 10-deep history, and one log entry to anchor "last
+// practiced" so the decay clock has something to measure from.
+function masterAt(m, id, t, rating = 900) {
+  m.skills[id] = { r: rating, n: 24, hist: Array(10).fill(1) };
+  m.log.push({ t, skill: id, tag: null, ok: true, ms: 1, hint: false });
+}
+
+test('decay: gentle within a week, fades after weeks, bounded, never inflates', () => {
+  const m = createMathState();
+  masterAt(m, 'add_20', BASE); // freshly mastered, rating 900
+
+  assert.equal(tideSkill(m, 'add_20', 0).rating, 900, 'no clock: untouched');
+  assert.equal(tideSkill(m, 'add_20', BASE).rating, 900, 'just practiced: untouched');
+
+  // a week away only nudges (a handful of points) and stays mastered
+  const week = tideSkill(m, 'add_20', BASE + 7 * DAY);
+  assert.ok(week.rating < 900 && week.rating > 875, `week ${week.rating}`);
+  assert.equal(week.mastered, true, 'a week off does not punish');
+
+  // a few weeks later it has genuinely faded out of mastery
+  const sixWeeks = tideSkill(m, 'add_20', BASE + 42 * DAY);
+  assert.ok(sixWeeks.rating < 850, `six weeks ${sixWeeks.rating}`);
+  assert.equal(sixWeeks.mastered, false, 'weeks unpracticed de-masters');
+  assert.ok(tideSkill(m, 'add_20', BASE + 60 * DAY).rating < sixWeeks.rating, 'keeps fading');
+
+  // exponential pull is bounded: never below the START floor, even after a year
+  assert.ok(tideSkill(m, 'add_20', BASE + 365 * DAY).rating >= 600, 'floored at a fresh start');
+
+  // a struggling skill already below the floor is never inflated upward by "decay"
+  const w = createMathState();
+  w.skills.add_20 = { r: 540, n: 12, hist: [0, 1, 0, 1, 0, 1, 0, 1, 1, 0] };
+  w.log.push({ t: BASE, skill: 'add_20', tag: null, ok: false, ms: 1, hint: false });
+  assert.equal(tideSkill(w, 'add_20', BASE + 365 * DAY).rating, 540, 'decay only pulls down');
+});
+
+test('decay: a long-unpracticed mastered skill becomes Echo-eligible again', () => {
+  const m = createMathState();
+  masterAt(m, 'add_20', BASE, 900);                // mastered long ago, high stored rating
+  masterAt(m, 'sub_20', BASE + 90 * DAY, 760);     // weaker but practiced recently
+
+  // with no clock, echo sorts by stored rating -> the weaker *recent* skill wins
+  assert.equal(nextProblem(m, { echo: true, rng: new Rng('echo-fresh') }).skillId, 'sub_20');
+
+  // 90 days on, add_20 has faded below sub_20, so spaced review re-targets it —
+  // exactly the acceptance criterion: mastered-long-ago becomes Echo-eligible
+  assert.equal(
+    nextProblem(m, { echo: true, now: BASE + 90 * DAY, rng: new Rng('echo-stale') }).skillId,
+    'add_20',
+  );
+});
+
+test('decay: re-practicing recovers a faded skill faster than the decay cost it', () => {
+  const days = 60;
+  const m = createMathState();
+  masterAt(m, 'add_20', BASE, 900);
+
+  const decayed = tideSkill(m, 'add_20', BASE + days * DAY).rating;
+  assert.ok(decayed < 850, `faded below mastery: ${decayed}`);
+  const lostPerDay = (900 - decayed) / days;
+
+  const rng = new Rng('recover');
+  const t0 = BASE + days * DAY;
+  // the first correct attempt on return bakes the forgetting in, then claws back
+  let p = nextProblem(m, { skill: 'add_20', now: t0, rng });
+  recordResult(m, p, { correct: true, usedHint: false, ms: 1000 }, { now: t0 });
+  const afterFirst = m.skills.add_20.r;
+
+  // measure the per-attempt recovery slope over the next few correct answers
+  for (let i = 1; i <= 4; i++) {
+    p = nextProblem(m, { skill: 'add_20', now: t0 + i, rng });
+    recordResult(m, p, { correct: true, usedHint: false, ms: 1000 }, { now: t0 + i });
+  }
+  const gainedPerAttempt = (m.skills.add_20.r - afterFirst) / 4;
+  assert.ok(
+    gainedPerAttempt > lostPerDay,
+    `recovery ${gainedPerAttempt.toFixed(2)}/attempt must beat decay ${lostPerDay.toFixed(2)}/day`,
+  );
+
+  // and one session of practice re-masters it well inside the time it took to fade
+  for (let i = 5; i < 50; i++) {
+    p = nextProblem(m, { skill: 'add_20', now: t0 + i, rng });
+    recordResult(m, p, { correct: true, usedHint: false, ms: 1000 }, { now: t0 + i });
+  }
+  assert.ok(m.skills.add_20.r >= 850, `recovered rating ${m.skills.add_20.r}`);
+  assert.equal(tideSkill(m, 'add_20', t0 + 50).mastered, true, '50 attempts re-master inside 60 days');
+});
+
+test('decay never wilts the gate/portal bloom (the visible reward only rises)', () => {
+  const m = createMathState();
+  for (const id of ['add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100']) masterAt(m, id, BASE);
+
+  // the hub builds living gates from masteryReport WITHOUT a clock, so the number
+  // that feeds the bloom never decays — the gate stays full however stale it gets
+  const gateFeed = masteryReport(m).worlds.tide.pct;
+  assert.equal(portalStage(gateFeed), 4, 'gate-feeding pct is full');
+
+  // the honest (clocked) report DOES fade — proof the decay is real, not absent
+  const honest = masteryReport(m, { now: BASE + 120 * DAY }).worlds.tide;
+  assert.ok(honest.pct < gateFeed, 'the honest report fades');
+  assert.ok(honest.skills.every((s) => !s.mastered), 'every stale skill de-masters honestly');
+
+  // and even if a faded pct ever reached the gate, the high-water mark (a running
+  // max, mirroring hub.celebrateGateGrowth / flags.portalStages) can only hold
+  assert.equal(Math.max(portalStage(gateFeed), portalStage(honest.pct)), portalStage(gateFeed));
+});
+
+test('decay: the ≈65%-targeting simulation is untouched (no clock in that loop)', () => {
+  // TODO_08's simulated learner calls nextProblem with no `now` and consecutive
+  // millisecond timestamps in recordResult, so decay is a no-op there. Re-assert
+  // a steady-state skill still lands in band, guarding the TODO_09/TODO_08 seam.
+  const m = createMathState();
+  const genRng = new Rng('decay-guard-gen');
+  const ansRng = new Rng('decay-guard-ans');
+  let hits = 0;
+  for (let i = 0; i < 1200; i++) {
+    const p = nextProblem(m, { skill: 'tables_mix', rng: genRng });
+    const correct = ansRng.chance(1 / (1 + 10 ** ((p.difficulty - 800) / 400)));
+    recordResult(m, p, { correct, usedHint: false, ms: 2000 }, { now: i });
+    if (i >= 400) hits += correct ? 1 : 0;
+  }
+  const realized = hits / 800;
+  assert.ok(realized > 0.55 && realized < 0.75, `realized ${realized.toFixed(3)} left the band`);
 });
