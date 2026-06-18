@@ -573,6 +573,7 @@ export class HubPlace extends Place {
     }
     this.buildSpots = {};   // build id -> {x, z, state} for hub taps
     this.npcs = [];         // tappable friends who moved in with builds
+    this._plotSigns = {};   // unlocked-plot id -> [sign, tag], cleared by addBuild
     this._placeBuilds();
     if (this.island.crabKing) this._placeCrabKing();
     this.applyBloom(masteryPct);
@@ -669,13 +670,58 @@ export class HubPlace extends Place {
     }
   }
 
-  // An unlocked plot: wooden sign + a floating "🔨" tag, tap to fund.
+  // An unlocked plot: wooden sign + a floating "🔨" tag, tap to fund. Both
+  // meshes are tracked per build so addBuild() can clear them when the build
+  // itself takes the plot (the incremental fund-a-build path).
   _placePlotSign(def, spot) {
-    this._prop('sign', 0.8, spot.x, spot.z);
+    const sign = this._prop('sign', 0.8, spot.x, spot.z);
     const tag = makeTextSprite(`🔨 ${def.emoji}`, { bg: '#fff8ecdd', scale: 0.7, fontSize: 44 });
     tag.position.copy(this.worldPos(spot.x, spot.z, 1.45));
     this.group.add(tag);
     this.cellAt(spot.x, spot.z).walk = false;
+    this._plotSigns[def.id] = [sign, tag];
+  }
+
+  // Raise one funded build on its existing plot — drop just this build's meshes
+  // (and any move-in friend) in place, touching nothing else in the scene. This
+  // is the no-hitch path behind the fund-a-build celebration, and it mirrors
+  // what _placeBuilds() does for a single build on a fresh load so the
+  // incremental and from-scratch hubs agree. Returns the build's spot, or null
+  // when the build reshapes the whole island and the caller must fall back to a
+  // full rebuild: the bridge re-floors the water gap into plank tiles (a
+  // template-level change, see applyIslandRows) and the finale reblooms the
+  // entire island, maxes the gates, and moves the Crab King in.
+  addBuild(buildId) {
+    const def = BUILDS.find((b) => b.id === buildId);
+    if (!def || def.finale || buildId === 'bridge') return null;
+    const spot = (this.markers[def.char] || [])[0];
+    if (!spot) return null;
+    this._clearPlotSign(buildId); // the unlocked-plot sign + 🔨 tag give way
+    if (!this.island.built.includes(buildId)) this.island.built.push(buildId);
+    this.buildSpots[buildId] = { x: spot.x, z: spot.z, state: 'built' };
+    const npcBefore = this.npcs.length;
+    this._placeBuilt(def, spot);
+    // a friend who just moved in must be tappable too — the constructor does
+    // this for every npc; here we add only the ones _placeBuilt just pushed
+    for (const n of this.npcs.slice(npcBefore)) this.world.pickables.push(n.mesh);
+    return this.buildSpots[buildId];
+  }
+
+  // Clear the unlocked-plot dressing (wooden sign + floating 🔨 tag) once the
+  // build takes the plot, disposing exactly as Place.dispose() would: shared
+  // cached geometry and shared materials are left alone, the tag's owned canvas
+  // texture is freed.
+  _clearPlotSign(buildId) {
+    const meshes = this._plotSigns[buildId];
+    if (!meshes) return;
+    for (const o of meshes) {
+      this.group.remove(o);
+      o.traverse((c) => {
+        if (c.geometry && !c.geometry._cached) c.geometry.dispose?.();
+        if (c.material?._owned) { c.material.map?.dispose?.(); c.material.dispose?.(); }
+      });
+    }
+    delete this._plotSigns[buildId];
   }
 
   _placeBuilt(def, spot) {

@@ -483,7 +483,12 @@ export class HubController {
   celebrateBuild(def) {
     const g = this.game;
     if (def.finale) { g.profile.flags.festivalDone = true; persist(); }
-    this.buildHub(); // rebuild the hub with the new build standing
+    // Drop just the new build onto its plot — no teardown/rebuild of the whole
+    // hub, so the single most celebratory moment never hitches on a cheap
+    // phone. Two builds reshape the entire island (the bridge re-floors the
+    // gap, the finale reblooms it all and moves the Crab King in); addBuild
+    // declines those and we fall back to the full rebuild for them.
+    if (!g.place.addBuild(def.id)) this.buildHub();
     hud.showHud(true);
     g.refreshHudCounts();
     const spot = g.place.buildSpots[def.id];
