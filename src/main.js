@@ -32,6 +32,7 @@ import { t, pickCorrectLine } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
 import { audio } from './audio.js';
+import { applyComfortSettings } from './a11y.js';
 import { updateTweens, delay, tween, ease } from './anim.js';
 import { Rng } from './rng.js';
 import { BALANCE, WORLD_THEME, TILE, portalStage, IS_TOUCH, MOBILE_DEFAULT_ZOOM } from './config.js';
@@ -90,6 +91,7 @@ class Game {
 
   boot() {
     loadSave();
+    applyComfortSettings();
     hud.initHud({
       onHint: () => this.useHint(),
       onAction: () => (this.mode === 'hub' ? this.hubAction() : this.verb?.onAction()),

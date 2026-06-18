@@ -417,6 +417,9 @@ export const en = {
   'settings.lang': 'Language',
   'settings.sfx': 'Sounds',
   'settings.music': 'Music',
+  'settings.reduce_motion': 'Calm motion',
+  'settings.dyslexia_font': 'Easy-read font',
+  'settings.high_contrast': 'High contrast',
   'settings.switch_player': 'Switch explorer',
 
   // duel

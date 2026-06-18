@@ -2,6 +2,7 @@
 // parents, chamber results, duel. One active screen at a time in #screens.
 import { t, setLang } from './i18n.js';
 import { languageButton } from './langFlags.js';
+import { applyComfortSettings, reducedMotion } from './a11y.js';
 import { audio } from './audio.js';
 import {
   settings, profiles, activeProfile, createProfile, selectProfile, deleteProfile,
@@ -33,7 +34,11 @@ export function closeScreen() {
 function render(html, extraClass = '') {
   const className = ['screen', extraClass].filter(Boolean).join(' ');
   host().innerHTML = `<div class="${className}">${html}</div>`;
-  return host().firstElementChild;
+  const el = host().firstElementChild;
+  // move keyboard/screen-reader focus into the freshly opened screen
+  el.tabIndex = -1;
+  el.focus?.({ preventScroll: true });
+  return el;
 }
 
 function backBtn(onBack, label = null) {
@@ -402,6 +407,11 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
           <button class="btn soft" id="tg-sfx">${s.sfx ? '🔊' : '🔇'} ${t('settings.sfx')}</button>
           <button class="btn soft" id="tg-music">${s.music ? '🎵' : '🚫'} ${t('settings.music')}</button>
         </div>
+        <div class="menu-col">
+          <button class="btn soft" id="tg-motion" aria-pressed="${reducedMotion()}">${reducedMotion() ? '🐢' : '🏃'} ${t('settings.reduce_motion')}</button>
+          <button class="btn soft" id="tg-font" aria-pressed="${!!s.dyslexiaFont}">🔤 ${t('settings.dyslexia_font')}</button>
+          <button class="btn soft" id="tg-contrast" aria-pressed="${!!s.highContrast}">${s.highContrast ? '◑' : '○'} ${t('settings.high_contrast')}</button>
+        </div>
         <button class="btn soft" id="switch-player">👥 ${t('settings.switch_player')}</button>
         ${devTools?.toggleHtml || ''}
       </div>
@@ -421,6 +431,18 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   });
   el.querySelector('#tg-music').addEventListener('click', () => {
     s.music = !s.music; audio.setMusic(s.music); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-motion').addEventListener('click', () => {
+    s.reduceMotion = !reducedMotion(); applyComfortSettings(); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-font').addEventListener('click', () => {
+    s.dyslexiaFont = !s.dyslexiaFont; applyComfortSettings(); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-contrast').addEventListener('click', () => {
+    s.highContrast = !s.highContrast; applyComfortSettings(); persist();
     showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
   el.querySelector('#switch-player').addEventListener('click', onSwitchPlayer);

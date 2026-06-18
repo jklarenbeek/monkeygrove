@@ -37,12 +37,17 @@ function freshProfile(name, opts = {}) {
   };
 }
 
+// reduceMotion null = follow the OS (prefers-reduced-motion); true/false = explicit.
+function settingsDefaults() {
+  return { lang: detectLang(), sfx: true, music: true, reduceMotion: null, dyslexiaFont: false, highContrast: false };
+}
+
 function freshSave() {
   return {
     v: VERSION,
     profiles: [],
     activeProfile: null,
-    settings: { lang: detectLang(), sfx: true, music: true },
+    settings: settingsDefaults(),
   };
 }
 
@@ -110,6 +115,12 @@ function migrate(s) {
     if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
     if (p.curriculum.warmup.skillIds === undefined) p.curriculum.warmup.skillIds = [];
     ensureBusinessState(p);
+  }
+  // heal settings so saves from before comfort/accessibility options get the defaults
+  if (!isObject(s.settings)) s.settings = settingsDefaults();
+  else {
+    const d = settingsDefaults();
+    for (const k of Object.keys(d)) if (s.settings[k] === undefined) s.settings[k] = d[k];
   }
   s.v = VERSION;
   return s;

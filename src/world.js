@@ -1,6 +1,7 @@
 // Renderer, isometric ortho camera rig, lighting, picking.
 import * as THREE from 'three';
 import { QUALITY, TILE } from './config.js';
+import { reducedMotion } from './a11y.js';
 
 const ISO_DIR = new THREE.Vector3(1, 1.15, 1).normalize();
 const CAM_DIST = 40;
@@ -235,7 +236,10 @@ export class World {
     }
   }
 
-  shake(amount = 0.15) { this.shakeAmp = Math.max(this.shakeAmp, amount); }
+  shake(amount = 0.15) {
+    if (reducedMotion()) return; // camera shake is the motion most worth skipping
+    this.shakeAmp = Math.max(this.shakeAmp, amount);
+  }
 
   update(dtMs) {
     // who the camera frames: the hub always trails the player; a chamber shows

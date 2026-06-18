@@ -632,3 +632,39 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001s !important; transition-duration: .001s !important; }
 }
+
+/* ---- Accessibility & comfort (toggled in Settings, applied via src/a11y.js) ---- */
+
+/* Manual "Calm motion" toggle — same effect as the OS preference above, on demand. */
+:root.reduce-motion * {
+  animation-duration: .001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: .001s !important;
+}
+
+/* Easy-read font: a more legible stack for dyslexic readers, with breathing room. */
+:root.dyslexia {
+  --font: 'OpenDyslexic', 'Atkinson Hyperlegible', 'Comic Sans MS', Verdana, system-ui, sans-serif;
+  letter-spacing: .02em;
+  word-spacing: .06em;
+}
+
+/* High contrast: darker ink on plain white, stronger shadows — text-critical only. */
+:root.high-contrast {
+  --ink: #1a1a1a;
+  --ink-soft: #333333;
+  --cream: #ffffff;
+  --cream-2: #f3f3f3;
+  --sun: #ffcf2e;
+  --sun-deep: #9a6b00;
+  --leaf: #2e8b2e;
+  --leaf-deep: #1f6f1f;
+  --shadow: rgba(0, 0, 0, .55);
+}
+
+/* Visible keyboard focus everywhere (mouse/touch users are unaffected). */
+:focus-visible {
+  outline: 3px solid var(--sun-deep);
+  outline-offset: 2px;
+  border-radius: 6px;
+}

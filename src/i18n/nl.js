@@ -404,6 +404,9 @@ export const nl = {
   'settings.lang': 'Taal',
   'settings.sfx': 'Geluiden',
   'settings.music': 'Muziek',
+  'settings.reduce_motion': 'Rustige beweging',
+  'settings.dyslexia_font': 'Leesvriendelijk lettertype',
+  'settings.high_contrast': 'Hoog contrast',
   'settings.switch_player': 'Andere ontdekker',
 
   'duel.title': 'Bananenduel',

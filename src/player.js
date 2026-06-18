@@ -2,7 +2,10 @@
 // squash & stretch; supports BFS tap-to-walk; can carry a stone mesh.
 import { TILE, STEP_H, HOP_MS, HOP_ARC } from './config.js';
 import { tween, ease, squash } from './anim.js';
+import { reducedMotion } from './a11y.js';
 import { audio } from './audio.js';
+
+const NO_SQUASH = { sy: 1, sxz: 1 };
 
 export class Player {
   constructor(mesh) {
@@ -81,7 +84,7 @@ export class Player {
         m.position.x = start.x + (end.x - start.x) * k;
         m.position.z = start.z + (end.z - start.z) * k;
         m.position.y = start.y + (end.y - start.y) * k + Math.sin(k * Math.PI) * HOP_ARC;
-        const s = squash(k);
+        const s = reducedMotion() ? NO_SQUASH : squash(k);
         m.scale.set(this.baseScale * s.sxz, this.baseScale * s.sy, this.baseScale * s.sxz);
         m.rotation.y += (this.facing - m.rotation.y) * 0.35;
       },
@@ -231,7 +234,7 @@ export class PetFollower {
             m.position.lerpVectors(start, end, k);
             m.position.y = start.y + (end.y - start.y) * k + Math.sin(k * Math.PI) * HOP_ARC * 0.7;
             m.rotation.y += (face - m.rotation.y) * 0.3;
-            const s = squash(k);
+            const s = reducedMotion() ? NO_SQUASH : squash(k);
             m.scale.set(this.baseScale * s.sxz, this.baseScale * s.sy, this.baseScale * s.sxz);
           },
           onDone: () => {
