@@ -106,6 +106,19 @@ test('opening a screen moves focus into it for keyboard/screen-reader users', ()
   assert.match(render, /\.focus\?\./, 'render moves focus into the new screen');
 });
 
+test('toasts and Mimi dialogue are announced to screen readers', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const hud = read('hud.js');
+  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
+
+  assert.match(html, /id="sr-announce"[^>]*aria-live="polite"/, 'a polite live region exists');
+  assert.match(hud, /function announce\(/, 'hud has an announce() helper');
+  const toast = hud.slice(hud.indexOf('export function toast'));
+  assert.match(toast.slice(0, 260), /announce\(/, 'toasts are mirrored to the announcer');
+  assert.match(hud, /\$\('bubble-text'\)\.innerHTML[\s\S]{0,40}announce\(/, 'Mimi dialogue is announced');
+  assert.match(css, /\.sr-only\s*\{/, 'the .sr-only utility exists');
+});
+
 test('icon-only controls carry accessible names for screen readers', () => {
   const screens = read('screens.js');
   const hud = read('hud.js');

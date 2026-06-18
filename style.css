@@ -20,6 +20,12 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+
+/* visually hidden but available to screen readers (the live-region announcer) */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
 html, body {
   margin: 0; padding: 0; width: 100%; height: 100dvh; overflow: hidden;
   font-family: var(--font); color: var(--ink);

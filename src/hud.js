@@ -189,6 +189,7 @@ function renderBubblePage(html, face, caret) {
   const b = $('bubble');
   $('bubble-face').textContent = face;
   $('bubble-text').innerHTML = html;
+  announce(html);
   $('bubble-next').classList.toggle('hidden', !caret);
   b.classList.remove('hidden');
   b.style.animation = 'none';
@@ -232,11 +233,20 @@ export function hideBubble() {
 
 // ---------- toasts ----------
 
+// Mirror transient on-screen text into the screen-reader live region so it's
+// announced even though toasts/the bubble are off-canvas or animated.
+function announce(html) {
+  const el = $('sr-announce');
+  if (!el) return;
+  el.textContent = String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 export function toast(text, cls = '') {
   const el = document.createElement('div');
   el.className = 'toast ' + cls;
   el.innerHTML = text;
   $('toasts').appendChild(el);
+  announce(text);
   setTimeout(() => el.remove(), 2800);
 }
 

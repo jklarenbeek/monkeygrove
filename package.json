@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "node scripts/e2e.mjs",
     "deploy": "npm run build && npx gh-pages -d dist",
     "debug": "node --inspect-brk ./node_modules/vite/bin/vite.js"
   },
