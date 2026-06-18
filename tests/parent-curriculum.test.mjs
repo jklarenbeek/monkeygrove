@@ -1,8 +1,14 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
-const screensSource = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
+// Screens were split into src/screens/*.js (TODO_16); read the barrel + every family
+// module so these structural assertions stay location-agnostic.
+const screensSource = [
+  readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8'),
+  ...readdirSync(new URL('../src/screens/', import.meta.url)).filter((f) => f.endsWith('.js'))
+    .map((f) => readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8')),
+].join('\n');
 const i18nSource = ['en', 'nl']
   .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
   .join('\n');

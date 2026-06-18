@@ -1,9 +1,15 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-const screensSource = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
+// Screens were split into src/screens/*.js (TODO_16); read the barrel + every family
+// module so these structural assertions stay location-agnostic.
+const screensSource = [
+  readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8'),
+  ...readdirSync(new URL('../src/screens/', import.meta.url)).filter((f) => f.endsWith('.js'))
+    .map((f) => readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8')),
+].join('\n');
 
 test('developer tools are dynamically loaded only in Vite dev mode', () => {
   assert.doesNotMatch(mainSource, /import .*['"]\.\/devtools\.js['"]/);

@@ -269,7 +269,8 @@ src/
   a11y.js           comfort/accessibility: reduced motion, dyslexia font, contrast
   devtools.js       DEV-only debug hooks, gated out of production builds
   hud.js            equation banner, chips, speech bubble, toasts, panels
-  screens.js        title, warm-up, settings, shop, pets, gem tree, parents, results
+  screens.js, screens/  full-screen overlays, one module per family (title, warm-up,
+                    settings, shop/pets, gem tree, business, parents, results)
   duel.js           hot-seat duel mode and challenge codes
   rng.js            seeded PRNG
 

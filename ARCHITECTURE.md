@@ -76,8 +76,20 @@ src/
   anim.js               hand-rolled tween engine + easing, ticked from the main loop
   hud.js                DOM HUD: equation banner, chips, helper/Mimi bubble, toasts,
                         verb panels, action/hint buttons
-  screens.js            DOM screens: title, story, warm-up, settings, shop, pets,
-                        gem tree, island worktable, parents, chamber results, duel
+  screens.js            barrel: re-exports every screen so callers keep importing
+                        from './screens.js' (most do `import * as screens`)
+  screens/              one module per screen family (split out of the old 1,353-line
+                        screens.js); shared spine + emoji maps in screens/core.js
+    core.js             render/backBtn/flash/esc/closeScreen host + emoji lookup tables
+    intro.js            attract loop, title / player-select, story, Crab King finale
+    warmup.js           placement warm-up quiz
+    settings.js         language, audio, comfort/accessibility toggles, DEV panel
+    cosmetics.js        shop (hats/furs/trails), pets/egg, hatch, island worktable
+    gems.js             Banyan Gem Tree times-table mosaic + skill progress
+    business.js         bakery/pizzeria order, prep + payment panels, stock, upgrades
+    business-summary.js end-of-day summary + shopkeeper-review views
+    parents.js          parent dashboard: curriculum coverage, controls, skill overview
+    result.js           chamber result chest + rewards
   duel.js               hot-seat duel mode + seeded challenge codes
   devtools.js           DEV-only debug hooks (window.__game); gated out of prod builds
   rng.js                seeded PRNG (mulberry32)

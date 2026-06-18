@@ -1,6 +1,6 @@
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import * as THREE from 'three';
@@ -46,7 +46,11 @@ function mainSource() {
 }
 
 function screensSource() {
-  return readFileSync(SCREENS_PATH, 'utf8');
+  // Screens were split into src/screens/*.js (TODO_16); read the barrel + every family
+  // module so wiring assertions stay location-agnostic (cf. mainSource above).
+  const dir = join(ROOT, 'src', 'screens');
+  return [SCREENS_PATH, ...readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => join(dir, f))]
+    .map((p) => readFileSync(p, 'utf8')).join('\n');
 }
 
 function i18nSource() {
@@ -289,7 +293,7 @@ test('business close-day flow does not discard active unfinished orders', () => 
 });
 
 test('business order close button is separate from guarded close-day flow', () => {
-  const source = readFileSync(new URL('../src/screens.js', import.meta.url), 'utf8');
+  const source = screensSource();
   const orderScreen = source.slice(source.indexOf('export function showBusinessOrder'), source.indexOf('function choiceValues'));
 
   assert.match(orderScreen, /onExit/, 'showBusinessOrder accepts an exit callback');

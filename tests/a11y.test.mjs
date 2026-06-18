@@ -1,8 +1,15 @@
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 
 const read = (p) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
+// The screens layer was split into src/screens/*.js (TODO_16); read the barrel plus
+// every family module so these structural assertions stay location-agnostic.
+const readScreens = () => [
+  read('screens.js'),
+  ...readdirSync(new URL('../src/screens/', import.meta.url))
+    .filter((f) => f.endsWith('.js')).map((f) => read(`screens/${f}`)),
+].join('\n');
 
 function mockStorage() {
   const data = new Map();
@@ -105,7 +112,7 @@ test('the 3D juice is gated by reducedMotion()', () => {
 });
 
 test('settings screen exposes the comfort toggles, localized in both languages', () => {
-  const screens = read('screens.js');
+  const screens = readScreens();
   for (const id of ['tg-motion', 'tg-font', 'tg-contrast', 'tg-colorblind', 'tg-textsize']) {
     assert.ok(screens.includes(`id="${id}"`), `settings has a ${id} toggle`);
   }
@@ -124,7 +131,7 @@ test('text-scale and the colour-blind palette are opt-in and wired in CSS', () =
 });
 
 test('opening a screen moves focus into it for keyboard/screen-reader users', () => {
-  const screens = read('screens.js');
+  const screens = readScreens();
   const render = screens.slice(screens.indexOf('function render('), screens.indexOf('function backBtn('));
   assert.match(render, /\.tabIndex\s*=\s*-1/, 'screen container is focusable');
   assert.match(render, /\.focus\?\./, 'render moves focus into the new screen');
@@ -161,7 +168,7 @@ test('toasts and Mimi dialogue are announced to screen readers', () => {
 });
 
 test('icon-only controls carry accessible names for screen readers', () => {
-  const screens = read('screens.js');
+  const screens = readScreens();
   const hud = read('hud.js');
 
   assert.match(screens, /id="scr-back"[^>]*aria-label=/, 'the back/close button has an accessible name');
