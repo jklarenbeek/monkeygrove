@@ -90,7 +90,9 @@ try {
   await waitSel('[data-settings-preset="bakery_built"]');
   await click('[data-settings-preset="bakery_built"]');
   await pause(1500);
-  assert.equal(await evalp('!!window.__game.startBusiness()'), true, 'business mode starts (bakery is built)');
+  // startBusiness() is async now (it lazy-loads the business-* chunk); await the
+  // promise so the assertion is real and this.business exists before we use it.
+  assert.equal(await evalp('window.__game.startBusiness()'), true, 'business mode starts (bakery is built)');
   await pause(1200);
 
   // 7. the order panel works and shows the TODO_06 bake status

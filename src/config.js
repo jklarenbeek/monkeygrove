@@ -33,6 +33,40 @@ export const WORLD_THEME = {
   vines:  { floor: 'grass', accent: 0xc9a6ff, bloom: '#c9a6ff', emoji: '🍇' },
 };
 
+// ---- Cell markers ---------------------------------------------------------
+// Single-character codes the chamber/hub templates use for special cells (see
+// chamber.js for the full template legend + marker extraction). These named
+// constants and the two membership sets below are the ONE source of truth for
+// "what does this cell char mean": call sites ask the sets, never hand-rolled
+// string literals, so adding or renaming a marker can't silently drift apart
+// between files (the old bug: two near-identical 'AsPp…' strings, one per file).
+export const MARKERS = {
+  PLAYER: 'P', ALTAR: 'A', STONE: 's', POT: 'p', CRAB: 'c', DOOR: 'D',
+  DECO: 'd', SOIL: 'o', BASKET: 'B', STUMP: 'm', VINE: 'V', HELPER: 'M',
+  GEM_TREE: 'T', SHOP: 'O', NEST: 'N',
+};
+
+// Plain walkable floor — the only tiles ambient critters, scattered fetch
+// stones, and wandering NPCs may settle on. '.' = floor, ',' = alt shade.
+export const FLOOR_CHARS = new Set(['.', ',']);
+
+// SOLID: cells a crab patrol can't cross (main.js patrolReach). Note what is
+// deliberately ABSENT — 'c' (other crabs are mobile; their marker is just the
+// floor they spawned on) and 'D' (the exit door is open ground a crab may
+// wander over). 'P' (player spawn) IS solid, so a patrol never paces onto the
+// cell the monkey appears on.
+export const SOLID_MARKERS = new Set([
+  MARKERS.ALTAR, MARKERS.STONE, MARKERS.PLAYER, MARKERS.POT, MARKERS.BASKET,
+  MARKERS.STUMP, MARKERS.HELPER, MARKERS.VINE, MARKERS.SOIL,
+  MARKERS.GEM_TREE, MARKERS.SHOP, MARKERS.NEST,
+]);
+
+// OCCUPIED: cells a painted floor model (array bed, share baskets, number
+// strip) can't be laid on (verbs.js FloorModel._free). Everything SOLID, PLUS
+// 'c' and 'D': you may block a crab's *path* with a math model, but never
+// paint one UNDER a crab's home cell or OVER the exit door's portal art.
+export const OCCUPIED_MARKERS = new Set([...SOLID_MARKERS, MARKERS.CRAB, MARKERS.DOOR]);
+
 // Living gates: each hub portal blooms in stages with that world's mastery
 // pct (the same number that drives the island bloom). Stages never go down —
 // mistakes can't wilt a gate.

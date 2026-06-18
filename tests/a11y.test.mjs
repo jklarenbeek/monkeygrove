@@ -61,24 +61,26 @@ test('applyComfortSettings mirrors settings onto the root element classes', asyn
   const s = settings();
   const cl = globalThis.document.documentElement.classList;
 
+  // applyComfortSettings awaits the lazy dyslexia font before flipping the class, so it
+  // returns a promise — await it before asserting on the .dyslexia class.
   s.reduceMotion = true; s.dyslexiaFont = true; s.highContrast = false;
-  applyComfortSettings();
+  await applyComfortSettings();
   assert.ok(cl.contains('reduce-motion'));
   assert.ok(cl.contains('dyslexia'));
   assert.ok(!cl.contains('high-contrast'));
 
   s.dyslexiaFont = false; s.highContrast = true;
-  applyComfortSettings();
+  await applyComfortSettings();
   assert.ok(!cl.contains('dyslexia'), 'toggling off removes the class');
   assert.ok(cl.contains('high-contrast'));
 
   // colour-blind palette + text scale
   s.colorblind = true; s.textScale = 1.3;
-  applyComfortSettings();
+  await applyComfortSettings();
   assert.ok(cl.contains('colorblind'), 'colour-blind palette is opt-in via a class');
   assert.equal(globalThis.document.documentElement.style.getPropertyValue('--text-scale'), '1.3', 'text scale drives --text-scale');
   s.colorblind = false; s.textScale = 1;
-  applyComfortSettings();
+  await applyComfortSettings();
   assert.ok(!cl.contains('colorblind'), 'normal mode has no colour-blind class');
   assert.equal(globalThis.document.documentElement.style.getPropertyValue('--text-scale'), '1');
 });
@@ -128,9 +130,18 @@ test('opening a screen moves focus into it for keyboard/screen-reader users', ()
   assert.match(render, /\.focus\?\./, 'render moves focus into the new screen');
 });
 
-test('OpenDyslexic is bundled and wired to the easy-read font option', () => {
+test('OpenDyslexic is lazy-loaded at runtime, not statically declared, and wired to the easy-read option', () => {
   const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
-  assert.match(css, /@font-face[\s\S]*?font-family:\s*'OpenDyslexic'[\s\S]*?\.woff2/i, 'OpenDyslexic @font-face is declared');
+  const a11y = read('a11y.js');
+  // The heavy woff2 must NOT ship as a static @font-face in the always-loaded CSS (that would
+  // pull it into the PWA precache for every kid — the whole point of TODO_01 is to avoid that).
+  assert.doesNotMatch(css, /@font-face/i, 'no static @font-face in the always-loaded CSS');
+  // Instead it is registered on demand via the FontFace API, with Vite-fingerprinted URLs.
+  assert.match(a11y, /new FontFace\(\s*['"]OpenDyslexic['"]/, 'OpenDyslexic is registered via the FontFace API');
+  assert.match(a11y, /new URL\(\s*['"][^'"]*OpenDyslexic-Regular\.woff2['"]\s*,\s*import\.meta\.url\)/, 'Regular woff2 is referenced via new URL(import.meta.url) so Vite emits it');
+  assert.match(a11y, /new URL\(\s*['"][^'"]*OpenDyslexic-Bold\.woff2['"]\s*,\s*import\.meta\.url\)/, 'Bold woff2 is referenced via new URL(import.meta.url) so Vite emits it');
+  assert.match(a11y, /document\.fonts\.add/, 'the loaded face is added to document.fonts');
+  // The easy-read option still selects OpenDyslexic first in the font stack.
   assert.match(css, /:root\.dyslexia[\s\S]*?'OpenDyslexic'/, 'the dyslexia option uses OpenDyslexic first');
   assert.ok(existsSync(new URL('../assets/fonts/OpenDyslexic-Regular.woff2', import.meta.url)), 'Regular woff2 is in the repo');
   assert.ok(existsSync(new URL('../assets/fonts/OpenDyslexic-Bold.woff2', import.meta.url)), 'Bold woff2 is in the repo');

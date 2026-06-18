@@ -1,4 +1,6 @@
-// Monkey Grove math engine — pure logic, no DOM, no three.js.
+// Monkey Grove math engine — pure logic, no DOM, no three.js, and no ambient
+// entropy or clock: callers inject the rng (nextProblem) and the timestamp
+// (recordResult), so every output is reproducible from its inputs.
 // Owns the profile.math subtree: per-skill Elo-lite ratings, times-table fact
 // gems (Banyan Gem Tree), and a ring-buffer practice log.
 //
@@ -11,8 +13,6 @@
 // - frac_compare design: FOUR fraction choices, find the LARGEST (richer
 //   misconception distractors than a pair comparison). Equation shows the
 //   candidates in stone order: '2/5 · 1/2 · 3/4 · 1/8 → ?'.
-
-import { Rng } from './rng.js';
 
 export const WORLDS = ['tide', 'garden', 'stump', 'vines'];
 
@@ -834,7 +834,8 @@ function spreadFractionMagnitude(initial, math, rng, target, kind, scaffold, s) 
 // opts: { world?, kind?, echo?, rng?, skill? } — skill is an extension used by
 // tests and duels to force a specific skill; the core game never passes it.
 export function nextProblem(math, opts = {}) {
-  const rng = opts.rng ?? new Rng((Math.random() * 2 ** 32) >>> 0);
+  const rng = opts.rng;
+  if (!rng) throw new Error('nextProblem requires opts.rng — the engine sources no entropy of its own.');
   let skillId;
   if (opts.skill && SKILLS[opts.skill]) {
     skillId = opts.skill;
@@ -913,7 +914,9 @@ function updateFacts(math, problem, correct) {
   return newly;
 }
 
-export function recordResult(math, problem, res) {
+// `now` is the caller-supplied timestamp stamped into the practice log; the
+// engine never reads the clock, so the log replays byte-identically from inputs.
+export function recordResult(math, problem, res, { now = 0 } = {}) {
   const s = math.skills[problem.skillId];
   const wasMastered = isMastered(s);
   const expected = expectedFor(s.r, problem.difficulty);
@@ -925,7 +928,7 @@ export function recordResult(math, problem, res) {
   s.hist.push(res.correct ? 1 : 0);
   if (s.hist.length > HIST_MAX) s.hist.shift();
   math.log.push({
-    t: Date.now(),
+    t: now,
     skill: problem.skillId,
     tag: problem.explain?.key ?? null,
     item: problem.meta?.n !== undefined && problem.meta?.d !== undefined

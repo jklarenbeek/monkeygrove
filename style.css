@@ -1,20 +1,9 @@
 /* Monkey Grove — cozy pastel UI. All text lives in DOM; the 3D world is the canvas. */
 
-/* OpenDyslexic — only fetched when the "Easy-read font" option is on (:root.dyslexia). */
-@font-face {
-  font-family: 'OpenDyslexic';
-  src: url('./assets/fonts/OpenDyslexic-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'OpenDyslexic';
-  src: url('./assets/fonts/OpenDyslexic-Bold.woff2') format('woff2');
-  font-weight: 700 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* OpenDyslexic (235 KB of woff2) is NOT declared here on purpose: most kids never turn
+   on the easy-read font, so we keep it out of the always-loaded CSS and the PWA precache.
+   loadDyslexiaFont() in src/a11y.js registers it at runtime via the FontFace API the first
+   time :root.dyslexia is enabled (see :root.dyslexia below). */
 
 :root {
   --ink: #4a3f35;

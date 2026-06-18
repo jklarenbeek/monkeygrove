@@ -27,9 +27,23 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // precache the app shell incl. fonts; the three.js chunk is large, so lift the cap
-        globPatterns: ['**/*.{js,css,html,woff2,png,svg}'],
+        // Precache the app shell. The OpenDyslexic woff2 (235 KB) is deliberately excluded —
+        // it's an opt-in font most kids never enable, lazy-loaded by src/a11y.js. The three.js
+        // chunk is large, so lift the cap.
+        globPatterns: ['**/*.{js,css,html,png,svg}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // Runtime-cache the dyslexia font on first use so it still works offline once enabled.
+        runtimeCaching: [
+          {
+            urlPattern: /\.woff2$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'dyslexia-fonts',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

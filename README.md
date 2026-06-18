@@ -99,11 +99,101 @@ connection. Three.js is bundled by Vite.
 
 ```bash
 npm run dev        # Vite dev server with hot reload
-npm test           # Vitest suites
+npm test           # Vitest suites (simulated DOM — no browser needed)
+npm run test:e2e   # Headless-browser smoke test: boot -> profile -> hub -> kitchen
 npm run build      # Production build into dist/
 npm run preview    # Serve the production build locally
 npm run deploy     # Build and publish dist/ to the gh-pages branch
 ```
+
+See [End-To-End (Browser) Tests](#end-to-end-browser-tests) for `test:e2e`,
+including how to run it on Fedora-family distributions.
+
+## End-To-End (Browser) Tests
+
+`npm test` runs the Vitest suites in a simulated DOM (happy-dom) and never needs
+a browser. The one test that needs a *real* WebGL context is the end-to-end
+smoke test [`scripts/e2e.mjs`](scripts/e2e.mjs):
+
+```bash
+npm run test:e2e
+```
+
+It spawns its own Vite dev server, drives the real game through Playwright
+(title -> create profile -> hub -> bakery business scene), asserts there were no
+page errors, then tears everything down. It runs **headless with a software GL
+backend** (SwiftShader), so it works on machines without a real GPU.
+
+Unlike a typical Playwright project, this harness does **not** download or use
+Playwright's bundled browsers. It points Playwright's launcher at a **system
+Chrome/Chromium**, searching in this order:
+
+1. `$MG_CHROME` — set this to any Chrome/Chromium binary to override the search
+2. `/usr/bin/google-chrome`
+3. `/usr/bin/chromium`
+4. `/usr/bin/chromium-browser`
+
+If none is found it **skips cleanly** (exit 0), so CI and contributors without a
+browser are never blocked by it.
+
+### Fedora / RHEL-family hosts (incl. Nobara)
+
+Playwright's `npx playwright install-deps` only knows Debian/Ubuntu and Arch
+package names, so on Fedora-family hosts it cannot install the native libraries
+Playwright's *bundled* Chromium needs — the usual source of "Playwright doesn't
+work on Fedora" pain. **This project avoids that entirely by launching a system
+browser**, so the simplest path is also the native one — no container required:
+
+```bash
+sudo dnf install chromium     # provides /usr/bin/chromium, auto-detected below
+npm run test:e2e
+```
+
+Google Chrome works too (`/usr/bin/google-chrome`, if you have Google's rpm repo
+enabled). For a browser in a non-standard location, point the harness at it
+directly:
+
+```bash
+MG_CHROME=/path/to/chrome npm run test:e2e
+```
+
+#### Fallback: run inside an Ubuntu container (distrobox)
+
+If you would rather not install a system Chrome on the host — or specifically
+want Playwright's own bundled Chromium and its `install-deps` flow — run the test
+inside an Ubuntu container with [distrobox](https://github.com/89luca89/distrobox).
+distrobox shares your home directory, so the repo, `node_modules`, and your
+editor all see the same files unchanged.
+
+```bash
+# 1. On the host
+sudo dnf install distrobox
+
+# 2. A dedicated container (its own name avoids clashing with other toolboxes)
+distrobox create --name mg-e2e --image ubuntu:24.04 \
+    --additional-packages "git curl ca-certificates"
+distrobox enter mg-e2e
+
+# 3. Inside the container: Vite 7 needs Node 20+, but Ubuntu 24.04's apt ships
+#    Node 18 — install a current Node from NodeSource (do NOT `apt install nodejs`).
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# 4. Install Playwright's Chromium AND its (Ubuntu-known) system libraries
+cd ~/path/to/monkeygrove          # your home is shared — the repo is right here
+npm install
+npx playwright install-deps chromium
+npx playwright install chromium
+
+# 5. Point the harness at that bundled Chromium and run.
+#    (The harness only searches /usr/bin + $MG_CHROME, so $MG_CHROME is required
+#    here — the bundled browser lives under ~/.cache/ms-playwright, not /usr/bin.)
+export MG_CHROME="$(node -e "console.log(require('playwright').chromium.executablePath())")"
+npm run test:e2e
+```
+
+The container exists only to provide the browser and its native libraries; the
+dev server, the test, and your files are still the shared host copies.
 
 ## Deploy To GitHub Pages
 

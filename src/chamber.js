@@ -13,7 +13,7 @@
 //   l/f/e/h/k/b/j island build plots (island.js BUILDS), w bridge-gap water
 //   (becomes 'V' planks once the bridge is built, '#' before — island.js)
 import * as THREE from 'three';
-import { TILE, STEP_H, PALETTE, WORLD_THEME } from './config.js';
+import { TILE, STEP_H, PALETTE, WORLD_THEME, MARKERS, FLOOR_CHARS } from './config.js';
 import { makeProp, makeCharacter, makeTextSprite, LivingPortal } from './entities.js';
 import { PROPS, CHARS, PETS } from './models.js';
 import { BUILDS, applyIslandRows } from './island.js';
@@ -111,7 +111,7 @@ export function scatterFetchSpots(place, rng, { stones = 4, pots = 1 } = {}) {
   for (let z = 1; z < d - 1; z++) {
     for (let x = 1; x < w - 1; x++) {
       const c = place.cellAt(x, z);
-      if (!c || !c.walk || c.h !== 0 || !'.,'.includes(c.ch)) continue;
+      if (!c || !c.walk || c.h !== 0 || !FLOOR_CHARS.has(c.ch)) continue;
       if (!far(x, z, keep, 2)) continue;
       free.push({ x, z });
     }
@@ -634,7 +634,7 @@ export class HubPlace extends Place {
           const nx = this.mimiPos.x + dx, nz = this.mimiPos.z + dz;
           if (Math.abs(nx - this.mimiHome.x) + Math.abs(nz - this.mimiHome.z) > 2) continue;
           const c = this.cellAt(nx, nz);
-          if (!c || !c.walk || c.h !== 0 || !'.,M'.includes(c.ch)) continue;
+          if (!c || !c.walk || c.h !== 0 || !(FLOOR_CHARS.has(c.ch) || c.ch === MARKERS.HELPER)) continue;
           if (p && p.x === nx && p.z === nz) continue;
           // claim the new cell, free the old (taps check both during the hop)
           this.cellAt(this.mimiPos.x, this.mimiPos.z).walk = true;
@@ -728,7 +728,7 @@ export class HubPlace extends Place {
     let home = null;
     for (const [dx, dz] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
       const c = this.cellAt(spot.x + dx, spot.z + dz);
-      if (c && c.walk && '.,'.includes(c.ch)) { home = { x: spot.x + dx, z: spot.z + dz }; break; }
+      if (c && c.walk && FLOOR_CHARS.has(c.ch)) { home = { x: spot.x + dx, z: spot.z + dz }; break; }
     }
     if (!home) return;
     const mesh = makeCharacter(petDef.model, 0.6, null, 'npc:' + def.npc.pet);

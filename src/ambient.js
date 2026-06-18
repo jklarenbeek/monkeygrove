@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { buildVoxelMesh, withPalette } from './voxel.js';
 import { AMBIENT } from './models.js';
 import { Rng } from './rng.js';
+import { FLOOR_CHARS } from './config.js';
 
 const WING_COLORS = [
   { id: 'pink', W: '#ffb3c6' },
@@ -218,7 +219,7 @@ class Bird {
       const dirs = this.rng.shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]]);
       for (const [dx, dz] of dirs) {
         const c = this.place.cellAt(gx + dx, gz + dz);
-        if (!c || !c.walk || !'.,'.includes(c.ch)) continue;
+        if (!c || !c.walk || !FLOOR_CHARS.has(c.ch)) continue;
         m.rotation.x = 0;
         m.rotation.y = Math.atan2(dx, dz);
         this.hop = { from: m.position.clone(), to: this.place.worldPos(gx + dx, gz + dz, 0.04), k: 0 };
@@ -279,7 +280,7 @@ export class AmbientLife {
     for (let z = 1; z < place.size.d - 1; z++) {
       for (let x = 1; x < place.size.w - 1; x++) {
         const c = place.cellAt(x, z);
-        if (c && c.walk && c.h === 0 && '.,'.includes(c.ch)) this.openCells.push({ x, z });
+        if (c && c.walk && c.h === 0 && FLOOR_CHARS.has(c.ch)) this.openCells.push({ x, z });
       }
     }
     // butterflies gather where the flowers are (deco spots), or anywhere open

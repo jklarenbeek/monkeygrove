@@ -11,8 +11,13 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 const SCENE_PATH = join(ROOT, 'src', 'business', 'scene.js');
 // Business runtime flow now lives in the BusinessController; the Game shell only
-// sets up the scene. Read both so wiring assertions are location-agnostic.
-const MAIN_PATHS = [join(ROOT, 'src', 'main.js'), join(ROOT, 'src', 'business', 'controller.js')];
+// sets up the scene, and the hub controller owns the bakery-entry tap. Read them
+// all so wiring assertions are location-agnostic.
+const MAIN_PATHS = [
+  join(ROOT, 'src', 'main.js'),
+  join(ROOT, 'src', 'business', 'controller.js'),
+  join(ROOT, 'src', 'hub.js'),
+];
 const SCREENS_PATH = join(ROOT, 'src', 'screens.js');
 const I18N_PATHS = [join(ROOT, 'src', 'i18n', 'en.js'), join(ROOT, 'src', 'i18n', 'nl.js')];
 const STYLE_PATH = join(ROOT, 'style.css');
@@ -246,7 +251,7 @@ test('future main business runtime wiring is declared', () => {
 
 test('business runtime resumes unfinished active orders before generating a new one', () => {
   const source = mainSource();
-  const startBusiness = source.slice(source.indexOf('  startBusiness()'), source.indexOf('  startNextBusinessOrder()'));
+  const startBusiness = source.slice(source.indexOf('async startBusiness()'), source.indexOf('  startNextBusinessOrder()'));
 
   assert.match(startBusiness, /business\.activeOrder\?\.tasks\?\.length/, 'startBusiness checks for a resumable active order');
   assert.ok(

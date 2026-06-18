@@ -582,9 +582,30 @@ test('masteryReport shape and weakest list', () => {
   assert.ok(!rep.weakest.includes('add_20')); // 4 practiced, top-3 weakest only
 });
 
-test('nextProblem works without an explicit rng', () => {
+test('nextProblem requires an explicit rng (engine sources no entropy)', () => {
   const m = createMathState();
-  const p = nextProblem(m, { world: 'garden' });
-  validateProblem(p);
-  assert.equal(p.world, 'garden');
+  assert.throws(() => nextProblem(m, { world: 'garden' }), /rng/);
+});
+
+test('nextProblem + recordResult are reproducible from inputs', () => {
+  const run = () => {
+    const m = createMathState();
+    const rng = new Rng('repro-seed');
+    const problems = [];
+    for (let i = 0; i < 8; i++) {
+      const p = nextProblem(m, { world: 'garden', rng });
+      validateProblem(p);
+      problems.push(p);
+      recordResult(m, p, { correct: i % 2 === 0, usedHint: false, ms: 1000 + i }, { now: 5000 + i });
+    }
+    return { problems, log: m.log };
+  };
+  const a = run();
+  const b = run();
+  // same math + same rng + same now ⇒ byte-identical problems and log entries
+  assert.deepEqual(b.problems, a.problems);
+  assert.deepEqual(b.log, a.log);
+  // the log carries the caller-supplied clock, never wall time
+  assert.equal(a.log[0].t, 5000);
+  assert.equal(a.log[7].t, 5007);
 });

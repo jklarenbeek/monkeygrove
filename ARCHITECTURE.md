@@ -19,7 +19,19 @@
 index.html              SPA shell: canvas + DOM overlay layers (Vite entry)
 vite.config.js          base '/monkeygrove/', vitest config
 src/
-  main.js               game controller: boot, RAF loop, chamber/hub flow, input, juice
+  main.js               slim Game orchestrator: boot, RAF loop tick, mode switching,
+                        and wiring the collaborators below together (composition, not a
+                        framework; each is `new XxxController(this)` and reaches back via
+                        `this.game`). Also keeps the title/warm-up flow and shared HUD wiring.
+  input.js              InputController: keyboard/touch/camera gestures -> semantic intents
+                        (step/tap/action/hint), pinch/pan zoom, retained zoom, gesture hint
+  hub.js                HubController: island hub build + attract diorama, living-gate growth,
+                        NPC talk, hub taps, and the menus (gems/shop/pets/island worktable)
+  chamberflow.js        ChamberFlow: one math chamber from build to clear — pick problem,
+                        build diorama, present, score, reroute next-problem kinds, complete;
+                        plus chamber-only frame work (crab bumps, banana pickups)
+  rewards.js            RewardService: banana/egg/combo/chest/treat payouts + emoji-fly juice
+  avatar.js             AvatarRig: player monkey + pet follower mesh lifecycle (shared scenes)
   config.js             central knobs: palette, world themes (accent/bloom colors),
                         grid metrics, timings, balance, portal growth stages, QUALITY
   i18n.js               t(key, vars) helper + EN/NL dictionaries
@@ -62,6 +74,10 @@ src/
   rng.js                seeded PRNG (mulberry32)
 tests/                  vitest: mathengine, curriculum, state migration, warm-up and
                         parent wiring, chambers, island, mimi, models, portal stages
+scripts/
+  e2e.mjs               browser smoke test: self-hosted Vite + Playwright drive of
+                        the real game (see Testing)
+  gen-icons.mjs         offline PWA icon generation
 ```
 
 ## Rendering approach
@@ -107,10 +123,13 @@ accessible hit targets (≥48px), CSS animations for cheap polish.
   meta,                           // generator extras (e.g. a, b for fact gems)
 }
 createMathState() -> the profile.math blob (skills, facts, log)
-nextProblem(math, { world?, kind?, skill?, echo?, allowedSkills?, rng? }) -> Problem
-  // ≈65% expected success; allowedSkills softly constrains adaptive selection
-recordResult(math, problem, { correct, ms, usedHint })
-  -> { delta, rating, masteredSkill, newGems }      // masteredSkill/newGems drive toasts
+nextProblem(math, { world?, kind?, skill?, echo?, allowedSkills?, rng }) -> Problem
+  // ≈65% expected success; allowedSkills softly constrains adaptive selection.
+  // rng is REQUIRED — the engine sources no entropy of its own (main.js owns the
+  // seeded Rng; tests pass a fixed seed), so selection replays from inputs.
+recordResult(math, problem, { correct, ms, usedHint }, { now }) -> { delta, rating, masteredSkill, newGems }
+  // masteredSkill/newGems drive toasts; `now` is the caller-supplied timestamp
+  // stamped into the log — the engine never reads the clock.
 masteryReport(math)
   -> { worlds: { [world]: { pct, skills: [{ id, rating, acc10, n, mastered }] } },
        gems: { lit, total }, weakest }
@@ -257,3 +276,23 @@ duel-critical draws.
 - Particles live in one pooled `THREE.Points` per place; tweens run on one global
   ticker; the RAF hot path avoids per-frame allocations.
 - `renderer.setPixelRatio(min(devicePixelRatio, 2))`; shadows only at high QUALITY.
+
+## Testing
+Two layers:
+- **`npm test` (vitest)** — the bulk of coverage. Pure logic (math engine, curriculum,
+  island, state migration) and DOM wiring run in a simulated DOM (happy-dom); no WebGL,
+  no browser. Fast and CI-default.
+- **`npm run test:e2e`** — one real-browser smoke test (`scripts/e2e.mjs`) for the flow
+  happy-dom can't reach: WebGL boot → create profile → hub → bakery business scene,
+  asserting zero page errors. It is **self-contained** — it spawns its own Vite dev
+  server on a dedicated port and tears it down — and overlay-aware (it clicks/fills via
+  injected JS because DOM overlays intercept synthetic pointer events).
+
+The e2e harness deliberately does **not** use Playwright's bundled browsers. It points
+Playwright's launcher at a **system** Chrome/Chromium via `executablePath`, resolved from
+`$MG_CHROME` then `/usr/bin/{google-chrome,chromium,chromium-browser}`, and runs headless
+with a software GL backend (`--use-angle=swiftshader`, `--no-sandbox`) so it needs no GPU.
+If no browser is found it **exits 0 (skips)**, so browserless CI and contributors are never
+blocked. Consequence: Playwright's `install-deps` (Debian/Arch-only, the usual Fedora
+blocker) is irrelevant here — on Fedora-family hosts just install a system Chromium, or use
+the distrobox fallback. Both are documented in [README.md](README.md#fedora--rhel-family-hosts-incl-nobara).

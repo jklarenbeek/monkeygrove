@@ -11,7 +11,7 @@ import {
   NumberStone, Pot, makeProp, makeTextSprite, floatLabel,
 } from './entities.js';
 import { PROPS } from './models.js';
-import { PALETTE } from './config.js';
+import { PALETTE, OCCUPIED_MARKERS } from './config.js';
 import { t } from './i18n.js';
 
 // ---------- shared: paint a visual model onto the chamber floor ----------
@@ -37,7 +37,7 @@ export class FloorModel {
 
   _free(x, z) {
     const c = this.place.cellAt(x, z);
-    return c && c.walk && c.h === 0 && !'AsPpcDmMBVoTON'.includes(c.ch);
+    return c && c.walk && c.h === 0 && !OCCUPIED_MARKERS.has(c.ch);
   }
 
   _findRect(rw, rd) {

@@ -4,6 +4,7 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { TEMPLATES, parseLayout, varyLayout, HOST_LIMITS } from '../src/chamber.js';
+import { SOLID_MARKERS, OCCUPIED_MARKERS } from '../src/config.js';
 import { Rng } from '../src/rng.js';
 
 const KNOWN = new Set('#.,12PAspcDdoBmVMTONtguylfehkbjw'.split(''));
@@ -116,6 +117,26 @@ test('solid altar: all task cells stay reachable, altar keeps a doorstep', () =>
       }
     }
   });
+});
+
+// Guard the consolidated marker sets (config.js) against silent drift. These
+// are the exact literals the patrol blocker (main.js patrolReach) and the
+// paint blocker (verbs.js FloorModel._free) each hard-coded before TODO_03
+// folded them into one source of truth. The two intentionally differ by 'c'
+// (crab) and 'D' (door) — a crab patrol ignores both, but a painted model must
+// avoid both — so pin each independently and pin the difference itself.
+test('SOLID/OCCUPIED marker sets match the historical call-site literals', () => {
+  const SOLID_WAS = 'AsPpBmMVoTON';      // main.js patrolReach
+  const OCCUPIED_WAS = 'AsPpcDmMBVoTON'; // verbs.js FloorModel._free
+  const pin = (set, lit) => {
+    assert.equal(set.size, new Set(lit).size, `'${lit}': set has extra/missing markers`);
+    for (const ch of lit) assert.ok(set.has(ch), `set is missing '${ch}'`);
+  };
+  pin(SOLID_MARKERS, SOLID_WAS);
+  pin(OCCUPIED_MARKERS, OCCUPIED_WAS);
+  // the deliberate difference is exactly the crab and the door, nothing else
+  const extra = [...OCCUPIED_MARKERS].filter((ch) => !SOLID_MARKERS.has(ch)).sort();
+  assert.deepEqual(extra, ['D', 'c'], 'OCCUPIED must add exactly crab + door over SOLID');
 });
 
 test('varyLayout: deterministic, preserves markers, only dresses plain floor', () => {
