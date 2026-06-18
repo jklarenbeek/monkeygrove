@@ -164,7 +164,7 @@ export const nl = {
   'ex.no_carry': 'Vergeet de tien niet te onthouden! Kijk: het wordt <b>{answer}</b>.',
   'ex.borrow': 'Een lastige! We moeten een tien inwisselen. Het wordt <b>{answer}</b>.',
   'ex.reversed': 'Bijna! De cijfers wisselden van plek. Het is <b>{answer}</b>.',
-  'ex.whole_number_bias': 'Verrassing: een groter getal onder de streep betekent <b>kleinere stukjes</b>! Hoe meer stukjes je snijdt, hoe kleiner elk stukje wordt.',
+  'ex.whole_number_bias': 'Verrassing: een groter getal onder de streep betekent <b>kleinere stukjes</b>! Snijd in {d}, dan wordt elk stukje kleiner.',
   'ex.add_tops_bottoms': 'Breukstukjes moeten eerst <b>even groot</b> zijn voor je ze optelt — kijk!',
   'ex.remainder_ignored': 'Vergeet de restjes niet — er blijven er <b>{remainder} over</b>!',
   'ex.near_miss': 'Zóóó dichtbij! Tel nog één keer — het is <b>{answer}</b>.',
