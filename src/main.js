@@ -20,20 +20,8 @@ import {
   applyWarmupResult, eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
 } from './curriculum/placement.js';
 import { BusinessPlace } from './business/scene.js';
-import { BUSINESS_CUSTOMERS } from './business/data.js';
-import {
-  applyPaymentAction,
-  applyPrepAction,
-  applyReviewAction,
-  buyUpgrade,
-  completeOrder,
-  dailyBusinessReport,
-  ensureBusinessState,
-  ensureOrderMakeable,
-  nextBusinessOrder,
-  nextBusinessReview,
-  restockIngredient,
-} from './business/engine.js';
+import { BusinessController } from './business/controller.js';
+import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
 import {
   islandStatus, newBlueprints, markSeen, fund as fundIsland, buildById,
   grantDailyPerks, BUILDS, isBuilt,
@@ -95,8 +83,7 @@ class Game {
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
     this.gestureHintDone = false; // pinch/pan hint shows at most once per session
     this.userZoom = null; // player's retained pinch/wheel zoom (null = comfort default)
-    this.businessAttempts = [];
-    this.businessCustomer = null;
+    this.business = null; // BusinessController, created when entering the shop
   }
 
   // ---------- boot ----------
@@ -1289,6 +1276,7 @@ class Game {
     if (!isBuilt(this.profile, 'bakery')) return false;
     this.mode = 'business';
     this.flowToken++;
+    this.business = new BusinessController(this);
     screens.closeScreen();
     this.clearPlace();
     this.place = new BusinessPlace(this.world, { seed: 606 });
@@ -1299,7 +1287,7 @@ class Game {
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.spawnPet(spawn);
     this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);
-    this.player.onBump = (x, z) => this.businessTap(x, z);
+    this.player.onBump = (x, z) => this.business.businessTap(x, z);
     this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
     this.world.defaultZoom = this.sceneZoom('hub');
     this.world.frameBoard(this.place.center(), this.place.size.w, this.place.size.d, this.player.mesh);
@@ -1311,254 +1299,8 @@ class Game {
     this.refreshHudCounts();
     audio.music('island');
     const business = ensureBusinessState(this.profile);
-    if (business.activeOrder?.tasks?.length) this.resumeBusinessOrder(business);
-    else this.startNextBusinessOrder();
-    return true;
-  }
-
-  resumeBusinessOrder(business) {
-    const order = business.activeOrder;
-    ensureOrderMakeable(business, order); // legacy/saved orders can't soft-lock either
-    business.queue = [order];
-    this.businessAttempts = [];
-    this.place?.clearCustomers?.();
-    this.place?.setActiveRecipe?.(order.recipeId);
-    this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
-    persist();
-    this.announceBusinessOrder(order);
-  }
-
-  startNextBusinessOrder() {
-    const business = ensureBusinessState(this.profile);
-    if (business.activeOrder?.tasks?.length) {
-      this.resumeBusinessOrder(business);
-      return;
-    }
-    if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) {
-      this.endBusinessDay();
-      return;
-    }
-    const rng = new Rng(`business:${this.profile.id}:${business.currentDay}:${business.day.ordersServed}`);
-    const order = nextBusinessOrder(business, this.profile.curriculum, { rng });
-    business.activeOrder = order;
-    business.queue = [order];
-    this.businessAttempts = [];
-    this.place?.clearCustomers?.();
-    this.place?.setActiveRecipe?.(order.recipeId);
-    this.businessCustomer = this.place?.spawnCustomer?.(order.customerId) || null;
-    persist();
-    this.announceBusinessOrder(order);
-  }
-
-  announceBusinessOrder(order) {
-    if (!order) return;
-    hud.toast(order.supplied ? t('business.supplied') : t('business.order_ready'));
-  }
-
-  showBusinessOrderPanel() {
-    const business = ensureBusinessState(this.profile);
-    const order = business.activeOrder;
-    if (!order) {
-      this.startNextBusinessOrder();
-      return;
-    }
-    const customer = BUSINESS_CUSTOMERS[order.customerId];
-    screens.showBusinessOrder({
-      order,
-      customerName: t(customer?.nameKey || 'business.order'),
-      activeTask: this.nextOpenBusinessTask(order) || { kind: 'done', mode: 'ready' },
-      onPrep: (task) => this.handleBusinessPrep(task),
-      onPay: (task) => this.handleBusinessPayment(task),
-      onServe: () => this.serveBusinessOrder(),
-      onExit: () => this.leaveBusiness(),
-    });
-  }
-
-  nextOpenBusinessTask(order) {
-    return (order?.tasks || []).find((task) => (
-      (task.kind === 'prep' || task.kind === 'payment') && !task.businessDone
-    )) || null;
-  }
-
-  handleBusinessPrep(task) {
-    if (!task || task.kind !== 'prep') return;
-    screens.showBusinessPrep({
-      task,
-      onClose: () => this.showBusinessOrderPanel(),
-      onSubmit: (action) => {
-        const business = ensureBusinessState(this.profile);
-        const order = business.activeOrder;
-        if (!order || task.kind !== 'prep') return { correct: false, handled: true };
-        const result = applyPrepAction(business, order, task, action);
-        this.businessAttempts.push(result);
-        persist();
-        if (result.correct) {
-          task.businessDone = true;
-          audio.sfx('correct');
-          hud.toast(t('business.done'));
-          this.showBusinessOrderPanel();
-          return { correct: true };
-        }
-        audio.sfx('boop');
-        if (result.reason === 'stock') {
-          // Out of stock isn't a math mistake — send them out to restock.
-          hud.toast(t('business.stock'));
-          this.showBusinessOrderPanel();
-          return { correct: false, handled: true };
-        }
-        return { correct: false }; // wrong answer: panel stays and offers a hint
-      },
-    });
-  }
-
-  handleBusinessPayment(task) {
-    if (!task || task.kind !== 'payment') return;
-    screens.showBusinessPayment({
-      task,
-      onClose: () => this.showBusinessOrderPanel(),
-      onSubmit: (action) => {
-        const business = ensureBusinessState(this.profile);
-        const order = business.activeOrder;
-        if (!order || task.kind !== 'payment') return { correct: false, handled: true };
-        const result = applyPaymentAction(business, order, task, action);
-        this.businessAttempts.push(result);
-        persist();
-        if (result.correct) {
-          task.businessDone = true;
-          audio.sfx('correct');
-          hud.toast(t('business.done'));
-          this.showBusinessOrderPanel();
-          return { correct: true };
-        }
-        audio.sfx('boop');
-        return { correct: false }; // wrong answer: panel stays and offers a hint
-      },
-    });
-  }
-
-  serveBusinessOrder() {
-    const business = ensureBusinessState(this.profile);
-    const order = business.activeOrder;
-    if (!order) return;
-    const task = this.nextOpenBusinessTask(order);
-    if (task) {
-      this.showBusinessOrderPanel();
-      return;
-    }
-    const result = completeOrder(business, order, { attempts: this.businessAttempts });
-    business.queue = [];
-    this.businessAttempts = [];
-    this.place?.clearCustomers?.();
-    const bananas = this.rng.int(BALANCE.businessBananaReward[0], BALANCE.businessBananaReward[1]);
-    addBananas(this.profile, bananas);
-    persist();
-    this.refreshHudCounts();
-    audio.sfx('coin');
-    hud.toast(`+${bananas} 🍌 · ${t('business.profit')}: ${(result.profitCents / 100).toFixed(2)}`);
-    if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) this.endBusinessDay();
-    else this.startNextBusinessOrder();
-  }
-
-  openBusinessStock() {
-    const business = ensureBusinessState(this.profile);
-    screens.showBusinessStock({
-      business,
-      onRestock: (ingredientId) => {
-        const result = restockIngredient(business, ingredientId, 1);
-        audio.sfx(result.ok ? 'coin' : 'boop');
-        if (!result.ok) hud.toast(t(result.reason === 'full' ? 'business.stock_full' : 'business.not_enough'));
-        persist();
-        this.openBusinessStock();
-      },
-      onClose: () => this.showBusinessOrderPanel(),
-    });
-  }
-
-  openBusinessUpgrades() {
-    const business = ensureBusinessState(this.profile);
-    screens.showBusinessUpgrades({
-      business,
-      onBuy: (upgradeId) => {
-        const result = buyUpgrade(business, upgradeId);
-        audio.sfx(result.ok ? 'coin' : 'boop');
-        if (!result.ok) hud.toast(t('business.not_enough'));
-        persist();
-        this.openBusinessUpgrades();
-      },
-      onClose: () => this.showBusinessOrderPanel(),
-    });
-  }
-
-  leaveBusiness() {
-    const business = ensureBusinessState(this.profile);
-    business.queue = business.activeOrder ? [business.activeOrder] : [];
-    persistNow();
-    this.businessAttempts = [];
-    this.businessCustomer = null;
-    this.startHub();
-    return true;
-  }
-
-  requestEndBusinessDay() {
-    const business = ensureBusinessState(this.profile);
-    if (business.activeOrder) {
-      audio.sfx('boop');
-      hud.toast(t('business.serve'));
-      this.showBusinessOrderPanel();
-      return false;
-    }
-    this.endBusinessDay();
-    return true;
-  }
-
-  endBusinessDay() {
-    const business = ensureBusinessState(this.profile);
-    if (business.activeOrder) {
-      audio.sfx('boop');
-      hud.toast(t('business.serve'));
-      this.showBusinessOrderPanel();
-      return false;
-    }
-    const report = dailyBusinessReport(business);
-    business.activeOrder = null;
-    business.queue = [];
-    this.businessAttempts = [];
-    this.place?.clearCustomers?.();
-    const reviewRng = new Rng(`business-review:${this.profile.id}:${business.currentDay}`);
-    const review = nextBusinessReview(business, this.profile.curriculum, { rng: reviewRng });
-    screens.showBusinessDaySummary({
-      report,
-      review,
-      onReview: (task, value) => {
-        const result = applyReviewAction(business, task, value);
-        audio.sfx(result.correct ? 'correct' : 'boop');
-        persist();
-        return result.correct;
-      },
-      onDone: () => {
-        business.currentDay = (business.currentDay || 1) + 1;
-        business.day = {
-          ordersServed: 0,
-          revenueCents: 0,
-          costCents: 0,
-          profitCents: 0,
-          wasteCents: 0,
-          demand: {},
-        };
-        persistNow();
-        this.startHub();
-      },
-    });
-  }
-
-  businessTap(x, z) {
-    if (this.mode !== 'business') return false;
-    const station = this.place?.stationAt?.(x, z);
-    if (!station) return false;
-    audio.sfx('click');
-    if (station === 'pantry' || station === 'shopTable') this.openBusinessStock();
-    else if (station === 'orderBoard') this.openBusinessUpgrades();
-    else this.showBusinessOrderPanel();
+    if (business.activeOrder?.tasks?.length) this.business.resumeBusinessOrder(business);
+    else this.business.startNextBusinessOrder();
     return true;
   }
 
@@ -1660,7 +1402,7 @@ class Game {
         const cell = this.pickCell(e.clientX, e.clientY);
         if (!cell) return;
         if (this.mode === 'hub' && this.hubTap(cell.x, cell.z)) return;
-        if (this.mode === 'business' && this.businessTap(cell.x, cell.z)) return;
+        if (this.mode === 'business' && this.business?.businessTap(cell.x, cell.z)) return;
         if (this.helper && cell.x === this.helper.x && cell.z === this.helper.z) {
           this.helperTap();
           return;

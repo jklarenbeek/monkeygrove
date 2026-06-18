@@ -10,7 +10,9 @@ import { PETS } from '../src/models.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 const SCENE_PATH = join(ROOT, 'src', 'business', 'scene.js');
-const MAIN_PATH = join(ROOT, 'src', 'main.js');
+// Business runtime flow now lives in the BusinessController; the Game shell only
+// sets up the scene. Read both so wiring assertions are location-agnostic.
+const MAIN_PATHS = [join(ROOT, 'src', 'main.js'), join(ROOT, 'src', 'business', 'controller.js')];
 const SCREENS_PATH = join(ROOT, 'src', 'screens.js');
 const I18N_PATHS = [join(ROOT, 'src', 'i18n', 'en.js'), join(ROOT, 'src', 'i18n', 'nl.js')];
 const STYLE_PATH = join(ROOT, 'style.css');
@@ -35,7 +37,7 @@ function sceneSource() {
 }
 
 function mainSource() {
-  return readFileSync(MAIN_PATH, 'utf8');
+  return MAIN_PATHS.map((p) => readFileSync(p, 'utf8')).join('\n');
 }
 
 function screensSource() {
