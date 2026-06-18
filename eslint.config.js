@@ -39,6 +39,15 @@ export default [
       // Empty `catch {}` is a deliberate idiom here — localStorage can throw in
       // private mode / when quota is full, and the right response is to do nothing.
       'no-empty': ['error', { allowEmptyCatch: true }],
+      // Irregular whitespace in *code* is a real hazard (invisible bugs), so keep it
+      // an error there — but tolerate it inside comments, where a stray zero-width
+      // space is harmless prose cruft, not a defect worth failing the gate over.
+      // (Strings/templates already skipped: emoji like 🧙‍♂️ use ZWJ legitimately.)
+      'no-irregular-whitespace': ['error', { skipComments: true }],
+      // `recommended` errors on a defensive initializer that's always overwritten
+      // before use (`let x = null; try { x = … } catch { x = null }`). That pattern
+      // is intentional house style here, so keep it a `warn`, not a build-breaker.
+      'no-useless-assignment': 'warn',
       // Lenient for now: unused *args* and unused catch bindings are ignored, and an
       // `_`-prefix opts a binding out explicitly. Surfaces dead vars without a wall.
       'no-unused-vars': ['warn', {

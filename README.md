@@ -25,6 +25,10 @@ The game runs fully in the browser. There are no accounts, no ads, and no server
 backend. Progress is saved on the device in `localStorage` under
 `monkeygrove.save`.
 
+Monkey Grove is an installable **PWA**: a service worker precaches the app shell,
+so once it has loaded it plays **offline** (handy on flaky school Wi-Fi) and can be
+added to the home screen like a native app.
+
 ## What Is In The Game
 
 - **Four math worlds**
@@ -98,12 +102,16 @@ connection. Three.js is bundled by Vite.
 ## Scripts
 
 ```bash
-npm run dev        # Vite dev server with hot reload
-npm test           # Vitest suites (simulated DOM — no browser needed)
-npm run test:e2e   # Headless-browser smoke test: boot -> profile -> hub -> kitchen
-npm run build      # Production build into dist/
-npm run preview    # Serve the production build locally
-npm run deploy     # Build and publish dist/ to the gh-pages branch
+npm run dev         # Vite dev server with hot reload
+npm test            # Vitest suites (simulated DOM — no browser needed)
+npm run test:watch  # Vitest in watch mode
+npm run test:e2e    # Headless-browser smoke test: boot -> profile -> hub -> kitchen
+npm run lint        # ESLint (flat config): size + correctness guardrails
+npm run build       # Production build into dist/
+npm run preview     # Serve the production build locally
+npm run gen:icons   # Regenerate the PWA app icons into public/
+npm run deploy      # Build and publish dist/ to the gh-pages branch
+npm run debug       # Vite under the Node inspector (--inspect-brk)
 ```
 
 See [End-To-End (Browser) Tests](#end-to-end-browser-tests) for `test:e2e`,
@@ -227,28 +235,39 @@ If you fork the project under a different repository name, update `base` in
 ```text
 index.html          single-page shell: WebGL canvas plus DOM overlay
 style.css           full UI, HUD, screens, responsive layout
-vite.config.js      Vite, Vitest, and GitHub Pages base path
+vite.config.js      Vite, Vitest, PWA, and GitHub Pages base path
+eslint.config.js    ESLint flat config: size + correctness guardrails
 
 src/
-  main.js           game controller, flow, input, rewards, hub/chamber transitions
+  main.js           slim game orchestrator: boot, loop tick, mode switching, wiring
+  input.js          keyboard/touch/camera gestures -> semantic intents
+  hub.js            island hub build, NPC talk, gate growth, hub menus
+  chamberflow.js    one math chamber: pick problem, build, present, score, complete
+  rewards.js        banana/egg/combo/chest payouts + emoji-fly juice
+  avatar.js         player + pet follower mesh lifecycle
   world.js          Three.js renderer, orthographic camera, picking, zoom/pan
   chamber.js        ASCII diorama layouts, hub island, portals, build plots
   player.js         grid-hop movement, tap-to-walk, carrying, pet follower
   entities.js       stones, pots, crabs, portals, particles, props, labels
+  ambient.js        living-island critters (butterflies, birds)
   voxel.js          ASCII voxel data to cached Three.js geometry
   mesh/             one file per character & pet voxel model
   models.js         props, cosmetics, ambient critters; re-exports mesh/
   anim.js           tweening and easing
   audio.js          procedural WebAudio music and SFX
+  config.js         central balance / palette / timing / quality knobs
 
-  mathengine.js     pure adaptive math engine and mastery report
+  mathengine.js     pure adaptive math engine, mastery report, rating decay
   curriculum/       NL_PO pack, age placement, warm-up scoring, coverage, eligibility
+  business/         bakery/pizzeria sim: data, pure engine, controller, scene
   verbs.js          fetch, array, number-line, and share interactions
   island.js         restoration blueprints, gating, funding, daily perks
   mimi.js           Mimi's advice ladder
-  state.js          save/load, profiles, settings, streaks, economy
-  i18n.js           English and Dutch dictionaries
+  state.js          save/load/migrate, profiles, settings, streaks, economy
+  i18n.js, i18n/    t() helper + English and Dutch dictionaries
   langFlags.js      accessible drawn language flags for EN/NL toggles
+  a11y.js           comfort/accessibility: reduced motion, dyslexia font, contrast
+  devtools.js       DEV-only debug hooks, gated out of production builds
   hud.js            equation banner, chips, speech bubble, toasts, panels
   screens.js        title, warm-up, settings, shop, pets, gem tree, parents, results
   duel.js           hot-seat duel mode and challenge codes
@@ -256,6 +275,7 @@ src/
 
 tests/              Vitest suites for math, curriculum, state, UI wiring, chambers,
                     island, Mimi, models, portals
+scripts/            e2e smoke test, PWA icon generation, playtest driver
 docs/               research notes and retro-game inspiration
 DESIGN.md           canonical game design document
 ARCHITECTURE.md     technical architecture notes
@@ -268,7 +288,8 @@ Monkey Grove follows a few simple principles:
 - The math is the game mechanic, not a quiz layer.
 - Mistakes are diagnostic, not punitive.
 - Visual models appear in the world: arrays, baskets, number lines, and place-value strips.
-- Practice adapts per skill and includes spaced review.
+- Practice adapts per skill and includes spaced review. "Mastered" means *recently*
+  mastered: an unpracticed skill gently fades and resurfaces through Echo Doors.
 - Curriculum targeting is soft by default, but the age-derived stage is a floor:
   eligible practice starts at that lower bound and may include higher stages so
   the adaptive engine can let the learner stretch. Parents can explicitly change

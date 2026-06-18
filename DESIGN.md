@@ -114,6 +114,10 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   monkeys") to seed ratings.
 - **Selection**: ~70% focus skill (lowest unmastered, prereqs met), 20%
   neighbor review, 10% older refresh; Echo Doors pull the weakest stale skill.
+- **Forgetting curve**: "mastered" means *recently* mastered. A skill left
+  unpracticed gently decays (a lazy, clock-driven view of its rating/mastery), so it
+  can lapse back to "stale" — which is exactly what Echo Doors and neighbor review
+  re-surface, bringing scaffolds back when a rusty skill returns.
 - **Curriculum filter**: normal chamber selection accepts `allowedSkills` from
   the profile curriculum. Forced skill paths, duels, and deterministic challenge
   codes remain in control when they explicitly choose a skill.
