@@ -91,9 +91,45 @@ export function loadSave() {
   return save;
 }
 
-function migrate(s) {
-  // future versions migrate forward here
-  // heal any missing fields against a fresh profile (additive updates stay safe)
+// ---------- save migration ----------
+// Version-step ladder. STEPS[n] upgrades a v(n) save to v(n+1); migrate() runs them
+// in order from the save's stored version up to VERSION, then heals. Reach for a step
+// when a fresh-profile heal can't express the change — a *renamed, moved, or
+// restructured* field. (Healing only fills in fields that are missing; it can't
+// rename `coins`→`bananas` or turn a bare number into `{ points, goal }`.) The ladder
+// is empty today because v1 is the only shipped format, but the rails — and the test
+// that drives a synthetic old save through them — exist so the first real v2 step
+// lands on tested machinery instead of a hopeful comment.
+//
+//   const STEPS = {
+//     1: (s) => { for (const p of s.profiles) { p.egg = { points: p.eggPoints ?? 0, goal: BALANCE.eggGoal }; delete p.eggPoints; } return s; },
+//     2: (s) => …,   // v2 -> v3 lives here, and so on
+//   };
+const STEPS = {};
+
+// Upgrade a parsed save to the current shape: run version steps, then heal missing
+// fields against a fresh profile (the final, additive step). A step may mutate `s` in
+// place or return a new object — either is fine. `steps`/`target` are injectable so
+// the ladder can be exercised by tests before a real step ships. A step that throws
+// propagates to loadSave(), which backs up the raw payload and falls back to a fresh
+// save — a child never sees a blank screen.
+export function migrate(s, steps = STEPS, target = VERSION) {
+  let v = Number.isFinite(s.v) ? s.v : 1;
+  while (v < target) {
+    const step = steps[v];
+    if (!step) break; // gap in the ladder: the heal below still normalizes what it can
+    s = step(s) || s;
+    v += 1;
+  }
+  healSave(s);
+  s.v = v;
+  return s;
+}
+
+// Final migration step: additively heal any field missing against a fresh profile.
+// Additive-only by contract — it never renames or restructures (that's a step's job),
+// so it stays safe to re-run on every load.
+function healSave(s) {
   const ref = freshProfile('x');
   for (const p of s.profiles) {
     for (const k of Object.keys(ref)) if (p[k] === undefined) p[k] = structuredClone(ref[k]);
@@ -139,8 +175,6 @@ function migrate(s) {
     const d = settingsDefaults();
     for (const k of Object.keys(d)) if (s.settings[k] === undefined) s.settings[k] = d[k];
   }
-  s.v = VERSION;
-  return s;
 }
 
 function isObject(value) {

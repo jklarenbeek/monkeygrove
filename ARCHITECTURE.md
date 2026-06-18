@@ -222,9 +222,14 @@ monkeygrove.save = {
   settings: { lang, sfx, music },
 }
 ```
-`state.js` heals missing profile fields against a fresh profile on load (migrations
-stay additive); corrupt JSON falls back to a fresh save after stashing the broken
-blob in `monkeygrove.backup`.
+`state.js` migrates a loaded save up a version-step ladder (`STEPS[n]` upgrades a
+v`n` save to v`n+1`, run from the save's stored `v` up to `VERSION`), then heals any
+missing profile fields against a fresh profile as the final, additive step. Use a
+ladder step for a *changed* shape (renamed/restructured field) that healing can't
+express; healing only fills in fields that are missing. The ladder is empty while v1
+is the only shipped format. Corrupt JSON — or a migration that throws — falls back to
+a fresh save after stashing the broken blob in `monkeygrove.save.corrupt`, so a child
+never sees a blank screen.
 
 ## Runtime flow additions
 - New Explorer creation accepts an optional age from 4-13, optional birthday,
