@@ -169,6 +169,21 @@ test('forced kinds are honored, unsupported kinds fall back to natural', () => {
   assert.equal(nextProblem(m2, { skill: 'add_20', kind: 'share', rng: rng() }).kind, 'fetch');
 });
 
+test('constructed remainder sharing uses remainder-aware prompt copy', () => {
+  const exact = nextProblem(stateWithRating('share', 700), {
+    skill: 'share', kind: 'share', rng: new Rng(7),
+  });
+  const remainder = nextProblem(stateWithRating('div_remainder', 700), {
+    skill: 'div_remainder', kind: 'share', rng: new Rng(79),
+  });
+
+  validateProblem(exact);
+  validateProblem(remainder);
+  assert.equal(exact.prompt.key, 'q.share');
+  assert.equal(remainder.prompt.key, 'q.share_remainder');
+  assert.ok(remainder.prompt.vars.remainder > 0);
+});
+
 test('fraction answers are fraction strings', () => {
   for (const skillId of ['frac_compare', 'frac_equiv']) {
     const m = stateWithRating(skillId, 800);

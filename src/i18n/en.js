@@ -163,6 +163,7 @@ export const en = {
   'q.array_rows': 'Plant {total} sprouts in {rows} fair rows!',
   'q.array_total': 'Grow a bed with exactly {total} sprouts!',
   'q.share': 'Share {total} coconuts fairly over {baskets} baskets!',
+  'q.share_remainder': 'Share {total} coconuts fairly over {baskets} baskets. Leave leftovers on the stump!',
   'q.share_fetch': '{total} coconuts, {baskets} baskets — how many in each? Fetch that stone!',
   'q.numberline': 'Stand where {frac} lives and ring the bell!',
   'q.compare': 'Fetch the LARGEST fraction!',
@@ -198,6 +199,7 @@ export const en = {
   'verb.array_need_soil': 'Stand on the brown soil first!',
   'verb.array_unplant': 'Flag picked up — plant it anywhere!',
   'verb.share_sub': 'tap a basket to share · tap the stump to take back',
+  'verb.share_remainder_sub': 'share equally · leftovers stay on the stump',
 
   // chamber helpers (friendly pet guides — tap them for a cheer)
   'helper.turtle': 'Tuk the Turtle',
@@ -207,7 +209,7 @@ export const en = {
   'helper.fetch': 'Work it out first, then carry the answer stone to the ✨ altar! Picked the wrong one? Walk onto another stone to swap, or press ⬇️ to set it down. Crabs nap while you carry — and pots hide surprises!',
   'helper.array': 'Stand on the soil and press 🌱 to plant a flag. Then walk — the bed stretches with you! Press 🌱 again when the size is right. Changed your mind? Press 🌱 on the flag to pick it back up.',
   'helper.numberline': 'The ▲ marks chop the vine into equal hops! Walk to where your fraction lives and ring the 🔔.',
-  'helper.share': 'Tap a basket to drop a coconut in — every basket must get the same! Then press ✅. Took one too many? Tap the stump!',
+  'helper.share': 'Tap a basket to drop a coconut in — every basket must get the same! Then press ✅. If there are leftovers, leave them on the stump. Took one too many? Tap the stump!',
   'helper.cheer.1': 'You can do this! 🌟',
   'helper.cheer.2': 'Mistakes are how we learn — just try something!',
   'helper.cheer.3': 'Take your time. Count nice and slow!',

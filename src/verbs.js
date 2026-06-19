@@ -907,7 +907,12 @@ export class ShareVerb extends VerbBase {
   }
 
   _panel() {
-    return { kind: 'share', pile: this.pile, counts: this.baskets.map((b) => b.count) };
+    return {
+      kind: 'share',
+      pile: this.pile,
+      remainder: this.ctx.problem.model.params.remainder,
+      counts: this.baskets.map((b) => b.count),
+    };
   }
 
   _updateLabel(b) {

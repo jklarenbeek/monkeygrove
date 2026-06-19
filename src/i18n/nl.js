@@ -158,6 +158,7 @@ export const nl = {
   'q.array_rows': 'Plant {total} plantjes in {rows} eerlijke rijen!',
   'q.array_total': 'Maak een bedje met precies {total} plantjes!',
   'q.share': 'Verdeel {total} kokosnoten eerlijk over {baskets} mandjes!',
+  'q.share_remainder': 'Verdeel {total} kokosnoten eerlijk over {baskets} mandjes. Laat restjes op de stronk liggen!',
   'q.share_fetch': '{total} kokosnoten, {baskets} mandjes — hoeveel in elk mandje? Haal die steen!',
   'q.numberline': 'Ga staan waar {frac} woont en luid de bel!',
   'q.compare': 'Haal de GROOTSTE breuk!',
@@ -192,6 +193,7 @@ export const nl = {
   'verb.array_need_soil': 'Ga eerst op de bruine aarde staan!',
   'verb.array_unplant': 'Vlaggetje opgepakt — plant het waar je wilt!',
   'verb.share_sub': 'tik op een mandje om te delen · tik op de stronk om terug te pakken',
+  'verb.share_remainder_sub': 'deel eerlijk · restjes blijven op de stronk',
 
   // kamerhelpers (vriendelijke dieren-gidsen — tik voor een aanmoediging)
   'helper.turtle': 'Tuk de Schildpad',
@@ -201,7 +203,7 @@ export const nl = {
   'helper.fetch': 'Reken eerst uit, en draag dan de juiste steen naar het ✨ altaar! Verkeerde steen? Loop naar een andere steen om te ruilen, of druk op ⬇️ om hem neer te zetten. Krabben slapen zolang je draagt — en in potten zitten verrassingen!',
   'helper.array': 'Ga op de aarde staan en druk op 🌱 om een vlaggetje te planten. Loop dan — het bedje rekt met je mee! Klopt de maat? Druk nog eens op 🌱. Bedacht? Druk op 🌱 op het vlaggetje en je pakt het terug.',
   'helper.numberline': 'De ▲-streepjes hakken de liaan in gelijke stukjes! Loop naar waar jouw breuk woont en luid de 🔔.',
-  'helper.share': 'Tik op een mandje om er een kokosnoot in te doen — elk mandje evenveel! Druk daarna op ✅. Eentje te veel? Tik op de stronk!',
+  'helper.share': 'Tik op een mandje om er een kokosnoot in te doen — elk mandje evenveel! Druk daarna op ✅. Zijn er restjes, laat ze op de stronk liggen. Eentje te veel? Tik op de stronk!',
   'helper.cheer.1': 'Jij kan dit! 🌟',
   'helper.cheer.2': 'Van foutjes leer je — probeer gewoon iets!',
   'helper.cheer.3': 'Neem de tijd. Tel maar rustig!',

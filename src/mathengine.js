@@ -482,7 +482,10 @@ function shareProblem(rng, kind, { total, baskets, quotient, remainder, d, meta,
     return {
       kind: 'share',
       equation: `${total} ÷ ${baskets}`,
-      prompt: { key: 'q.share', vars: { total, baskets } },
+      prompt: {
+        key: remainder > 0 ? 'q.share_remainder' : 'q.share',
+        vars: { total, baskets, remainder },
+      },
       answer: quotient,
       choices: null,
       model,

@@ -268,8 +268,9 @@ export function setVerbPanel(data) {
         <div class="sub">${t(subKey)}</div>
       </div>`;
   } else if (data.kind === 'share') {
+    const subKey = data.remainder > 0 ? 'verb.share_remainder_sub' : 'verb.share_sub';
     p.innerHTML = `
       <div>🥥 ${data.pile} &nbsp;→&nbsp; 🧺 ${data.counts.join(' · ')}</div>
-      <div class="sub">${t('verb.share_sub')}</div>`;
+      <div class="sub">${t(subKey, { remainder: data.remainder })}</div>`;
   }
 }
