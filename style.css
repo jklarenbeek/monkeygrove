@@ -698,3 +698,67 @@ html, body {
   outline-offset: 2px;
   border-radius: 6px;
 }
+/* Magical scene transitions */
+#scene-transition {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255,255,255,.95) 0 7%, rgba(255,235,146,.88) 8% 15%, rgba(159,124,255,.72) 16% 26%, rgba(75,196,225,.58) 27% 41%, rgba(27,31,55,.96) 63% 100%);
+}
+#scene-transition.hidden { display: none; }
+#scene-transition::before,
+#scene-transition::after,
+#scene-transition .scene-transition-core {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+#scene-transition::before {
+  width: 120vmax;
+  height: 120vmax;
+  background:
+    conic-gradient(from 0deg, rgba(255,255,255,.1), rgba(255,216,102,.8), rgba(123,211,255,.74), rgba(201,166,255,.78), rgba(255,255,255,.1));
+  mix-blend-mode: screen;
+  animation: portal-spin .9s linear infinite;
+}
+#scene-transition::after {
+  width: 42vmax;
+  height: 42vmax;
+  box-shadow: 0 0 48px 18px rgba(255,255,255,.72), inset 0 0 44px rgba(255,255,255,.78);
+  background: radial-gradient(circle, rgba(255,255,255,.95), rgba(255,255,255,.18) 38%, rgba(255,255,255,0) 62%);
+  animation: portal-core .86s ease-in-out infinite alternate;
+}
+#scene-transition .scene-transition-core {
+  width: 100vmax;
+  height: 100vmax;
+  border: 7px dotted rgba(255,255,255,.8);
+  filter: drop-shadow(0 0 14px rgba(255,237,154,.9));
+  animation: portal-spin 1.7s linear infinite reverse;
+}
+#scene-transition.entering { animation: portal-cover .36s ease-in forwards; }
+#scene-transition.leaving { animation: portal-reveal .3s ease-out forwards; }
+@keyframes portal-cover {
+  from { opacity: 0; clip-path: circle(0 at 50% 50%); }
+  to { opacity: 1; clip-path: circle(75% at 50% 50%); }
+}
+@keyframes portal-reveal {
+  from { opacity: 1; clip-path: circle(75% at 50% 50%); }
+  to { opacity: 0; clip-path: circle(0 at 50% 50%); }
+}
+@keyframes portal-spin { to { transform: rotate(360deg); } }
+@keyframes portal-core {
+  from { transform: scale(.82); opacity: .72; }
+  to { transform: scale(1.08); opacity: 1; }
+}
+html.reduce-motion #scene-transition,
+html.reduce-motion #scene-transition::before,
+html.reduce-motion #scene-transition::after,
+html.reduce-motion #scene-transition .scene-transition-core {
+  animation-duration: .001s !important;
+}

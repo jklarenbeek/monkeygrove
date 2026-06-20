@@ -31,6 +31,7 @@ import { InputController } from './input.js';
 import { RewardService } from './rewards.js';
 import { HubController } from './hub.js';
 import { ChamberFlow } from './chamberflow.js';
+import { runSceneTransition } from './scene-transition.js';
 
 const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
 
@@ -68,6 +69,8 @@ class Game {
     this.hubWelcomed = false; // the hub greeting page shows once per session
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
     this.business = null; // BusinessController, created when entering the shop
+    this.lastHubEntry = null; // portal/build anchor used when returning from a scene
+    this.transitioning = false; // blocks repeated gate/shop entry during transition
     this.avatar = new AvatarRig(this); // player monkey + pet mesh lifecycle (shared by scenes)
     this.input = new InputController(this); // keyboard/touch/camera input + retained zoom
     this.rewards = new RewardService(this); // banana/egg/combo/chest/treat payouts + juice
@@ -261,6 +264,26 @@ class Game {
     this.runChamber();
   }
 
+  async transitionTo(fn, opts = {}) {
+    if (this.transitioning) return false;
+    this.transitioning = true;
+    this.player?.stop();
+    if (this.player) this.player.locked = true;
+    try {
+      await runSceneTransition(fn, opts);
+      return true;
+    } finally {
+      this.transitioning = false;
+      if (this.player) this.player.locked = false;
+    }
+  }
+
+  enterWorldFromPortal(worldId) {
+    this.lastHubEntry = { type: 'portal', worldId };
+    audio.sfx('door');
+    return this.transitionTo(() => this.enterWorld(worldId), { kind: 'portal' });
+  }
+
   runChamber() { this.chamber.runChamber(); }
 
   // Debug/test surface (window.__game.debugChamber): force a skill/kind chamber.
@@ -338,7 +361,7 @@ class Game {
     if (this.mode === 'hub') { this.showTitle(); return; }
     this.verb?.destroy();
     this.verb = null;
-    this.startHub();
+    this.transitionTo(() => this.startHub(), { kind: 'portal' });
   }
 
   // Mode entry points the collaborators (and duel/business) call through the
@@ -352,6 +375,11 @@ class Game {
   }
 
   // ---------- business ----------
+
+  startBusinessFromHub(buildId = 'bakery') {
+    this.lastHubEntry = { type: 'build', id: buildId };
+    return this.transitionTo(() => this.startBusiness(), { kind: 'portal' });
+  }
 
   async startBusiness() {
     if (!isBuilt(this.profile, 'bakery')) return false;

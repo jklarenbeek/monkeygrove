@@ -357,6 +357,31 @@ export class LivingPortal {
     audio.sfx('sparkle');
   }
 
+  enter() {
+    this.glowBoost = 0.9;
+    this.bounce();
+    this.place.fx?.emit(this._fxPos(), 42, {
+      colors: [this.accent, 0xffffff, 0xffd966, 0xc9a6ff],
+      speed: 2.2,
+      up: 2.0,
+      life: 850,
+      spread: 0.42,
+    });
+    tween({
+      ms: 420, ease: ease.outQuad,
+      onUpdate: (v, k) => {
+        const pulse = Math.sin(k * Math.PI);
+        this.body.rotation.y = pulse * Math.PI * 0.18;
+        this.body.scale.set(1 + pulse * 0.18, 1 + pulse * 0.24, 1 + pulse * 0.18);
+      },
+      onDone: () => {
+        this.body.rotation.y = 0;
+        this.body.scale.set(1, 1, 1);
+      },
+    });
+    audio.sfx('sparkle', { pitch: 0.75 });
+  }
+
   // Cartoon jelly-boing that settles back to rest.
   bounce() {
     tween({

@@ -224,8 +224,10 @@ export class HubController {
     this.celebrateGateGrowth(pct, gateStages);
     g.avatar.spawnAvatar();
     const spawn = (g.place.markers.P || [{ x: 11, z: 11 }])[0];
-    g.player.setPlace(g.place, spawn.x, spawn.z);
-    g.avatar.spawnPet(spawn);
+    if (!this.placePlayerAtHubReturn()) {
+      g.player.setPlace(g.place, spawn.x, spawn.z);
+      g.avatar.spawnPet(spawn);
+    }
     g.world.defaultZoom = g.input.sceneZoom('hub');
     g.world.follow(g.player.mesh, 13, { x: g.place.size.w * 0.5, z: g.place.size.d * 0.5 });
     g.player.onArrive = (x, z) => this.hubArrive(x, z);
@@ -263,14 +265,43 @@ export class HubController {
     if (i) persist();
   }
 
+  findHubReturnSpot(anchor) {
+    const place = this.game.place;
+    if (!place || !anchor) return null;
+    let target = null;
+    if (anchor.type === 'portal') target = place.portals?.[anchor.worldId] ?? null;
+    else if (anchor.type === 'build') target = place.buildSpots?.[anchor.id] ?? null;
+    if (!target) return null;
+
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+    for (const [dx, dz] of dirs) {
+      const x = target.x + dx, z = target.z + dz;
+      const c = place.cellAt(x, z);
+      if (!c || !c.walk) continue;
+      return { x, z, face: { dx: target.x - x, dz: target.z - z } };
+    }
+    return null;
+  }
+
+  placePlayerAtHubReturn() {
+    const g = this.game;
+    const spot = this.findHubReturnSpot(g.lastHubEntry);
+    if (!spot) return false;
+    g.player.setPlace(g.place, spot.x, spot.z);
+    g.player.face(spot.face.dx, spot.face.dz);
+    g.avatar.spawnPet({ x: spot.x, z: spot.z });
+    g.lastHubEntry = null;
+    return true;
+  }
+
   hubArrive(x, z) {
     const g = this.game;
     if (g.mode !== 'hub' || !g.place?.portals) return; // stray hop after we left the hub
     g.pet?.notePlayerAt(x, z);
     for (const [worldId, spot] of Object.entries(g.place.portals)) {
       if (spot.x === x && spot.z === z) {
-        audio.sfx('door');
-        g.enterWorld(worldId);
+        g.place.gates?.[worldId]?.enter?.();
+        g.enterWorldFromPortal(worldId);
         return;
       }
     }
@@ -304,7 +335,7 @@ export class HubController {
     if (build) {
       if (build.id === 'bakery' && isBuilt(g.profile, 'bakery')) {
         hud.toast(t('business.open'));
-        g.startBusiness();
+        g.startBusinessFromHub('bakery');
         return true;
       }
       if (build.state === 'unlocked') { this.openIsland(); return true; }
