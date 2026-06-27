@@ -19,6 +19,8 @@ import {
 // ships in its own `business-*` chunk the title/hub never download.
 import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
 import { isBuilt } from './island.js';
+import { ensureStory, refreshStoryLines, worldBands } from './story/engine.js';
+import { lineCeremonies } from './story/chapters.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
@@ -393,7 +395,43 @@ class Game {
 
   // Mode entry points the collaborators (and duel/business) call through the
   // Game shell, which routes them to the owning controller.
-  startHub() { this.hub.startHub(); }
+  //
+  // Before the hub builds, draw any founding-hexagram lines the player just
+  // earned (story mode). On a real transition into the hub — returning from a
+  // chamber/business — play their line-draw ceremony first; on the first
+  // title->hub bootstrap the lines are drawn silently (a remembered older-child
+  // batch shouldn't front-load a pile of pop-ups before the kid even arrives).
+  startHub() {
+    const ceremonial = this.mode !== 'title' && this.mode !== 'hub';
+    const events = ceremonial ? this.collectStoryLineEvents() : (this.collectStoryLineEvents(), []);
+    if (events.length) {
+      screens.showLineCeremony(events, { story: this.profile.story }, () => this.hub.startHub());
+      return;
+    }
+    this.hub.startHub();
+  }
+
+  // Latch newly-earned story lines (persists) and return the ceremony plan. Pure
+  // failures must never block hub entry, so the whole thing is defensive.
+  collectStoryLineEvents() {
+    try {
+      if (!this.profile) return [];
+      const report = masteryReport(this.profile.math, { now: Date.now() });
+      const eligible = eligibleSkillIds(this.profile.curriculum);
+      const story = ensureStory(this.profile);
+      const newly = refreshStoryLines(story, report, eligible);
+      if (!newly.length) return [];
+      persist();
+      const bands = worldBands(report, eligible);
+      const kindByWorld = {};
+      for (const [world, info] of Object.entries(bands)) {
+        kindByWorld[world] = info.band === 'below' ? 'remembered' : 'earned';
+      }
+      return lineCeremonies(newly, kindByWorld);
+    } catch {
+      return [];
+    }
+  }
 
   refreshHudCounts() {
     hud.setBananas(this.profile.bananas);

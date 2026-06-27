@@ -1,6 +1,7 @@
 // Save/load, profiles, settings, streak, economy. localStorage under monkeygrove.*
 import { createMathState } from './mathengine.js';
 import { freshIsland } from './island.js';
+import { freshStory } from './story/engine.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
 import { createCurriculumState, estimateStageFromAge, refreshCurriculumForDate } from './curriculum/placement.js';
 import { getPack } from './curriculum/index.js';
@@ -37,6 +38,7 @@ function freshProfile(name, opts = {}) {
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
+    story: freshStory(),
     curriculum: createCurriculumState({
       age: opts.age,
       birthDate: opts.birthDate,

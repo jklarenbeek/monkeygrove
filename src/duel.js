@@ -9,11 +9,10 @@ import { t } from './i18n.js';
 import { Rng } from './rng.js';
 import { audio } from './audio.js';
 import { BALANCE } from './config.js';
-import { esc } from './screens.js';
+import { esc, WORLD_EMOJI } from './screens.js';
 
 const $ = (id) => document.getElementById(id);
 const host = () => $('screens');
-const WORLD_EMOJI = { tide: '🌊', garden: '🌱', stump: '🥥', vines: '🍇' };
 const ROUNDS = 3;
 
 function render(html) {

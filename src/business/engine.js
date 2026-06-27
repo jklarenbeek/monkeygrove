@@ -316,14 +316,10 @@ function uniq(values) {
   return [...new Set(values)];
 }
 
-function shuffle(values, rng) {
-  const out = [...values];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = rng.int(0, i);
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
+// Seeded shuffle via the shared Rng (rng.shuffle) so review-question option order
+// stays reproducible from the day seed — not a second hand-rolled Fisher–Yates that
+// could silently drift from rng.js.
+const shuffle = (values, rng) => rng.shuffle(values);
 
 function reviewTaskForMode(mode, day, rng) {
   const base = { id: `review:${mode.id}`, kind: 'review', mode: mode.id, objectiveId: mode.objectiveId };

@@ -67,6 +67,17 @@ export const en = {
   'story.2': 'Without numbers the grove turned <b>gray</b>. We forgot how to plant, share and bake!',
   'story.3': 'Will you help bring the numbers home? The island will <b>bloom</b> wherever you do!',
 
+  // story — the line-draw ceremony ("Book of Banana Changes"). Child-safe words
+  // only (no "hexagram"/"yijing"/"binary" — those are author/parent vocabulary).
+  'story.line.title': 'A line returns! ✨',
+  'story.line.earned': 'You brought <b>{world}</b> all the way home — a new line lights up on the island!',
+  'story.line.remembered': 'You already know <b>{world}</b> by heart, so its line draws itself. ✨',
+  'story.line.remembered_batch': 'You already know these shores by heart — their lines draw themselves. ✨',
+  'story.line.friend_home': 'And look — a friend comes home! 💛',
+  'story.balance.label': 'Balance Dial',
+  'story.balance.value': '{n} of 6 lines',
+  'story.complete': 'All six lines are drawn — the grove is whole and in balance again! ☯️',
+
   // hub
   'hub.welcome': 'Welcome back, {name}! 🌴',
   'hub.pick_world': 'Where shall we play?',

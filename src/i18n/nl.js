@@ -65,6 +65,17 @@ export const nl = {
   'story.2': 'Zonder getallen werd het bos <b>grijs</b>. We weten niet meer hoe je plant, deelt en bakt!',
   'story.3': 'Help jij de getallen thuisbrengen? Het eiland gaat <b>bloeien</b> waar jij dat doet!',
 
+  // story — de lijn-tekenceremonie ("Boek der Bananenveranderingen"). Alleen
+  // kindvriendelijke woorden (geen "hexagram"/"yijing"/"binair").
+  'story.line.title': 'Een lijn keert terug! ✨',
+  'story.line.earned': 'Je bracht <b>{world}</b> helemaal thuis — er licht een nieuwe lijn op het eiland op!',
+  'story.line.remembered': 'Je kent <b>{world}</b> al uit je hoofd, dus die lijn tekent zichzelf. ✨',
+  'story.line.remembered_batch': 'Je kent deze kusten al uit je hoofd — hun lijnen tekenen zichzelf. ✨',
+  'story.line.friend_home': 'En kijk — er komt een vriend thuis! 💛',
+  'story.balance.label': 'Balansschijf',
+  'story.balance.value': '{n} van 6 lijnen',
+  'story.complete': 'Alle zes lijnen zijn getekend — het bos is weer heel en in balans! ☯️',
+
   'hub.welcome': 'Welkom terug, {name}! 🌴',
   'hub.pick_world': 'Waar gaan we spelen?',
   'world.tide': 'Getijdenpoel',
