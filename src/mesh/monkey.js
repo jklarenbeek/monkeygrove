@@ -92,3 +92,23 @@ export const monkey = {
     ],
   ],
 };
+
+// Chibi blob: the small follower form used when the monkey is someone else's
+// pet (height ~0.45). Keeps the F/f/S/E/W/N recolor contract so FURS still
+// tint a follower monkey, and a flat head top so it sits like the pet chibis.
+export const monkeyChibi = {
+  palette: {
+    F: '#8a5a3b', f: '#f0d6b3', S: '#ffd9b0',
+    E: '#2e2433', W: '#ffffff', N: '#b87a5e',
+  },
+  layers: [
+    ['.......', '.......', '..F.F..', '..f.f..'],                  // y0 feet
+    ['.......', '.FFFFF.', '.FFFFF.', '.FfffF.'],                  // y1 body
+    ['.......', '.FFFFF.', 'fFFFFFf', '.FfffF.'],                  // y2 body + arms
+    ['.......', '..FFF..', '.FFFFF.', '..FFF..'],                  // y3 neck
+    ['.FFFFF.', 'FFFFFFF', 'FFFFFFF', '.FSSSF.', '..fNf..'],       // y4 head + muzzle + nose
+    ['.FFFFF.', 'fFFFFFf', 'FFFFFFF', 'FEESEEF'],                  // y5 lower eyes + ears
+    ['.FFFFF.', 'fFFFFFf', 'FFFFFFF', 'FWESEWF'],                  // y6 upper eyes + glints
+    ['.......', '.FFFFF.', '.FFFFF.', '..FFF..'],                  // y7 head top
+  ],
+};

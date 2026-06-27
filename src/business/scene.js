@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { TILE } from '../config.js';
 import { Place } from '../chamber.js';
 import { makeCharacter, makeProp, makeTextSprite } from '../entities.js';
-import { PETS, PROPS } from '../models.js';
+import { PROPS, getCreature } from '../models.js';
 import { t } from '../i18n.js';
 import { BUSINESS_CUSTOMERS, RECIPES } from './data.js';
 
@@ -40,6 +40,8 @@ const ZONES = {
       pantry: { x: 2, z: 7, prop: 'shopTable', height: 0.38 },
     },
     queue: [{ x: 3, z: 10 }, { x: 4, z: 10 }, { x: 5, z: 10 }, { x: 6, z: 10 }],
+    // Full-size resident pets standing at the storefront — living set-dressing.
+    ambientPets: [{ id: 'piglet', x: 4, z: 11 }, { id: 'duckling', x: 7, z: 11 }],
   },
   pizzeria: {
     titleKey: 'business.zone.pizzeria',
@@ -56,6 +58,7 @@ const ZONES = {
       pantry: { x: 18, z: 7, prop: 'toppingCrate', height: 0.46 },
     },
     queue: [{ x: 17, z: 10 }, { x: 16, z: 10 }, { x: 15, z: 10 }, { x: 14, z: 10 }],
+    ambientPets: [{ id: 'owl', x: 14, z: 11 }, { id: 'turtle', x: 16, z: 11 }],
   },
 };
 
@@ -134,7 +137,39 @@ export class BusinessPlace extends Place {
       this._placeZone(zoneId, zone);
     }
     this._placeSharedDecor();
+    this._placeAmbientPets();
     this._activateStations('bakery');
+  }
+
+  // Full-size resident pets standing at each storefront — pure set-dressing
+  // that makes the shop feel lived-in. Built once at construction (they persist
+  // across orders) from the full-body creature mesh, with a gentle idle bob.
+  // Their cells are blocked so the player never stands inside a resident.
+  _placeAmbientPets() {
+    this._ambientPets = [];
+    for (const zone of Object.values(this.miniGameZones)) {
+      for (const def of zone.ambientPets || []) {
+        const cell = this.cellAt(def.x, def.z);
+        if (!cell) continue;
+        const creature = getCreature(def.id);
+        const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
+        const p = this.worldPos(def.x, def.z);
+        mesh.position.copy(p);
+        mesh.rotation.y = Math.PI; // face out toward the counter/player
+        this.group.add(mesh);
+        cell.walk = false;
+        const baseY = p.y;
+        const bob = {
+          t: Math.random() * 4,
+          update: (dtMs) => {
+            bob.t += dtMs / 1000;
+            mesh.position.y = baseY + Math.abs(Math.sin(bob.t * 1.8)) * 0.05;
+          },
+        };
+        this.addEntity(bob);
+        this._ambientPets.push(mesh);
+      }
+    }
   }
 
   _placeZone(zoneId, zone) {
@@ -198,13 +233,12 @@ export class BusinessPlace extends Place {
   spawnCustomer(customerId, queueIndex = 0) {
     const customer = BUSINESS_CUSTOMERS[customerId];
     if (!customer) return null;
-    const petDef = PETS.find((pet) => pet.id === customer.petId);
-    if (!petDef) return null;
+    const creature = getCreature(customer.petId);
     const spot = this.queueMarkers[queueIndex] || this.queueMarkers[0];
     if (!spot) return null;
 
     const group = new THREE.Group();
-    const mesh = makeCharacter(petDef.model, 0.55, null, 'business-customer:' + customer.id);
+    const mesh = makeCharacter(creature.full, 0.6, null, 'creature:' + creature.id + ':f');
     group.add(mesh);
     const label = makeTextSprite(t(customer.nameKey), { bg: '#fff8ecdd', scale: 0.48, fontSize: 34 });
     label.position.y = 0.8;
@@ -264,6 +298,7 @@ function cloneZones() {
       ...zone,
       props: [...zone.props],
       queue: zone.queue.map((spot) => ({ ...spot })),
+      ambientPets: (zone.ambientPets || []).map((spot) => ({ ...spot })),
       stations: Object.fromEntries(Object.entries(zone.stations).map(([name, station]) => [
         name,
         { ...station },

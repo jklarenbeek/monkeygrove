@@ -42,7 +42,9 @@ test('createProfile accepts starter pet and explicit placement warmup flag', asy
   const state = await freshStateModule();
   const p = state.createProfile('Ari', { avatarPet: 'owl', placementWarmup: true, today: '2026-06-15' });
   assert.equal(p.avatar.pet, 'owl');
-  assert.deepEqual(p.pets, ['owl']);
+  assert.equal(p.avatar.creature, 'monkey'); // monkey is the default avatar
+  // companions (monkey, mimi) are always owned followers; the starter buddy too
+  assert.deepEqual(p.pets, ['monkey', 'mimi', 'owl']);
   assert.equal(p.flags.needsPlacementWarmup, true);
   assert.equal(p.curriculum.ageAtStart, null);
 });

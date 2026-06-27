@@ -64,9 +64,12 @@ src/
   voxel.js              ASCII voxel models -> merged BufferGeometry with vertex colors
                         and baked AO; geometry cache; one shared material
   mesh/                 one file per character & pet voxel model; index.js
-                        assembles the CHARS / PETS registries
-  models.js             re-exports CHARS/PETS, plus props, hats, portal vine
-                        overlays, ambient critters
+                        assembles the CHARS / PETS registries. creatures.js builds
+                        the unified CREATURES roster (monkey, mimi + 8 pets), each
+                        with a small (chibi) + full (full-body) mesh and avatar/pet
+                        role flags — crab/crabKing stay narrative-only, never here
+  models.js             re-exports CHARS/PETS + CREATURES/getCreature, plus props,
+                        hats, portal vine overlays, ambient critters
   world.js              renderer, fixed-angle iso ortho camera rig, lighting, picking
   chamber.js            diorama builder: ASCII templates + variation, hub island (HubPlace)
   player.js             grid-hop movement w/ squash & stretch, BFS tap-to-walk, carrying
@@ -208,10 +211,16 @@ monkeygrove.save = {
   v: 1,
   profiles: [{
     id, name, created,
-    avatar:  { fur, hat, trail, pet },              // equipped cosmetics + active pet
+    avatar:  { creature, fur, hat, trail, pet },    // chosen body (default 'monkey')
+                                                    // + cosmetics + active follower.
+                                                    // Invariant: pet !== creature
+                                                    // (you never follow yourself).
+                                                    // fur/hat apply only to monkey/mimi.
     bananas,
     egg:     { points, goal },                      // goal grows 1.25× per hatch
-    pets:    [petId],
+    pets:    [creatureId],                          // owned followers; monkey+mimi are
+                                                    // always-owned companions (the egg
+                                                    // pool is still the 8 pets only)
     owned:   { hats: [], furs: ['classic'], trails: [] },
     streak:  { count, lastDay, freezes, giftDay },
     island:  { built: [buildId], seen: [buildId], perkDay },
@@ -311,8 +320,10 @@ The first download has to stay light for kids on slow school Wi-Fi / cheap Andro
 so `npm run build` runs `scripts/check-budget.mjs` after `vite build` and **fails the
 build** if the first load re-bloats (re-run alone with `npm run build:check`). The
 guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
-- **First-load `index` JS ≤ 215 kB gzip** — today 210.09 kB. The bakery sim lives in a
-  lazily-fetched `business-*` chunk (13.78 kB / 4.44 kB gzip), and duels in `duel-*`.
+- **First-load `index` JS ≤ 217 kB gzip** — today ~215.2 kB (bumped from 215 on
+  2026-06-27 for the unified creature roster: 10 new hand-authored character meshes the
+  hub/attract/avatar reference eagerly). The bakery sim lives in a lazily-fetched
+  `business-*` chunk, and duels in `duel-*`.
 - **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { HubPlace } from './chamber.js';
 import { Player, PetFollower } from './player.js';
 import { Particles, makeCharacter, floatLabel } from './entities.js';
-import { PETS } from './models.js';
+import { getCreature } from './models.js';
 import { masteryReport } from './mathengine.js';
 import {
   addBananas, addEggPoints, touchDailyStreak, persist, persistNow, todayString, activeProfile,
@@ -51,7 +51,7 @@ export class HubController {
     // profile's outfit, or the classic starter monkey — never a random
     // costume that could read as a stranger (or as a second Mimi)
     const known = activeProfile();
-    const mesh = g.avatar.makeMonkeyMesh(known?.avatar);
+    const mesh = g.avatar.makeAvatarMesh(known?.avatar);
     g.player = new Player(mesh);
     g.player.headH = 0.95;
     g.player.sfx = false;
@@ -62,9 +62,9 @@ export class HubController {
     // returning kids see their own equipped pet (or none, like in their game);
     // first-time visitors get the bunny — the helper they'll soon meet
     const petId = known ? known.avatar.pet : 'bunny';
-    const petDef = petId ? PETS.find((p) => p.id === petId) : null;
-    if (petDef) {
-      g.pet = new PetFollower(makeCharacter(petDef.model, 0.45, null, 'pet:' + petDef.id));
+    const creature = petId ? getCreature(petId) : null;
+    if (creature && creature.id === petId) {
+      g.pet = new PetFollower(makeCharacter(creature.small, 0.45, null, 'creature:' + creature.id + ':s'));
       const petSpot = g.avatar.findFreeNear(spawn.x, spawn.z) || spawn;
       g.pet.setPlace(g.place, petSpot.x, petSpot.z);
     }
@@ -76,6 +76,8 @@ export class HubController {
       butterflies: 7,
       birds: 3,
       clouds: 4,
+      pets: ['bunny', 'duckling', 'redpanda', 'kitten'],
+      petCount: 3,
       playerPos: () => g.player?.mesh.position,
     }));
     // tour stops: the four gates (each pops its world's math as a sparkle
@@ -237,10 +239,17 @@ export class HubController {
     // birds with mastery, the flower garden build invites extra butterflies
     const builtIds = status.filter((b) => b.state === 'built').map((b) => b.id);
     const avgPct = (pct.tide + pct.garden + pct.stump + pct.vines) / 4 || 0;
+    // A few full-size pets amble around as the grove wakes — never the creature
+    // you ARE, nor the pet already following you (no walking copies of yourself).
+    const avatar = g.profile.avatar || {};
+    const wanderRoster = ['bunny', 'duckling', 'kitten', 'redpanda', 'turtle', 'owl']
+      .filter((id) => id !== avatar.creature && id !== avatar.pet);
     g.place.addEntity(new AmbientLife(g.place, g.rng, {
       butterflies: 2 + Math.round(avgPct * 4) + (builtIds.includes('garden') ? 2 : 0),
       birds: 1 + (builtIds.length >= 3 ? 1 : 0) + (g.profile.flags.festivalDone ? 1 : 0),
       clouds: 2, // same sky the title screen promises
+      pets: wanderRoster,
+      petCount: 1 + Math.round(avgPct * 2) + (builtIds.length >= 3 ? 1 : 0),
       playerPos: () => g.player?.mesh.position,
     }));
   }

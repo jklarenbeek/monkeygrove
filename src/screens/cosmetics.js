@@ -4,7 +4,7 @@ import { render, backBtn, flash, HAT_EMOJI, TRAIL_EMOJI, PET_EMOJI } from './cor
 import { t } from '../i18n.js';
 import { audio } from '../audio.js';
 import { activeProfile, spendBananas, ownItem, equip, persist } from '../state.js';
-import { HATS, FURS, TRAILS, PETS } from '../models.js';
+import { HATS, FURS, TRAILS, PET_CREATURES, getCreature } from '../models.js';
 import { RARITY_STARS, BALANCE } from '../config.js';
 
 // ---------- shop ----------
@@ -20,6 +20,10 @@ export function showShop({ onClose, onChanged }) {
 
   const draw = () => {
     const tab = tabs.find((x) => x.id === cur);
+    // Hats anchor only on the monkey; fur recolours only the monkey/mimi fur
+    // slots. Tell the player so the shop never silently no-ops on a pet avatar.
+    const creature = getCreature(p.avatar.creature);
+    const cosmeticNote = (cur === 'hats' && !creature.hat) || (cur === 'furs' && !creature.fur);
     const el = render(`
       ${backBtn()}
       <h2>🛍️ ${t('shop.title')}</h2>
@@ -27,6 +31,7 @@ export function showShop({ onClose, onChanged }) {
       <div class="menu-row" style="margin-bottom:12px">
         ${tabs.map((x) => `<button class="btn soft" data-tab="${x.id}" ${x.id === cur ? 'style="outline:4px solid var(--sun)"' : ''}>${x.label}</button>`).join('')}
       </div>
+      ${cosmeticNote ? `<div class="form-help" style="margin-bottom:10px">${t('shop.cosmetic_note')}</div>` : ''}
       <div class="card">
         <div class="tile-grid">
           ${tab.items.map((it) => {
@@ -96,13 +101,14 @@ export function showPets({ onClose, onChanged, onHatch }) {
     <div class="card">
       <div style="font-size:14px;color:var(--ink-soft);font-weight:700;margin-bottom:8px">${t('pets.choose')}</div>
       <div class="tile-grid">
-        ${PETS.map((pet) => {
-          const owned = p.pets.includes(pet.id);
-          const equipped = p.avatar.pet === pet.id;
-          return `<div class="tile pressable ${owned ? 'owned' : 'locked'} ${equipped ? 'equipped' : ''}" data-pet="${pet.id}">
-            <div class="t-rarity">${RARITY_STARS[pet.rarity]}</div>
-            <div class="t-icon">${owned ? (PET_EMOJI[pet.id] || '🐾') : '❓'}</div>
-            <div class="t-name">${owned ? t(pet.nameKey) : t('rarity.' + pet.rarity)}</div>
+        ${PET_CREATURES.filter((c) => c.id !== p.avatar.creature).map((c) => {
+          const owned = p.pets.includes(c.id);
+          const equipped = p.avatar.pet === c.id;
+          const stars = c.companion ? '💛' : RARITY_STARS[c.rarity];
+          return `<div class="tile pressable ${owned ? 'owned' : 'locked'} ${equipped ? 'equipped' : ''}" data-pet="${c.id}">
+            <div class="t-rarity">${stars}</div>
+            <div class="t-icon">${owned ? (PET_EMOJI[c.id] || '🐾') : '❓'}</div>
+            <div class="t-name">${owned ? t(c.nameKey) : t('rarity.' + c.rarity)}</div>
             ${equipped ? `<div class="t-price">${t('pets.follow')}</div>` : ''}
           </div>`;
         }).join('')}

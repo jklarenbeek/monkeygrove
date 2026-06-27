@@ -4,6 +4,7 @@ import { getPack } from './curriculum/index.js';
 import { createCurriculumState } from './curriculum/placement.js';
 import { BALANCE } from './config.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
+import { CREATURES, CHARS, HATS, PROPS, AMBIENT } from './models.js';
 
 export const DEV_PRESETS = [
   { id: 'warmup_done', label: 'Warmup done', detail: 'Intro seen, placement complete.' },
@@ -29,6 +30,20 @@ const STYLE = `<style>
 .mg-devtools-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
 .mg-devtools-preset{display:flex;flex-direction:column;gap:3px;align-items:flex-start;text-align:left;width:100%}
 .mg-devtools-preset small{color:var(--ink-soft);font-family:var(--font);font-size:12px;font-weight:800;line-height:1.25}
+.mg-dev-note{color:var(--ink-soft);font-size:12px;font-weight:800;margin-bottom:8px}
+.mg-dev-gallery h4{margin:14px 0 6px;color:var(--ink);font-size:14px;font-weight:950}
+.mg-dev-gallery details{margin-top:8px;border-top:1px dashed var(--cream-2);padding-top:6px}
+.mg-dev-gallery summary{cursor:pointer;font-weight:900;color:var(--ink-soft);font-size:13px;padding:3px 0}
+.mg-dev-creatures{display:grid;grid-template-columns:repeat(auto-fill,minmax(154px,1fr));gap:10px}
+.mg-dev-creature{border:2px solid var(--cream-2);border-radius:12px;padding:6px;background:#fff}
+.mg-dev-creature-h{font-weight:950;font-size:12px;color:var(--ink);text-align:center;margin-bottom:3px}
+.mg-dev-pair{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.mg-dev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:8px;margin-top:6px}
+.mg-dev-model{margin:0;display:flex;flex-direction:column;align-items:center;gap:2px}
+.mg-dev-stage{width:100%;height:74px;display:grid;place-items:center;background:linear-gradient(#eef6ff,#fbf4e6);border-radius:8px;overflow:hidden}
+.mg-dev-voxel{width:88%;height:88%;max-height:66px}
+.mg-dev-model figcaption{font-size:11px;font-weight:900;color:var(--ink-soft);text-align:center;line-height:1.15}
+.mg-dev-model figcaption small{display:block;font-size:9px;color:var(--ink-soft);opacity:.7;font-weight:700}
 </style>`;
 
 function pctValue(summary, world) {
@@ -70,6 +85,106 @@ function manualControlsHtml(summary) {
     </form>`;
 }
 
+// ---------------------------------------------------------------------------
+// Model viewer: render any voxel model as a static isometric SVG, so every
+// mesh can be eyeballed straight from the dev-tools panel. Pure data in, an
+// <svg> string out — no three.js, no canvas, no mount step (the panel is
+// injected as innerHTML). Faces are culled against neighbours (like voxel.js)
+// and painted back-to-front with simple top/right/front shading.
+const ISO = { tw: 14, th: 7, vh: 11 }; // tile width, depth-height, voxel up-height
+
+function shadeHex(hex, f) {
+  const n = parseInt(String(hex).slice(1), 16);
+  if (!Number.isFinite(n)) return hex;
+  const c = (s) => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f)));
+  return `#${((1 << 24) + (c(16) << 16) + (c(8) << 8) + c(0)).toString(16).slice(1)}`;
+}
+
+function voxelSvg(model, opts = {}) {
+  const o = { ...ISO, ...opts };
+  const pal = model?.palette || {};
+  const vox = [];
+  (model?.layers || []).forEach((layer, y) => {
+    layer.forEach((row, z) => {
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '.' || ch === ' ' || !pal[ch]) continue;
+        vox.push({ x, y, z, hex: pal[ch] });
+      }
+    });
+  });
+  if (!vox.length) return '';
+  const occ = new Set(vox.map((v) => `${v.x},${v.y},${v.z}`));
+  const has = (x, y, z) => occ.has(`${x},${y},${z}`);
+  // back-to-front: smaller (x+z) is farther; lower y first within a column
+  vox.sort((a, b) => (a.x + a.z) - (b.x + b.z) || a.y - b.y || a.x - b.x);
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const pt = (x, y, z) => {
+    const sx = (x - z) * (o.tw / 2);
+    const sy = (x + z) * (o.th / 2) - y * o.vh;
+    if (sx < minX) minX = sx; if (sx > maxX) maxX = sx;
+    if (sy < minY) minY = sy; if (sy > maxY) maxY = sy;
+    return `${sx.toFixed(1)},${sy.toFixed(1)}`;
+  };
+  const polys = [];
+  for (const { x, y, z, hex } of vox) {
+    if (!has(x, y + 1, z)) { // top (+y), brightest
+      polys.push(`<polygon points="${pt(x, y + 1, z)} ${pt(x + 1, y + 1, z)} ${pt(x + 1, y + 1, z + 1)} ${pt(x, y + 1, z + 1)}" fill="${hex}"/>`);
+    }
+    if (!has(x + 1, y, z)) { // right (+x)
+      polys.push(`<polygon points="${pt(x + 1, y, z)} ${pt(x + 1, y, z + 1)} ${pt(x + 1, y + 1, z + 1)} ${pt(x + 1, y + 1, z)}" fill="${shadeHex(hex, 0.8)}"/>`);
+    }
+    if (!has(x, y, z + 1)) { // front (+z), darkest
+      polys.push(`<polygon points="${pt(x, y, z + 1)} ${pt(x + 1, y, z + 1)} ${pt(x + 1, y + 1, z + 1)} ${pt(x, y + 1, z + 1)}" fill="${shadeHex(hex, 0.62)}"/>`);
+    }
+  }
+  const pad = 2;
+  const w = (maxX - minX) + pad * 2;
+  const h = (maxY - minY) + pad * 2;
+  return `<svg class="mg-dev-voxel" viewBox="${(minX - pad).toFixed(1)} ${(minY - pad).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}" preserveAspectRatio="xMidYMid meet">${polys.join('')}</svg>`;
+}
+
+function modelCard(model, label, sub) {
+  const art = voxelSvg(model) || '<span style="font-size:11px;color:#b00">empty</span>';
+  return `<figure class="mg-dev-model">
+    <div class="mg-dev-stage">${art}</div>
+    <figcaption>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</figcaption>
+  </figure>`;
+}
+
+function dims(model) {
+  let w = 0;
+  for (const layer of model.layers) for (const row of layer) w = Math.max(w, row.replace(/[. ]+$/, '').length);
+  return `${w}w×${model.layers.length}L`;
+}
+
+function modelGalleryHtml() {
+  const creatures = CREATURES.map((c) => `
+    <div class="mg-dev-creature">
+      <div class="mg-dev-creature-h">${esc(c.id)}${c.isDefault ? ' ★' : ''}${c.companion ? ' 💛' : ''}</div>
+      <div class="mg-dev-pair">
+        ${modelCard(c.small, 'small', dims(c.small))}
+        ${modelCard(c.full, 'full', dims(c.full))}
+      </div>
+    </div>`).join('');
+  const grid = (cards) => `<div class="mg-dev-grid">${cards}</div>`;
+  const npcs = ['crab', 'crabKing'].filter((id) => CHARS[id])
+    .map((id) => modelCard(CHARS[id], id, dims(CHARS[id]))).join('');
+  const hats = HATS.map((h) => modelCard(h.model, h.id, dims(h.model))).join('');
+  const props = Object.entries(PROPS).map(([k, m]) => modelCard(m, k, dims(m))).join('');
+  const ambient = Object.entries(AMBIENT).map(([k, m]) => modelCard(m, k, dims(m))).join('');
+  return `
+    <div class="mg-dev-gallery">
+      <h4>Creature roster — small ↔ full (${CREATURES.length})</h4>
+      <div class="mg-dev-creatures">${creatures}</div>
+      <details><summary>Story NPCs — crab &amp; Crab King (not avatars/pets)</summary>${grid(npcs)}</details>
+      <details><summary>Hats (${HATS.length})</summary>${grid(hats)}</details>
+      <details><summary>Props (${Object.keys(PROPS).length})</summary>${grid(props)}</details>
+      <details><summary>Ambient critters (${Object.keys(AMBIENT).length})</summary>${grid(ambient)}</details>
+    </div>`;
+}
+
 export function renderDevTools({ summary, presets = DEV_PRESETS, open = false } = {}) {
   const toggleHtml = `<button class="btn soft" id="settings-extra-toggle">${open ? 'Hide developer tools' : 'Developer tools'}</button>`;
   const panelHtml = !open ? '' : `
@@ -98,6 +213,11 @@ export function renderDevTools({ summary, presets = DEV_PRESETS, open = false } 
           </button>
         `).join('')}
       </div>
+    </div>
+    <div class="card mg-devtools-panel">
+      <h3>Model viewer</h3>
+      <div class="mg-dev-note">Every voxel model as a front-lit isometric SVG — no need to leave settings. ★ default avatar · 💛 companion.</div>
+      ${modelGalleryHtml()}
     </div>`;
   return { toggleHtml, panelHtml };
 }

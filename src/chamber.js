@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { TILE, STEP_H, PALETTE, WORLD_THEME, MARKERS, FLOOR_CHARS } from './config.js';
 import { makeProp, makeCharacter, makeTextSprite, LivingPortal } from './entities.js';
-import { PROPS, CHARS, PETS } from './models.js';
+import { PROPS, CHARS, getCreature } from './models.js';
 import { BUILDS, applyIslandRows } from './island.js';
 import { Rng } from './rng.js';
 import { nextProblem } from './mathengine.js';
@@ -776,15 +776,14 @@ export class HubPlace extends Place {
 
   // A friend moves in next to their build: idle bounce, tap for a chat.
   _placeNpc(def, spot) {
-    const petDef = PETS.find((p) => p.id === def.npc.pet);
-    if (!petDef) return;
+    const creature = getCreature(def.npc.pet);
     let home = null;
     for (const [dx, dz] of [[0, 1], [1, 0], [-1, 0], [0, -1]]) {
       const c = this.cellAt(spot.x + dx, spot.z + dz);
       if (c && c.walk && FLOOR_CHARS.has(c.ch)) { home = { x: spot.x + dx, z: spot.z + dz }; break; }
     }
     if (!home) return;
-    const mesh = makeCharacter(petDef.model, 0.6, null, 'npc:' + def.npc.pet);
+    const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
     mesh.position.copy(this.worldPos(home.x, home.z));
     this.group.add(mesh);
     this.cellAt(home.x, home.z).walk = false;

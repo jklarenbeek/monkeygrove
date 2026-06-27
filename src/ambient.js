@@ -8,7 +8,8 @@
 // must never share the chamber rng with verbs/stones (duel fairness).
 import * as THREE from 'three';
 import { buildVoxelMesh, withPalette } from './voxel.js';
-import { AMBIENT } from './models.js';
+import { makeCharacter } from './entities.js';
+import { AMBIENT, getCreature } from './models.js';
 import { Rng } from './rng.js';
 import { FLOOR_CHARS } from './config.js';
 
@@ -265,8 +266,75 @@ class Cloud {
   }
 }
 
+// A full-size pet ambling on the walkable floor — pure set-dressing in the same
+// spirit as the birds: hops to a free floor neighbour, pauses, idle-bobs, and
+// shies off the player's cell. Built from the creature's full-body mesh with
+// shadows off to stay cheap. Never sets cell.walk=false (non-blocking cosmetic).
+class WanderingPet {
+  constructor(place, rng, openCells, playerPos, creatureId) {
+    this.place = place;
+    this.rng = rng;
+    this.playerPos = playerPos;
+    const creature = getCreature(creatureId);
+    this.mesh = makeCharacter(creature.full, 0.5, null, 'creature:' + creature.id + ':f');
+    this.mesh.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+    const start = openCells.length ? rng.pick(openCells) : { x: 0, z: 0 };
+    this.cell = { x: start.x, z: start.z };
+    this.mesh.position.copy(place.worldPos(start.x, start.z, 0.02));
+    place.group.add(this.mesh);
+    this.baseScale = this.mesh.scale.x;
+    this.t = rng.float() * 5;
+    this.wait = 900 + rng.float() * 2600;
+    this.hop = null;
+  }
+
+  _playerCell() {
+    const p = this.playerPos?.();
+    if (!p) return null;
+    return {
+      x: Math.round(p.x + this.place.size.w / 2 - 0.5),
+      z: Math.round(p.z + this.place.size.d / 2 - 0.5),
+    };
+  }
+
+  update(dtMs) {
+    const m = this.mesh;
+    this.t += dtMs / 1000;
+    if (this.hop) {
+      this.hop.k += dtMs / 320;
+      const k = Math.min(1, this.hop.k);
+      m.position.lerpVectors(this.hop.from, this.hop.to, k);
+      m.position.y = this.hop.from.y + Math.sin(k * Math.PI) * 0.16;
+      if (k >= 1) { this.cell = this.hop.cell; this.hop = null; }
+      return;
+    }
+    m.scale.set(this.baseScale, this.baseScale * (1 + Math.sin(this.t * 4) * 0.03), this.baseScale);
+    this.wait -= dtMs;
+    if (this.wait > 0) return;
+    this.wait = 900 + this.rng.float() * 2600;
+    const pc = this._playerCell();
+    const dirs = this.rng.shuffle([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+    for (const [dx, dz] of dirs) {
+      const nx = this.cell.x + dx, nz = this.cell.z + dz;
+      if (pc && pc.x === nx && pc.z === nz) continue; // never hop onto the player
+      const c = this.place.cellAt(nx, nz);
+      if (!c || !c.walk || c.h !== 0 || !FLOOR_CHARS.has(c.ch)) continue;
+      m.rotation.y = Math.atan2(dx, dz);
+      this.hop = {
+        from: m.position.clone(),
+        to: this.place.worldPos(nx, nz, 0.02),
+        k: 0,
+        cell: { x: nx, z: nz },
+      };
+      break;
+    }
+  }
+}
+
 export class AmbientLife {
-  constructor(place, rng, { butterflies = 0, birds = 0, clouds = 0, playerPos = null } = {}) {
+  constructor(place, rng, {
+    butterflies = 0, birds = 0, clouds = 0, pets = [], petCount = 0, playerPos = null,
+  } = {}) {
     this.place = place;
     this.rng = new Rng(rng.int(1, 1e9)); // own stream — never skews game rng
     this.playerPos = playerPos;
@@ -298,11 +366,20 @@ export class AmbientLife {
       this.birds.push(null);
       this.birdTimers.push(i === 0 ? 600 : this.rng.float() * 9000);
     }
+    // Wandering full-size pets, hard-capped at 4 for the draw-call budget.
+    this.wanderers = [];
+    const petCap = Math.min(petCount, 4, this.openCells.length);
+    for (let i = 0; i < petCap && pets.length; i++) {
+      this.wanderers.push(
+        new WanderingPet(place, this.rng, this.openCells, this.playerPos, pets[i % pets.length]),
+      );
+    }
   }
 
   update(dtMs) {
     for (const c of this.clouds) c.update(dtMs);
     for (const b of this.butterflies) b.update(dtMs);
+    for (const w of this.wanderers) w.update(dtMs);
     for (let i = 0; i < this.birds.length; i++) {
       const bird = this.birds[i];
       if (bird && !bird.done) { bird.update(dtMs); continue; }

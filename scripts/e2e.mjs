@@ -64,13 +64,17 @@ try {
   assert.ok(await present('#game-canvas'), 'game canvas exists');
   assert.equal(await evalp('(() => { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); })()'), true, 'WebGL is available');
 
-  // 2. title -> new-explorer form
+  // 2. title -> open the new-explorer wizard
   await click('#attract-start');
-  await waitSel('#new-go');
+  await waitSel('#tile-new');
+  await click('#tile-new');
+  await waitSel('#new-name');
 
-  // 3. create a profile (birth date avoids nothing here; we skip warm-up next)
+  // 3. create a profile: name + default avatar (monkey) on step 1, then the
+  //    learning-trail step. The avatar-creature grid defaults to monkey.
   await fill('#new-name', 'E2E');
-  await fill('#new-birth-date', '2015-06-18');
+  await click('#wizard-next');
+  await waitSel('#new-go');
   await click('#new-go');
 
   // 4. through the intro story, then the warm-up

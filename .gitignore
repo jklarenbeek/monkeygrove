@@ -7,3 +7,4 @@ docs/superpowers/
 .vite-smoke*.log
 .codex-remote-attachments/
 TODO*.md
+PROGRESS*.md

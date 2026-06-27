@@ -22,7 +22,7 @@ test('task 5 wiring exists for playful explorer wizard and warmup flow', () => {
   assert.doesNotMatch(screens, /id="new-age"/);
   assert.doesNotMatch(screens, /id="new-birth-date"/);
   assert.match(screens, /id="new-pack"/);
-  assert.match(screens, /createProfile\(name, \{ age, packId, avatarPet, placementWarmup \}\)/);
+  assert.match(screens, /createProfile\(name, \{ age, packId, avatarPet, avatarCreature, placementWarmup \}\)/);
   assert.match(screens, /let explorerName = '';/);
   assert.match(screens, /explorerName = wizard\.querySelector\('#new-name'\)\?\.value\.trim\(\) \|\| explorerName;/);
   assert.match(screens, /playerCard\.classList\.add\('hidden'\)/);

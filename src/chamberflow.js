@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { Place, TEMPLATES, ensureHostable, varyLayout, scatterFetchSpots } from './chamber.js';
 import { Particles, Crab, Altar, makeCharacter, makeProp, floatLabel } from './entities.js';
 import { VERBS } from './verbs.js';
-import { PETS, PROPS } from './models.js';
+import { PROPS, getCreature } from './models.js';
 import { nextProblem, recordResult } from './mathengine.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import { addBananas, persist } from './state.js';
@@ -127,8 +127,8 @@ export class ChamberFlow {
     const mSpot = (g.place.markers.M || [])[0];
     if (mSpot) {
       const def = HELPERS[g.currentWorld] || HELPERS.garden;
-      const petDef = PETS.find((p) => p.id === def.pet);
-      const mesh = makeCharacter(petDef.model, 0.62, null, 'helper:' + def.pet);
+      const creature = getCreature(def.pet);
+      const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
       mesh.position.copy(g.place.worldPos(mSpot.x, mSpot.z));
       g.place.group.add(mesh);
       g.place.cellAt(mSpot.x, mSpot.z).walk = false;

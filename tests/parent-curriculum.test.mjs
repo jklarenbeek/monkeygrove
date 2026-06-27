@@ -97,7 +97,7 @@ test('new explorer wizard sends trail placement and default curriculum pack into
   assert.doesNotMatch(screensSource, /id="new-birth-date"/);
   assert.match(screensSource, /const trail = TRAIL_CHOICES\.find\(\(choice\) => choice\.id === selectedTrail\)/);
   assert.match(screensSource, /const packId = el\.querySelector\('#new-pack'\)\.value/);
-  assert.match(screensSource, /createProfile\(name, \{ age, packId, avatarPet, placementWarmup \}\)/);
+  assert.match(screensSource, /createProfile\(name, \{ age, packId, avatarPet, avatarCreature, placementWarmup \}\)/);
 });
 
 test('showParents renders translated curriculum coverage without exposing internal ids', async () => {

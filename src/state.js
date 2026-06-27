@@ -5,6 +5,7 @@ import { BALANCE, RARITY_WEIGHTS } from './config.js';
 import { createCurriculumState, estimateStageFromAge, refreshCurriculumForDate } from './curriculum/placement.js';
 import { getPack } from './curriculum/index.js';
 import { createBusinessState, ensureBusinessState } from './business/engine.js';
+import { DEFAULT_CREATURE_ID, COMPANION_IDS } from './mesh/creatures.js';
 
 const KEY = 'monkeygrove.save';
 const VERSION = 1;
@@ -16,15 +17,23 @@ let saveTimer = null;
 
 function freshProfile(name, opts = {}) {
   const avatarPet = typeof opts.avatarPet === 'string' && opts.avatarPet ? opts.avatarPet : null;
+  const avatarCreature = typeof opts.avatarCreature === 'string' && opts.avatarCreature
+    ? opts.avatarCreature : DEFAULT_CREATURE_ID;
   const lang = normalizeLang(opts.lang, 'en');
+  // Companions (monkey, mimi) are always owned so they can tag along as pets;
+  // the starter buddy is owned too. A follower can never be the creature you ARE.
+  const startingPets = [...new Set([...COMPANION_IDS, ...(avatarPet ? [avatarPet] : [])])];
   return {
     id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
     name,
     lang,
-    avatar: { fur: 'classic', hat: null, trail: null, pet: avatarPet },
+    avatar: {
+      creature: avatarCreature, fur: 'classic', hat: null, trail: null,
+      pet: avatarPet && avatarPet !== avatarCreature ? avatarPet : null,
+    },
     bananas: 0,
     egg: { points: 0, goal: BALANCE.eggGoal },
-    pets: avatarPet ? [avatarPet] : [],
+    pets: startingPets,
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
@@ -157,6 +166,13 @@ function healSave(s) {
     if (!isObject(p.avatar)) p.avatar = structuredClone(ref.avatar);
     for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
     for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
+    // Companions (monkey, mimi) are always-owned followers — grant them to any
+    // save that predates them so they never appear as locked '?' pet tiles.
+    if (Array.isArray(p.pets)) {
+      for (const id of COMPANION_IDS) if (!p.pets.includes(id)) p.pets.push(id);
+    }
+    // Identity invariant: your follower can never be the creature you ARE.
+    if (p.avatar.pet && p.avatar.pet === p.avatar.creature) p.avatar.pet = null;
     p.lang = normalizeLang(missingLang ? undefined : p.lang, normalizeLang(s.settings?.lang, detectLang()));
     if (!isObject(p.curriculum)) p.curriculum = createCurriculumState();
     const ageCapturedOn = p.curriculum.ageCapturedOn || dayFromTimestamp(p.created);
@@ -359,5 +375,8 @@ export function ownItem(p, kind, id) {
 
 export function equip(p, slot, id) {
   p.avatar[slot] = id;
+  // Switching your avatar creature to the one currently following you would
+  // make two of you — drop the follower so you never trail a copy of yourself.
+  if (slot === 'creature' && p.avatar.pet === id) p.avatar.pet = null;
   persist();
 }

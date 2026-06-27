@@ -99,3 +99,23 @@ export const mimi = {
     ],
   ],
 };
+
+// Chibi blob: Mimi's small follower form (height ~0.45) when she tags along as
+// a pet instead of guiding from the hub. Keeps her warmer fur + flower.
+export const mimiChibi = {
+  palette: {
+    F: '#9c6b4a', f: '#f5dfc0', S: '#ffdcb8', E: '#2e2433',
+    W: '#ffffff', N: '#c08a6a', P: '#ffb3c6', Y: '#ffe28a',
+  },
+  layers: [
+    ['.......', '.......', '..F.F..', '..f.f..'],                  // y0 feet
+    ['.......', '.FFFFF.', '.FFFFF.', '.FfffF.'],                  // y1 body
+    ['.......', '.FFFFF.', 'fFFFFFf', '.FfffF.'],                  // y2 body + arms
+    ['.......', '..FFF..', '.FFFFF.', '..FFF..'],                  // y3 neck
+    ['.FFFFF.', 'FFFFFFF', 'FFFFFFF', '.FSSSF.', '..fNf..'],       // y4 head + muzzle + nose
+    ['.FFFFF.', 'fFFFFFf', 'FFFFFFF', 'FEESEEF'],                  // y5 lower eyes + ears
+    ['.FFFFF.', 'fFFFFFf', 'FFFFFFF', 'FWESEWF'],                  // y6 upper eyes + glints
+    ['.......', '.FFFFF.', '.FFFFF.', '..FFF..'],                  // y7 head top
+    ['.......', '...P...', '..PYP..', '...P...'],                  // y8 flower
+  ],
+};

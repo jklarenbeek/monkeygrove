@@ -6,7 +6,7 @@ import { languageButton } from '../langFlags.js';
 import { audio } from '../audio.js';
 import { profiles, settings, createProfile, deleteProfile, persistNow } from '../state.js';
 import { listPacks } from '../curriculum/index.js';
-import { PETS } from '../models.js';
+import { PETS, AVATAR_CREATURES } from '../models.js';
 import { curriculumPackLabel } from './parents.js';
 
 
@@ -142,10 +142,12 @@ export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
   const starterPets = STARTER_PET_IDS.map((id) => PETS.find((pet) => pet.id === id)).filter(Boolean);
   let wizardStep = 1;
   let selectedPet = starterPets[0]?.id || null;
+  let selectedCreature = 'monkey';
   let selectedTrail = 'unsure';
   let explorerName = '';
 
-  const profileIcon = (profile) => PET_EMOJI[profile.avatar?.pet] || '🐵';
+  const profileIcon = (profile) => PET_EMOJI[profile.avatar?.creature]
+    || PET_EMOJI[profile.avatar?.pet] || '🐵';
   const petName = (id) => t(PETS.find((pet) => pet.id === id)?.nameKey || 'pets.title');
 
   const el = render(`
@@ -200,6 +202,15 @@ export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
           <div class="wizard-panel name-panel">
             <div class="wizard-kicker">${esc(t('title.wizard_name_title'))}</div>
             <input id="new-name" class="wizard-input" maxlength="14" value="${esc(explorerName)}" placeholder="${esc(t('title.name_prompt'))}">
+            <div class="wizard-kicker pet-kicker">${esc(t('title.wizard_avatar_title'))}</div>
+            <div class="starter-pet-grid">
+              ${AVATAR_CREATURES.map((c) => `
+                <button class="tile pressable starter-pet ${selectedCreature === c.id ? 'equipped' : ''}" data-avatar-creature="${esc(c.id)}" aria-pressed="${selectedCreature === c.id}">
+                  <div class="voxel-plinth"><span>${PET_EMOJI[c.id] || '🐾'}</span></div>
+                  <div class="t-name">${esc(t(c.nameKey))}</div>
+                </button>
+              `).join('')}
+            </div>
             <div class="wizard-kicker pet-kicker">${esc(t('title.wizard_pet_title'))}</div>
             <div class="starter-pet-grid">
               ${starterPets.map((pet) => `
@@ -241,6 +252,14 @@ export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
       btn.addEventListener('click', () => {
         explorerName = wizard.querySelector('#new-name')?.value.trim() || explorerName;
         selectedPet = btn.dataset.starterPet;
+        audio.sfx('click');
+        renderWizard();
+      });
+    }
+    for (const btn of wizard.querySelectorAll('[data-avatar-creature]')) {
+      btn.addEventListener('click', () => {
+        explorerName = wizard.querySelector('#new-name')?.value.trim() || explorerName;
+        selectedCreature = btn.dataset.avatarCreature;
         audio.sfx('click');
         renderWizard();
       });
@@ -318,8 +337,9 @@ export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
     const age = trail?.age ?? null;
     const packId = el.querySelector('#new-pack').value;
     const avatarPet = selectedPet;
+    const avatarCreature = selectedCreature;
     const placementWarmup = !!trail?.placementWarmup;
-    const p = createProfile(name, { age, packId, avatarPet, placementWarmup });
+    const p = createProfile(name, { age, packId, avatarPet, avatarCreature, placementWarmup });
     audio.sfx('correct');
     onPlay(p.id, true);
   };

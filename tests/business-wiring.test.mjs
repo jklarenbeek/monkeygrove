@@ -125,7 +125,8 @@ test('business scene source declares the place, factories, and customer model wi
   assert.match(source, /from\s+['"]\.\.\/entities\.js['"]/);
   assert.match(source, /from\s+['"]\.\.\/models\.js['"]/);
   assert.match(source, /from\s+['"]\.\/data\.js['"]/);
-  assert.ok(source.includes('makeCharacter(petDef.model'), 'spawnCustomer uses the helper pet model');
+  assert.match(source, /getCreature\(customer\.petId\)/);
+  assert.ok(source.includes('makeCharacter(creature.full'), 'spawnCustomer renders the full-body creature mesh');
   assert.match(source, /spawnCustomer\s*\(\s*customerId\s*,\s*queueIndex\s*=\s*0\s*\)/);
   assert.match(source, /clearCustomers\s*\(/);
   assert.match(source, /stationAt\s*\(\s*x\s*,\s*z\s*\)/);

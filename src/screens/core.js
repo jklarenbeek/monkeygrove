@@ -9,6 +9,7 @@ const $ = (id) => document.getElementById(id);
 const host = () => $('screens');
 
 export const PET_EMOJI = {
+  monkey: '🐵', mimi: '🐒',
   bunny: '🐰', duckling: '🐥', kitten: '🐱', piglet: '🐷',
   redpanda: '🦊', turtle: '🐢', owl: '🦉', dragon: '🐉',
 };

@@ -9,6 +9,15 @@ import { CHARS, PETS } from './mesh/index.js';
 
 export { CHARS, PETS };
 
+// Unified creature roster (monkey, mimi + 8 pets), each with a small (chibi)
+// and full (full-body) mesh + avatar/pet role flags. crab/crabKing are NOT in
+// here — see src/mesh/creatures.js. Avatar/pet/set-dressing code resolves
+// creatures through getCreature() instead of reaching into CHARS/PETS directly.
+export {
+  CREATURES, CREATURE_IDS, DEFAULT_CREATURE_ID, COMPANION_IDS,
+  AVATAR_CREATURES, PET_CREATURES, getCreature,
+} from './mesh/creatures.js';
+
 // Hat models are positioned with their y0 at this monkey layer (the small
 // crown cap at y11 lets hats hug the head instead of hovering).
 export const MONKEY_HAT_Y = 11;

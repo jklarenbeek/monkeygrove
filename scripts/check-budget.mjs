@@ -18,7 +18,10 @@ import { join } from 'node:path';
 // versions, tight enough to catch a re-bloating feature (a font is 100+ KB, a
 // folded-back chunk a few KB gzip). Recorded post-TODO_01/02 (2026-06-18):
 // index 210.09 kB gzip, precache 15 entries / 1088.28 KiB.
-const INDEX_JS_GZIP_BUDGET_KB = 215;   // decimal kB (÷1000), matches Vite's report
+// 2026-06-27: bumped 215 -> 217 for the unified creature roster — 10 new
+// hand-authored character meshes (8 full-body pets + chibi monkey/mimi) that the
+// hub/attract/avatar reference eagerly (~1.5 kB gzip). index now ~215.2 kB gzip.
+const INDEX_JS_GZIP_BUDGET_KB = 217;   // decimal kB (÷1000), matches Vite's report
 const PRECACHE_BUDGET_KIB = 1150;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
