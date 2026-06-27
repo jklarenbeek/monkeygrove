@@ -161,7 +161,7 @@ export function showHatch(pet, onDone) {
 // ---------- island restoration (Mimi's worktable) ----------
 
 // status: islandStatus() rows — built ✓, unlocked (fund button), locked (?).
-export function showIsland({ profile, status, onClose, onFund, onAltar = null }) {
+export function showIsland({ profile, status, onClose, onFund, onAltar = null, bloom = null }) {
   const built = status.filter((b) => b.state === 'built').length;
   const row = (icon, title, sub, right, dim = false) => `
     <div class="skill-row" ${dim ? 'style="opacity:.55"' : ''}>
@@ -177,6 +177,7 @@ export function showIsland({ profile, status, onClose, onFund, onAltar = null })
     <div class="menu-row" style="margin-bottom:10px">
       <div class="chip"><span class="chip-icon">🔨</span>${t('island.progress', { n: built, total: status.length })}</div>
       <div class="chip"><span class="chip-icon">🍌</span>${profile.bananas}</div>
+      ${bloom ? `<div class="chip"><span class="chip-icon">☯️</span>${t('story.balance.value', { n: bloom.linesDrawn })}</div>` : ''}
       ${onAltar ? `<button class="btn soft" id="island-altar">${t('altar.open')}</button>` : ''}
     </div>
     <div class="card">

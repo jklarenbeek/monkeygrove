@@ -511,9 +511,13 @@ export const HUB_PORTALS = { t: 'tide', g: 'garden', u: 'stump', y: 'vines' };
 // gateStages: last celebrated living-gate stage per world (the display floor —
 // gates are built at this stage so a fresh stage-up can visibly grow in).
 export class HubPlace extends Place {
-  constructor(world, masteryPct, island = {}, gateStages = {}) {
+  constructor(world, masteryPct, island = {}, gateStages = {}, storyBloom = 0) {
     super(world, 'hub');
     this.island = { built: [], unlocked: [], crabKing: false, festival: false, ...island };
+    // story-mode wholeness (0..1): an island-wide bloom floor so the whole grove
+    // — including the village center far from any world portal — gently gains
+    // colour as the founding hexagram is restored. 0 keeps the pre-story behaviour.
+    this.storyBloom = storyBloom;
     this.buildFrom(applyIslandRows(TEMPLATES.hub[0], this.island.built), { seed: 777 });
     this.portals = {};
     this.gates = {};
@@ -810,6 +814,8 @@ export class HubPlace extends Place {
   applyBloom(pct) {
     const gray = new THREE.Color(PALETTE.gray);
     const color = new THREE.Color();
+    // island-wide bloom floor from story progress (whole grove blooms together)
+    const floor = this.island.festival ? 1 : Math.min(1, this.storyBloom || 0);
     for (const it of this.floorList) {
       // nearest portal decides the region
       let best = null, bestD = 1e9;
@@ -817,8 +823,10 @@ export class HubPlace extends Place {
         const dd = Math.abs(it.x - spot.x) + Math.abs(it.z - spot.z);
         if (dd < bestD) { bestD = dd; best = worldId; }
       }
-      if (best === null || bestD > 7) continue;
-      const p = this.island.festival ? 1 : Math.min(1, (pct?.[best] ?? 0) * 1.15);
+      const regional = (best !== null && bestD <= 7)
+        ? Math.min(1, (pct?.[best] ?? 0) * 1.15) : 0;
+      const p = this.island.festival ? 1 : Math.max(regional, floor);
+      if (p <= 0) continue; // still pure gray — far from any world and no story bloom yet
       color.setHex(this._floorColors(it.c, it.x, it.z, {}));
       color.lerpColors(gray, color, 0.25 + 0.75 * p);
       this.floor.setColorAt(it.c.instanceId, color);

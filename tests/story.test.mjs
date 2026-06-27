@@ -22,6 +22,7 @@ import {
 import {
   CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS,
 } from '../src/story/chapters.js';
+import { echoShadow, neighborHexes, stepDistance, isGentleStep } from '../src/story/pacing.js';
 
 // A masteryReport skeleton with a chosen set of mastered skill ids.
 function reportWith(mastered = []) {
@@ -245,6 +246,26 @@ test('narrative beats point at the two narrative lines', () => {
   assert.equal(NARRATIVE_BEATS.reveal.lineIndex, 1);
   assert.equal(NARRATIVE_BEATS.finale.lineIndex, 5);
   assert.ok(NARRATIVE_BEATS.reveal.pages.length >= 1);
+});
+
+// ---------------------------------------------------------------------------
+// Pacing & reflection helpers (the Gray Echo Realm + the gentle ramp).
+
+test('the Echo Realm is the island inverted, and roots invert to roots', () => {
+  assert.equal(echoShadow(0), 63);                  // all-yin -> all-yang
+  assert.equal(echoShadow(FOUNDING_HEXAGRAM), 21);  // After Completion <-> Before Completion (both roots)
+  assert.equal(echoShadow(echoShadow(42)), 42);     // inversion is its own undo
+});
+
+test('the gentle ramp is a one-line (gray-code) step', () => {
+  const six = neighborHexes(FOUNDING_HEXAGRAM);
+  assert.equal(six.length, 6);
+  for (const n of six) {
+    assert.equal(stepDistance(FOUNDING_HEXAGRAM, n), 1, 'each neighbour is one line away');
+    assert.equal(isGentleStep(FOUNDING_HEXAGRAM, n), true);
+  }
+  assert.equal(isGentleStep(0, 63), false);         // the whole flip is NOT gentle
+  assert.equal(stepDistance(0, 63), 6);
 });
 
 test('ensureStory heals a save that predates story mode', () => {

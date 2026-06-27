@@ -66,6 +66,7 @@ export const en = {
   'story.1': 'Oh no! The <b>Crab King</b> pinched all the numbers of our island…',
   'story.2': 'Without numbers the grove turned <b>gray</b>. We forgot how to plant, share and bake!',
   'story.3': 'Will you help bring the numbers home? The island will <b>bloom</b> wherever you do!',
+  'story.4': 'Our island was once <b>one whole thing</b>. We’ll weave it back together — <b>one gentle line at a time</b>. ☯️',
 
   // story — the line-draw ceremony ("Book of Banana Changes"). Child-safe words
   // only (no "hexagram"/"yijing"/"binary" — those are author/parent vocabulary).
@@ -191,7 +192,7 @@ export const en = {
   'play.correct.2': 'Wonderful!',
   'play.correct.3': 'You can really see it now!',
   'play.correct.4': 'Banana-tastic!',
-  'play.echo_door': 'A shimmering door appeared… treasure inside! ✨',
+  'play.echo_door': 'The <b>Echo Realm</b> shimmers open — the island’s quiet reflection. Tend it and it stays bright! ✨',
   'play.echo_enter': 'Peek inside',
   'play.skip': 'Onwards!',
   'play.exit_confirm': 'Back to the island?',

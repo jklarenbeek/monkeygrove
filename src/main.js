@@ -437,11 +437,22 @@ class Game {
         }
       }
 
-      // The Four-Directions reveal draws the second line once the first shore is home.
+      // The Four-Directions reveal draws the second line once the first shore is
+      // home — but only at the moment its beat plays, so a preceding line-draw
+      // ceremony still shows the honest "1 of 6" before this one says "2 of 6".
+      // (No ceremony — the silent bootstrap — latches it eagerly instead.)
       if (dueNarrativeBeat(story) === 'reveal') {
-        drawNarrativeLine(story, NARRATIVE_BEATS.reveal.lineIndex);
-        changed = true;
-        if (withCeremony) queue.push((done) => screens.showStoryBeat('reveal', { story }, done));
+        const revealIdx = NARRATIVE_BEATS.reveal.lineIndex;
+        if (withCeremony) {
+          queue.push((done) => {
+            drawNarrativeLine(story, revealIdx);
+            persist();
+            screens.showStoryBeat('reveal', { story }, done);
+          });
+        } else {
+          drawNarrativeLine(story, revealIdx);
+          changed = true;
+        }
       }
 
       if (changed) persist();

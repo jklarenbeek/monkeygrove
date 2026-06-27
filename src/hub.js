@@ -19,7 +19,7 @@ import {
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines } from './mimi.js';
-import { ensureStory, drawNarrativeLine } from './story/engine.js';
+import { ensureStory, drawNarrativeLine, islandBloom } from './story/engine.js';
 import { AmbientLife } from './ambient.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
@@ -216,12 +216,13 @@ export class HubController {
     // living gates are built at their last celebrated stage, so growth since
     // the previous visit can pop in before the player's eyes (never shrinks)
     const gateStages = g.profile.flags.portalStages || (g.profile.flags.portalStages = {});
+    const storyBloom = islandBloom(ensureStory(g.profile)).wholeness;
     g.place = new HubPlace(g.world, pct, {
       built: status.filter((b) => b.state === 'built').map((b) => b.id),
       unlocked: status.filter((b) => b.state === 'unlocked').map((b) => b.id),
       crabKing: !!g.profile.flags.festivalDone,
       festival: !!g.profile.flags.festivalDone,
-    }, gateStages);
+    }, gateStages, storyBloom);
     g.particles = new Particles(g.place.group);
     g.place.fx = g.particles;
     this.celebrateGateGrowth(pct, gateStages);
@@ -497,6 +498,7 @@ export class HubController {
     screens.showIsland({
       profile: g.profile,
       status: islandStatus(g.profile, report),
+      bloom: islandBloom(ensureStory(g.profile)),
       onClose: () => screens.closeScreen(),
       onFund: (id) => this.fundBuild(id),
       onAltar: () => screens.showAltar({

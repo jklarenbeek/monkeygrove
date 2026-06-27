@@ -11,7 +11,11 @@ import { NARRATIVE_BEATS } from '../story/chapters.js';
 
 // Six stacked lines, line 6 (top) -> line 1 (bottom). Drawn lines are solid and
 // bright; not-yet-drawn lines sit faint at their eventual yang/yin shape. The
-// line(s) being celebrated this beat pulse.
+// line(s) being celebrated this beat pulse. Exported so the intro can show the
+// same motif (a fallen, all-faint island) as a through-line into the ceremonies.
+export function storyHexagram(story, highlight = []) {
+  return hexagramHtml(story, highlight);
+}
 function hexagramHtml(story, highlight = []) {
   const hi = new Set(highlight);
   let rows = '';

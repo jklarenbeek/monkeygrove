@@ -64,6 +64,7 @@ export const nl = {
   'story.1': 'O nee! De <b>Krabbenkoning</b> heeft alle getallen van ons eiland gejat…',
   'story.2': 'Zonder getallen werd het bos <b>grijs</b>. We weten niet meer hoe je plant, deelt en bakt!',
   'story.3': 'Help jij de getallen thuisbrengen? Het eiland gaat <b>bloeien</b> waar jij dat doet!',
+  'story.4': 'Ons eiland was ooit <b>één geheel</b>. We weven het weer aan elkaar — <b>één rustige lijn tegelijk</b>. ☯️',
 
   // story — de lijn-tekenceremonie ("Boek der Bananenveranderingen"). Alleen
   // kindvriendelijke woorden (geen "hexagram"/"yijing"/"binair").
@@ -187,7 +188,7 @@ export const nl = {
   'play.correct.2': 'Geweldig!',
   'play.correct.3': 'Nu zie je het écht!',
   'play.correct.4': 'Bananen-tastisch!',
-  'play.echo_door': 'Er verscheen een glinsterende deur… met schatten! ✨',
+  'play.echo_door': 'Het <b>Echorijk</b> glinstert open — de stille spiegeling van het eiland. Onderhoud het en het blijft stralen! ✨',
   'play.echo_enter': 'Kijk binnen',
   'play.skip': 'Verder!',
   'play.exit_confirm': 'Terug naar het eiland?',

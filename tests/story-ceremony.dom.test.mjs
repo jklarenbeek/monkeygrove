@@ -6,7 +6,7 @@
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { setLang } from '../src/i18n.js';
-import { showLineCeremony, showStoryBeat, showAltar } from '../src/screens.js';
+import { showLineCeremony, showStoryBeat, showAltar, showIsland } from '../src/screens.js';
 import { freshStory } from '../src/story/engine.js';
 import { lineCeremonies } from '../src/story/chapters.js';
 
@@ -64,6 +64,23 @@ test('the reveal beat steps through its prose pages then finishes', () => {
   assert.equal(done, false);
   host().querySelector('#story-next').click(); // finish
   assert.equal(done, true);
+});
+
+test('the worktable shows the persistent bloom chip and opens the Altar', () => {
+  let altarOpened = false;
+  showIsland({
+    profile: { bananas: 10 },
+    status: [{ id: 'lanterns', state: 'unlocked', emoji: '🏮', playerCost: 30 }],
+    bloom: { linesDrawn: 3 },
+    onClose: () => {},
+    onFund: () => {},
+    onAltar: () => { altarOpened = true; },
+  });
+  assert.match(host().textContent, /3 of 6/, 'bloom chip shows lines drawn');
+  const altarBtn = host().querySelector('#island-altar');
+  assert.ok(altarBtn, 'altar button renders');
+  altarBtn.click();
+  assert.equal(altarOpened, true);
 });
 
 test('the Altar renders the balance reading and closes', () => {

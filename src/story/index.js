@@ -2,3 +2,5 @@
 // chapter ceremonies / UI land in a later session (src/screens/story.js).
 export * from './constants.js';
 export * from './engine.js';
+export * from './chapters.js';
+export * from './pacing.js';

@@ -1,6 +1,7 @@
 // Intro flow overlays: the attract loop, the title / player-select, the story
 // pages, and the Crab King finale.
 import { render, esc, PET_EMOJI, flash } from './core.js';
+import { storyHexagram } from './story.js';
 import { t, setLang } from '../i18n.js';
 import { languageButton } from '../langFlags.js';
 import { audio } from '../audio.js';
@@ -373,13 +374,19 @@ export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
 }
 // ---------- story intro ----------
 
+// Chapter 0 — "The One": the island was one whole thing, the Crab King split it
+// and the grove went gray, and you'll weave it back one gentle line at a time.
+// The fallen island (the all-faint founding hexagram) sits above the words as the
+// through-line into the line-draw ceremonies the rest of the game pays off.
 export function showStory(onDone) {
   let step = 0;
-  const lines = [t('story.1'), t('story.2'), t('story.3')];
-  const faces = ['🦀', '🐵', '🌴'];
+  const lines = [t('story.1'), t('story.2'), t('story.3'), t('story.4')];
+  const faces = ['🦀', '🌫️', '🌴', '☯️'];
+  const fallen = { lines: [false, false, false, false, false, false] };
   const el = render(`
     <div style="flex:1"></div>
     <div class="card" style="text-align:center">
+      <div style="margin-bottom:10px">${storyHexagram(fallen)}</div>
       <div id="story-face" style="font-size:64px">${faces[0]}</div>
       <div id="story-text" style="font-size:20px;font-weight:700;line-height:1.4;min-height:64px">${lines[0]}</div>
     </div>
