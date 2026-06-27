@@ -6,7 +6,7 @@
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { setLang } from '../src/i18n.js';
-import { showLineCeremony } from '../src/screens.js';
+import { showLineCeremony, showStoryBeat, showAltar } from '../src/screens.js';
 import { freshStory } from '../src/story/engine.js';
 import { lineCeremonies } from '../src/story/chapters.js';
 
@@ -51,4 +51,28 @@ test('empty plan calls onDone immediately and renders nothing', () => {
   showLineCeremony([], { story: freshStory() }, () => { done = true; });
   assert.equal(done, true);
   assert.equal(host().querySelector('#story-next'), null);
+});
+
+test('the reveal beat steps through its prose pages then finishes', () => {
+  const story = freshStory();
+  story.lines[0] = true; story.lines[1] = true; // tide + reveal drawn
+  let done = false;
+  showStoryBeat('reveal', { story }, () => { done = true; });
+  assert.ok(host().querySelector('#story-hex'), 'hexagram renders');
+  assert.match(host().querySelector('#story-text').innerHTML, /four|Four/);
+  host().querySelector('#story-next').click(); // page 2
+  assert.equal(done, false);
+  host().querySelector('#story-next').click(); // finish
+  assert.equal(done, true);
+});
+
+test('the Altar renders the balance reading and closes', () => {
+  const full = freshStory();
+  full.lines = [true, true, true, true, true, true]; // Even Grove
+  let closed = false;
+  showAltar({ story: full, onClose: () => { closed = true; } });
+  assert.match(host().querySelector('h2').textContent, /Balance Dial/);
+  assert.match(host().textContent, /In balance/); // complete => in balance
+  host().querySelector('#scr-back').click();
+  assert.equal(closed, true);
 });

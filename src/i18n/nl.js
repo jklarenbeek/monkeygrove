@@ -75,6 +75,21 @@ export const nl = {
   'story.balance.label': 'Balansschijf',
   'story.balance.value': '{n} van 6 lijnen',
   'story.complete': 'Alle zes lijnen zijn getekend — het bos is weer heel en in balans! ☯️',
+  // narratieve momenten (lijnen die je niet met rekenen verdient). reveal = de Vier Richtingen.
+  'story.beat.reveal.1': 'Wacht… er waren hier vroeger <b>vier</b> van alles. Vier kusten, vier winden, vier kleine altaren. 🧭',
+  'story.beat.reveal.2': 'Een tweede lijn keert terug, en de <b>Vier Richtingen</b> worden wakker — het hele eiland opent zich om je heen. ✨',
+
+  // de Balansschijf (het Balansaltaar) — de diepe meting. Kindvriendelijk: het bos
+  // is "gelijk"/"in balans", nooit "helemaal vol". In balans is beter dan volgepropt.
+  'altar.title': 'Balansschijf',
+  'altar.sub': 'Hoe gelijk is het bos?',
+  'altar.balance': 'Balans',
+  'altar.in_balance': 'In balans! ☯️',
+  'altar.tip': 'Mik op het midden — een bos dat <b>gelijk</b> is, is blijer dan een bos dat volgepropt zit.',
+  'altar.lines': 'Teruggekeerde lijnen',
+  'altar.goal': 'Als alle zes lijnen gelijk zijn, is het bos heel — het <b>Gelijke Bos</b>.',
+  'altar.complete': 'Het <b>Gelijke Bos</b> — elke lijn op zijn plek, perfect in balans. ☯️',
+  'altar.open': '☯️ Balansschijf',
 
   'hub.welcome': 'Welkom terug, {name}! 🌴',
   'hub.pick_world': 'Waar gaan we spelen?',

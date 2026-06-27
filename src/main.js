@@ -19,8 +19,8 @@ import {
 // ships in its own `business-*` chunk the title/hub never download.
 import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
 import { isBuilt } from './island.js';
-import { ensureStory, refreshStoryLines, worldBands } from './story/engine.js';
-import { lineCeremonies } from './story/chapters.js';
+import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine } from './story/engine.js';
+import { lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS } from './story/chapters.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
@@ -403,34 +403,62 @@ class Game {
   // batch shouldn't front-load a pile of pop-ups before the kid even arrives).
   startHub() {
     const ceremonial = this.mode !== 'title' && this.mode !== 'hub';
-    const events = ceremonial ? this.collectStoryLineEvents() : (this.collectStoryLineEvents(), []);
-    if (events.length) {
-      screens.showLineCeremony(events, { story: this.profile.story }, () => this.hub.startHub());
-      return;
-    }
+    const queue = this.advanceStory(ceremonial);
+    if (queue.length) { this.runStoryQueue(queue, () => this.hub.startHub()); return; }
     this.hub.startHub();
   }
 
-  // Latch newly-earned story lines (persists) and return the ceremony plan. Pure
+  // Latch any story lines the player just earned (world mastery) and the auto
+  // narrative reveal, persisting as it goes. With `withCeremony`, returns an
+  // ordered queue of screen thunks (line-draw ceremony, then the reveal beat) to
+  // play before the hub builds; without it, the lines are drawn silently (the
+  // first title->hub bootstrap shouldn't front-load a pile of pop-ups). Pure
   // failures must never block hub entry, so the whole thing is defensive.
-  collectStoryLineEvents() {
+  advanceStory(withCeremony) {
+    const queue = [];
     try {
-      if (!this.profile) return [];
+      if (!this.profile) return queue;
       const report = masteryReport(this.profile.math, { now: Date.now() });
       const eligible = eligibleSkillIds(this.profile.curriculum);
       const story = ensureStory(this.profile);
+      let changed = false;
+
       const newly = refreshStoryLines(story, report, eligible);
-      if (!newly.length) return [];
-      persist();
-      const bands = worldBands(report, eligible);
-      const kindByWorld = {};
-      for (const [world, info] of Object.entries(bands)) {
-        kindByWorld[world] = info.band === 'below' ? 'remembered' : 'earned';
+      if (newly.length) {
+        changed = true;
+        if (withCeremony) {
+          const bands = worldBands(report, eligible);
+          const kindByWorld = {};
+          for (const [world, info] of Object.entries(bands)) {
+            kindByWorld[world] = info.band === 'below' ? 'remembered' : 'earned';
+          }
+          const events = lineCeremonies(newly, kindByWorld);
+          if (events.length) queue.push((done) => screens.showLineCeremony(events, { story }, done));
+        }
       }
-      return lineCeremonies(newly, kindByWorld);
+
+      // The Four-Directions reveal draws the second line once the first shore is home.
+      if (dueNarrativeBeat(story) === 'reveal') {
+        drawNarrativeLine(story, NARRATIVE_BEATS.reveal.lineIndex);
+        changed = true;
+        if (withCeremony) queue.push((done) => screens.showStoryBeat('reveal', { story }, done));
+      }
+
+      if (changed) persist();
     } catch {
       return [];
     }
+    return queue;
+  }
+
+  // Play a sequence of story-screen thunks (each calls its callback when done),
+  // then the final continuation.
+  runStoryQueue(queue, done) {
+    const step = (i) => {
+      if (i >= queue.length) { done(); return; }
+      queue[i](() => step(i + 1));
+    };
+    step(0);
   }
 
   refreshHudCounts() {

@@ -19,7 +19,9 @@ import {
   freshStory, ensureStory, worldBands, refreshStoryLines,
   drawNarrativeLine, islandHexagram, islandBloom, advancePhase, markBeat,
 } from '../src/story/engine.js';
-import { CHAPTER_LOOK, chapterForLine, lineCeremonies } from '../src/story/chapters.js';
+import {
+  CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS,
+} from '../src/story/chapters.js';
 
 // A masteryReport skeleton with a chosen set of mastered skill ids.
 function reportWith(mastered = []) {
@@ -228,6 +230,21 @@ test('one remembered world is not batched; mixed batches lead with the remembere
 
 test('narrative line indices produce no mastery ceremony', () => {
   assert.deepEqual(lineCeremonies([1, 5], {}), []);
+});
+
+test('the reveal beat is due once the first shore is home, then never again', () => {
+  const s = freshStory();
+  assert.equal(dueNarrativeBeat(s), null);          // nothing drawn yet
+  s.lines[0] = true;                                // tide line home
+  assert.equal(dueNarrativeBeat(s), 'reveal');
+  drawNarrativeLine(s, NARRATIVE_BEATS.reveal.lineIndex);
+  assert.equal(dueNarrativeBeat(s), null);          // reveal already drawn
+});
+
+test('narrative beats point at the two narrative lines', () => {
+  assert.equal(NARRATIVE_BEATS.reveal.lineIndex, 1);
+  assert.equal(NARRATIVE_BEATS.finale.lineIndex, 5);
+  assert.ok(NARRATIVE_BEATS.reveal.pages.length >= 1);
 });
 
 test('ensureStory heals a save that predates story mode', () => {

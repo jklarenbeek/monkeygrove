@@ -2,11 +2,12 @@
 // When a world is mastered (or a remembered shore draws itself), the founding
 // hexagram gains a line and the island steps toward balance. Calm and additive —
 // no timers, no fail state (DESIGN.md): a quiet card the child taps through.
-import { render, PET_EMOJI } from './core.js';
+import { render, backBtn, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { audio } from '../audio.js';
 import { islandBloom } from '../story/engine.js';
 import { LINE_POLARITY } from '../story/constants.js';
+import { NARRATIVE_BEATS } from '../story/chapters.js';
 
 // Six stacked lines, line 6 (top) -> line 1 (bottom). Drawn lines are solid and
 // bright; not-yet-drawn lines sit faint at their eventual yang/yin shape. The
@@ -104,4 +105,69 @@ export function showLineCeremony(events, ctx, onDone) {
     }
     renderStep();
   });
+}
+
+// A narrative beat (the Four-Directions reveal, the finale): a few prose pages
+// with the founding hexagram showing the beat's line freshly drawn. The caller
+// latches the line before showing this, so the hexagram already reflects it.
+export function showStoryBeat(beatKey, ctx, onDone) {
+  const beat = NARRATIVE_BEATS[beatKey];
+  if (!beat) { onDone?.(); return; }
+  const story = ctx?.story || { lines: [false, false, false, false, false, false] };
+  const pages = beat.pages;
+  const faces = beat.faces || [];
+  let step = 0;
+
+  const el = render(`
+    <div style="flex:1"></div>
+    <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
+      <div id="story-hex">${hexagramHtml(story, [beat.lineIndex])}</div>
+      <div id="story-face" style="font-size:56px;margin-top:10px">${faces[0] || '✨'}</div>
+      <div id="story-text" style="font-size:19px;font-weight:700;line-height:1.45;min-height:58px">${t(pages[0])}</div>
+    </div>
+    <button class="btn green" id="story-next">${t('ui.ok')} →</button>
+    <div style="flex:2"></div>
+  `);
+
+  el.querySelector('#story-next').addEventListener('click', () => {
+    audio.sfx('click');
+    step++;
+    if (step >= pages.length) { onDone?.(); return; }
+    el.querySelector('#story-face').textContent = faces[step] || '✨';
+    el.querySelector('#story-text').innerHTML = t(pages[step]);
+  });
+}
+
+// The Balance Dial (the Altar of Balance) — the deep reading the hybrid bloom
+// reserves for here. Shows the founding hexagram, a needle that seeks the MIDDLE
+// (balanced, not maxed — the anti-perfectionism moral), and the lines-returned
+// count. Child-safe throughout (no yijing/hexagram words).
+export function showAltar({ story, onClose }) {
+  const bloom = islandBloom(story);
+  const balancePct = Math.round(bloom.balance * 100); // 0..50 in this game's model
+  const inBalance = bloom.complete || bloom.balance === 0.5;
+
+  const el = render(`
+    ${backBtn()}
+    <h2>☯️ ${t('altar.title')}</h2>
+    <div class="tagline" style="margin-bottom:10px">${t('altar.sub')}</div>
+    <div class="card" style="text-align:center">
+      ${hexagramHtml(story)}
+      <div style="margin-top:16px">
+        <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;opacity:.7">${t('altar.balance')}</div>
+        <div style="position:relative;height:18px;border-radius:9px;background:rgba(255,255,255,.12);margin:8px 0">
+          <div style="position:absolute;left:calc(50% - 14px);top:-3px;width:28px;height:24px;border-radius:8px;background:rgba(124,207,124,.25)"></div>
+          <div style="position:absolute;left:50%;top:-5px;bottom:-5px;width:2px;background:rgba(124,207,124,.8)"></div>
+          <div style="position:absolute;left:calc(${balancePct}% - 7px);top:-4px;width:14px;height:26px;border-radius:7px;background:#f4c95d;transition:left .5s ease"></div>
+        </div>
+        <div style="font-weight:800;min-height:22px">${inBalance ? t('altar.in_balance') : ''}</div>
+      </div>
+      ${balanceHtml(story)}
+      <div style="margin-top:14px;font-size:14px;line-height:1.4;color:var(--ink-soft)">
+        ${bloom.complete ? t('altar.complete') : t('altar.goal')}
+      </div>
+      <div style="margin-top:10px;font-size:13px;line-height:1.4;opacity:.75">${t('altar.tip')}</div>
+    </div>
+  `);
+  el.querySelector('#scr-back').addEventListener('click', onClose);
 }

@@ -29,6 +29,23 @@ for (const c of CHAPTERS) if (c.lineIndex != null) CHAPTER_BY_LINE[c.lineIndex] 
 
 export const chapterForLine = (lineIndex) => CHAPTER_BY_LINE[lineIndex] || null;
 
+// The two narrative lines (not earned by mastery) and how they are shown. Their
+// prose pages live in i18n under story.beat.<id>.* (child-safe). `reveal` (line 2,
+// the Four Directions) fires once the first shore is home; `finale` (line 6, the
+// yielding top line) is drawn by the Crab King festival flow, not auto-triggered.
+export const NARRATIVE_BEATS = {
+  reveal: { lineIndex: 1, pages: ['story.beat.reveal.1', 'story.beat.reveal.2'], faces: ['🧭', '✨'] },
+  finale: { lineIndex: 5, pages: ['finale.1', 'finale.2', 'finale.3', 'finale.4'], faces: ['🦀', '🦀', '🦀', '🐵'] },
+};
+
+// Which narrative beat is due to play now, or null. Only `reveal` auto-fires
+// (after the Tide line is drawn and before its own line is). The finale is gated
+// on the plaza build, so the hub flow triggers it explicitly — never here.
+export function dueNarrativeBeat(story) {
+  if (story.lines[0] && !story.lines[1]) return 'reveal';
+  return null;
+}
+
 // Plan the ceremony for a batch of newly-drawn line indices.
 //
 // `kindByWorld` maps a world id -> 'earned' (mastered in the child's band) or

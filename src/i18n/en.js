@@ -77,6 +77,21 @@ export const en = {
   'story.balance.label': 'Balance Dial',
   'story.balance.value': '{n} of 6 lines',
   'story.complete': 'All six lines are drawn — the grove is whole and in balance again! ☯️',
+  // narrative beats (lines not earned by math). reveal = the Four Directions.
+  'story.beat.reveal.1': 'Wait… there used to be <b>four</b> of everything here. Four shores, four winds, four little altars. 🧭',
+  'story.beat.reveal.2': 'A second line returns, and the <b>Four Directions</b> wake up — the whole island opens around you. ✨',
+
+  // the Balance Dial (the Altar of Balance) — the deep reading. Child-safe: the
+  // grove is "even" / "in balance", never "all the way full". Balanced beats maxed.
+  'altar.title': 'Balance Dial',
+  'altar.sub': 'How even is the grove?',
+  'altar.balance': 'Balance',
+  'altar.in_balance': 'In balance! ☯️',
+  'altar.tip': 'Aim for the middle — a grove that is <b>even</b> is happier than one that is stuffed full.',
+  'altar.lines': 'Lines returned',
+  'altar.goal': 'When all six lines are even, the grove is whole — the <b>Even Grove</b>.',
+  'altar.complete': 'The <b>Even Grove</b> — every line in its place, perfectly in balance. ☯️',
+  'altar.open': '☯️ Balance Dial',
 
   // hub
   'hub.welcome': 'Welcome back, {name}! 🌴',

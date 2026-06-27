@@ -19,6 +19,7 @@ import {
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines } from './mimi.js';
+import { ensureStory, drawNarrativeLine } from './story/engine.js';
 import { AmbientLife } from './ambient.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
@@ -498,6 +499,10 @@ export class HubController {
       status: islandStatus(g.profile, report),
       onClose: () => screens.closeScreen(),
       onFund: (id) => this.fundBuild(id),
+      onAltar: () => screens.showAltar({
+        story: ensureStory(g.profile),
+        onClose: () => this.openIsland(),
+      }),
     });
   }
 
@@ -527,7 +532,16 @@ export class HubController {
 
   celebrateBuild(def) {
     const g = this.game;
-    if (def.finale) { g.profile.flags.festivalDone = true; persist(); }
+    if (def.finale) {
+      g.profile.flags.festivalDone = true;
+      // The festival draws the founding hexagram's top line — the yielding sixth
+      // line: the island is made whole by sharing it (letting the Crab King in),
+      // not by hoarding. Completes the Even Grove when every other line is home.
+      const story = ensureStory(g.profile);
+      drawNarrativeLine(story, 5);
+      story.crabKingReconciled = true;
+      persist();
+    }
     // Drop just the new build onto its plot — no teardown/rebuild of the whole
     // hub, so the single most celebratory moment never hitches on a cheap
     // phone. Two builds reshape the entire island (the bridge re-floors the
