@@ -224,6 +224,14 @@ export class ChamberFlow {
     if (problem.scaffold === 0) delay(700, () => g.verb?.showModel());
   }
 
+  refreshLanguage() {
+    const g = this.game;
+    if (g.mode !== 'chamber' || !g.problem) return;
+    const vars = this.promptVars(g.problem);
+    hud.setBanner(t(g.problem.prompt.key, vars), g.problem.equation);
+    g.verb?.refreshLanguage?.();
+  }
+
   promptVars(problem) {
     const v = { ...(problem.meta || {}), ...(problem.model?.params || {}), ...(problem.prompt?.vars || {}) };
     if (v.n !== undefined && v.d !== undefined) v.frac = `${v.n}/${v.d}`;

@@ -8,15 +8,19 @@ import { createBusinessState, ensureBusinessState } from './business/engine.js';
 
 const KEY = 'monkeygrove.save';
 const VERSION = 1;
+const SUPPORTED_LANGS = new Set(['en', 'nl']);
 
 let save = null;
+let loadedRaw = null;
 let saveTimer = null;
 
 function freshProfile(name, opts = {}) {
   const avatarPet = typeof opts.avatarPet === 'string' && opts.avatarPet ? opts.avatarPet : null;
+  const lang = normalizeLang(opts.lang, 'en');
   return {
     id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
     name,
+    lang,
     avatar: { fur: 'classic', hat: null, trail: null, pet: avatarPet },
     bananas: 0,
     egg: { points: 0, goal: BALANCE.eggGoal },
@@ -61,34 +65,48 @@ function detectLang() {
   return l.startsWith('nl') ? 'nl' : 'en';
 }
 
+function normalizeLang(lang, fallback = 'en') {
+  return SUPPORTED_LANGS.has(lang) ? lang : fallback;
+}
+
 // A corrupt or unreadable save must never hand a child a blank screen. Any failure
 // path — storage disabled, bad JSON, wrong shape, or a migration that throws —
 // preserves the bad payload under BACKUP_KEY (for recovery/debugging) and falls back
 // to a clean, playable save.
 const BACKUP_KEY = 'monkeygrove.save.corrupt';
 
+function storageApi() {
+  if (globalThis.localStorage) return globalThis.localStorage;
+  try { if (localStorage) return localStorage; } catch {}
+  return null;
+}
+
 function backupCorruptSave(raw) {
   if (!raw) return;
-  try { localStorage.setItem(BACKUP_KEY, raw); } catch { /* storage may be unavailable */ }
+  try { storageApi()?.setItem(BACKUP_KEY, raw); } catch { /* storage may be unavailable */ }
+  try { globalThis.localStorage?.setItem(BACKUP_KEY, raw); } catch { /* storage may be unavailable */ }
+  try { localStorage?.setItem(BACKUP_KEY, raw); } catch { /* storage may be unavailable */ }
 }
 
 export function loadSave() {
-  if (save) return save;
   let raw = null;
-  try { raw = localStorage.getItem(KEY); } catch { raw = null; } // storage can be disabled
+  try { raw = storageApi()?.getItem(KEY); } catch { raw = null; } // storage can be disabled
+  if (save && raw === loadedRaw) return save;
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       if (parsed && parsed.v >= 1 && Array.isArray(parsed.profiles) && parsed.profiles.every(isObject)) {
         save = migrate(parsed);
+        loadedRaw = raw;
         return save;
       }
-      backupCorruptSave(raw); // parseable but not our shape — don't silently drop it
+      backupCorruptSave(raw);
     } catch {
       backupCorruptSave(raw); // unreadable JSON, or migrate() threw
     }
   }
   save = freshSave();
+  loadedRaw = raw;
   return save;
 }
 
@@ -133,11 +151,13 @@ export function migrate(s, steps = STEPS, target = VERSION) {
 function healSave(s) {
   const ref = freshProfile('x');
   for (const p of s.profiles) {
+    const missingLang = p.lang === undefined;
     for (const k of Object.keys(ref)) if (p[k] === undefined) p[k] = structuredClone(ref[k]);
     if (!isObject(p.stats)) p.stats = structuredClone(ref.stats);
     if (!isObject(p.avatar)) p.avatar = structuredClone(ref.avatar);
     for (const k of Object.keys(ref.stats)) if (p.stats[k] === undefined) p.stats[k] = 0;
     for (const k of Object.keys(ref.avatar)) if (p.avatar[k] === undefined) p.avatar[k] = ref.avatar[k];
+    p.lang = normalizeLang(missingLang ? undefined : p.lang, normalizeLang(s.settings?.lang, detectLang()));
     if (!isObject(p.curriculum)) p.curriculum = createCurriculumState();
     const ageCapturedOn = p.curriculum.ageCapturedOn || dayFromTimestamp(p.created);
     const cref = createCurriculumState({
@@ -194,13 +214,13 @@ export function persist() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {}
+    try { loadedRaw = JSON.stringify(save); storageApi()?.setItem(KEY, loadedRaw); } catch {}
   }, 250);
 }
 
 export function persistNow() {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-  try { localStorage.setItem(KEY, JSON.stringify(save)); } catch {}
+  try { loadedRaw = JSON.stringify(save); storageApi()?.setItem(KEY, loadedRaw); } catch {}
 }
 
 export function settings() { return loadSave().settings; }
@@ -223,9 +243,10 @@ export function refreshProfileCurriculum(p, today = dayString()) {
 
 export function createProfile(name, opts = {}) {
   const s = loadSave();
-  const p = freshProfile(name, opts);
+  const p = freshProfile(name, { ...opts, lang: normalizeLang(opts.lang, normalizeLang(s.settings?.lang, detectLang())) });
   s.profiles.push(p);
   s.activeProfile = p.id;
+  s.settings.lang = p.lang;
   persistNow();
   return p;
 }
@@ -233,8 +254,23 @@ export function createProfile(name, opts = {}) {
 export function selectProfile(id) {
   const s = loadSave();
   s.activeProfile = id;
+  const p = s.profiles.find((profile) => profile.id === id) || null;
+  if (p) {
+    p.lang = normalizeLang(p.lang, normalizeLang(s.settings?.lang, detectLang()));
+    s.settings.lang = p.lang;
+  }
   persistNow();
   return activeProfile();
+}
+
+export function setActiveProfileLanguage(lang) {
+  const s = loadSave();
+  const p = s.profiles.find((profile) => profile.id === s.activeProfile) || null;
+  const next = normalizeLang(lang, normalizeLang(s.settings?.lang, detectLang()));
+  s.settings.lang = next;
+  if (p) p.lang = next;
+  persistNow();
+  return next;
 }
 
 export function deleteProfile(id) {

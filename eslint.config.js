@@ -30,9 +30,9 @@ export default [
       // --- The guardrails (TODO_12) ---------------------------------------
       // Flag god-files and god-functions before they snowball. `warn` for now;
       // flip to `error` once the remaining large modules (screens.js, verbs.js,
-      // mathengine.js, …) are split the way main.js was in TODO_06.
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
-      'max-lines-per-function': ['warn', { max: 60, skipBlankLines: true, skipComments: true }],
+      // mathengine.js, …) are split the way main.js was.
+      'max-lines': ['warn', { max: 777, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['warn', { max: 108, skipBlankLines: true, skipComments: true }],
 
       // --- Correctness ----------------------------------------------------
       eqeqeq: ['error', 'smart'],

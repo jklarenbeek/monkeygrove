@@ -282,7 +282,8 @@ export class LivingPortal {
 
     // label floats clear of the full-bloom crown (2.08) and the star (2.10)
     this.labelY = 2.45;
-    this.label = makeTextSprite(opts.label, { bg: '#fff8ecdd', scale: 0.85, fontSize: 44 });
+    this.labelText = opts.label;
+    this.label = makeTextSprite(this.labelText, { bg: '#fff8ecdd', scale: 0.85, fontSize: 44 });
     this.label.position.set(0, this.labelY, 0);
     this.group.add(this.label);
 
@@ -291,6 +292,18 @@ export class LivingPortal {
     this.motes = [];
     this._setStage(opts.stage ?? 0);
     place.addEntity(this);
+  }
+
+  updateLabel(text) {
+    this.labelText = text;
+    const next = makeTextSprite(this.labelText, { bg: '#fff8ecdd', scale: 0.85, fontSize: 44 });
+    next.position.copy(this.label.position);
+    this.group.add(next);
+    this.group.remove(this.label);
+    this.label.material?.map?.dispose?.();
+    this.label.material?.dispose?.();
+    if (this.label.geometry?._owned) this.label.geometry.dispose?.();
+    this.label = next;
   }
 
   _setStage(stage) {

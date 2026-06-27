@@ -584,6 +584,13 @@ export class HubPlace extends Place {
     }
   }
 
+  refreshLanguage() {
+    for (const [worldId, gate] of Object.entries(this.gates || {})) {
+      const theme = WORLD_THEME[worldId];
+      gate.updateLabel(`${theme.emoji} ${t('world.' + worldId)}`);
+    }
+  }
+
   // Gentle idle bounce shared by every standing friend in the hub.
   _bob(mesh, speed = 2, amp = 0.04) {
     const baseY = mesh.position.y;

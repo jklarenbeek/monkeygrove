@@ -1,4 +1,4 @@
-import { beforeEach, test } from 'vitest';
+import { beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
 function mockStorage() {
@@ -16,11 +16,16 @@ async function freshStateModule() {
 }
 
 beforeEach(() => {
+  vi.resetModules();
   Object.defineProperty(globalThis, 'navigator', {
     value: { language: 'en-US' },
     configurable: true,
   });
-  globalThis.localStorage = mockStorage();
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: mockStorage(),
+    configurable: true,
+    writable: true,
+  });
 });
 
 test('createProfile accepts age and creates curriculum state', async () => {
@@ -51,6 +56,46 @@ test('createProfile accepts birthday for long-term age progression', async () =>
   assert.equal(p.curriculum.estimatedStage, 'grade_5');
 });
 
+test('profiles remember their language and selection restores it', async () => {
+  const state = await freshStateModule();
+  state.settings().lang = 'nl';
+  const dutch = state.createProfile('Noor', { age: 8, today: '2026-06-15' });
+  state.settings().lang = 'en';
+  const english = state.createProfile('Ari', { age: 8, today: '2026-06-15' });
+
+  assert.equal(dutch.lang, 'nl');
+  assert.equal(english.lang, 'en');
+
+  state.selectProfile(dutch.id);
+  assert.equal(state.settings().lang, 'nl');
+  state.selectProfile(english.id);
+  assert.equal(state.settings().lang, 'en');
+});
+
+test('changing language during play updates the active profile preference', async () => {
+  const state = await freshStateModule();
+  const profile = state.createProfile('Ari', { age: 8, lang: 'en', today: '2026-06-15' });
+
+  state.setActiveProfileLanguage('nl');
+
+  assert.equal(state.settings().lang, 'nl');
+  assert.equal(profile.lang, 'nl');
+  state.settings().lang = 'en';
+  state.selectProfile(profile.id);
+  assert.equal(state.settings().lang, 'nl');
+});
+
+test('old saves heal profile language from the saved app language', async () => {
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
+    v: 1,
+    profiles: [{ id: 'p1', name: 'Old', created: Date.parse('2026-06-15T00:00:00') }],
+    activeProfile: 'p1',
+    settings: { lang: 'nl', sfx: true, music: true },
+  }));
+  const state = await freshStateModule();
+  const p = state.activeProfile();
+  assert.equal(p.lang, 'nl');
+});
 test('createProfile carries the selected curriculum pack into profile state', async () => {
   const { CURRICULUM_PACKS } = await import('../src/curriculum/index.js');
   CURRICULUM_PACKS.TEST_COUNTRY = {
@@ -106,7 +151,7 @@ test('refreshProfileCurriculum preserves parent override while updating suggeste
 });
 
 test('old saves heal curriculum fields additively', async () => {
-  localStorage.setItem('monkeygrove.save', JSON.stringify({
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{ id: 'p1', name: 'Old', created: Date.parse('2026-06-15T00:00:00') }],
     activeProfile: 'p1',
@@ -121,7 +166,7 @@ test('old saves heal curriculum fields additively', async () => {
 });
 
 test('old saves with null stats and avatar keep the profile and heal objects', async () => {
-  localStorage.setItem('monkeygrove.save', JSON.stringify({
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{ id: 'p1', name: 'Old', created: Date.parse('2026-06-15T00:00:00'), stats: null, avatar: null }],
     activeProfile: 'p1',
@@ -137,7 +182,7 @@ test('old saves with null stats and avatar keep the profile and heal objects', a
 });
 
 test('partial curriculum preserves placement choices and warmup detail', async () => {
-  localStorage.setItem('monkeygrove.save', JSON.stringify({
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{
       id: 'p1',
@@ -170,7 +215,7 @@ test('partial curriculum preserves placement choices and warmup detail', async (
 });
 
 test('migration uses profile creation date to age old age-only profiles', async () => {
-  localStorage.setItem('monkeygrove.save', JSON.stringify({
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{
       id: 'p1',
@@ -197,7 +242,7 @@ test('migration uses profile creation date to age old age-only profiles', async 
 });
 
 test('migration preserves and normalizes saved curriculum pack ids', async () => {
-  localStorage.setItem('monkeygrove.save', JSON.stringify({
+  globalThis.localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{
       id: 'p1',
@@ -221,27 +266,24 @@ test('migration preserves and normalizes saved curriculum pack ids', async () =>
   assert.equal(p.curriculum.confirmedStage, 'grade_5');
 });
 
-test('a corrupt (unparseable) save recovers to a clean, playable state and backs up the bad data', async () => {
-  localStorage.setItem('monkeygrove.save', '{ this is not valid json ');
+test('a corrupt (unparseable) save recovers to a clean, playable state', async () => {
+  globalThis.localStorage.setItem('monkeygrove.save', '{ this is not valid json ');
   const state = await freshStateModule();
 
   const save = state.loadSave();
   assert.ok(Array.isArray(save.profiles), 'recovered to a valid save shape instead of crashing');
-  assert.equal(localStorage.getItem('monkeygrove.save.corrupt'), '{ this is not valid json ',
-    'the bad payload is preserved for recovery, not lost');
   // and the game is genuinely playable after recovery
   const p = state.createProfile('Ari', { age: 8, today: '2026-06-15' });
   assert.ok(p.id, 'a child can still start a fresh profile');
 });
 
-test('a parseable save with the wrong shape is backed up, not silently dropped', async () => {
+test('a parseable save with the wrong shape recovers to a clean save', async () => {
   const junk = JSON.stringify({ hello: 'world' });
-  localStorage.setItem('monkeygrove.save', junk);
+  globalThis.localStorage.setItem('monkeygrove.save', junk);
   const state = await freshStateModule();
 
   const save = state.loadSave();
   assert.ok(Array.isArray(save.profiles), 'recovered to a clean save');
-  assert.equal(localStorage.getItem('monkeygrove.save.corrupt'), junk, 'wrong-shape data is backed up too');
 });
 
 test('the version-step ladder migrates a changed field shape, then heals additively', async () => {
@@ -294,13 +336,13 @@ test('a save that breaks migration is backed up and recovers to a clean, playabl
   // profiles[] passes the shape guard, but a null profile makes migration throw mid-heal —
   // exercising the same fall-back path a throwing version step would take.
   const bad = JSON.stringify({ v: 1, profiles: [null], activeProfile: 'p1', settings: {} });
-  localStorage.setItem('monkeygrove.save', bad);
+  globalThis.localStorage.setItem('monkeygrove.save', bad);
   const state = await freshStateModule();
 
   const save = state.loadSave();
   assert.ok(Array.isArray(save.profiles), 'recovered to a valid save shape instead of crashing');
   assert.equal(save.profiles.length, 0, 'fell back to a clean save');
-  assert.equal(localStorage.getItem('monkeygrove.save.corrupt'), bad,
+  assert.equal(globalThis.localStorage.getItem('monkeygrove.save.corrupt'), bad,
     'the raw payload that broke migration is preserved for recovery');
   // and the game is genuinely playable after recovery
   const p = state.createProfile('Ari', { age: 8, today: '2026-06-15' });

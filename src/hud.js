@@ -9,17 +9,21 @@ let bubbleTimer = null;
 
 export function initHud(h) {
   handlers = h;
+  refreshLabels();
+  $('btn-hint').addEventListener('click', () => { audio.sfx('click'); handlers.onHint?.(); });
+  $('btn-action').addEventListener('click', () => { audio.sfx('click'); handlers.onAction?.(); });
+  $('btn-home').addEventListener('click', () => { audio.sfx('click'); handlers.onHome?.(); });
+  $('btn-settings').addEventListener('click', () => { audio.sfx('click'); handlers.onSettings?.(); });
+  $('bubble').addEventListener('click', () => advanceBubble());
+}
+
+export function refreshLabels() {
   // accessible names for the icon-only round buttons (screen readers / keyboard)
   const label = (id, key) => { const b = $(id); if (b) { const s = t(key); b.setAttribute('aria-label', s); b.title = s; } };
   label('btn-hint', 'hud.hint');
   label('btn-action', 'hud.action');
   label('btn-home', 'hud.home');
   label('btn-settings', 'settings.title');
-  $('btn-hint').addEventListener('click', () => { audio.sfx('click'); handlers.onHint?.(); });
-  $('btn-action').addEventListener('click', () => { audio.sfx('click'); handlers.onAction?.(); });
-  $('btn-home').addEventListener('click', () => { audio.sfx('click'); handlers.onHome?.(); });
-  $('btn-settings').addEventListener('click', () => { audio.sfx('click'); handlers.onSettings?.(); });
-  $('bubble').addEventListener('click', () => advanceBubble());
 }
 
 export function showHud(on = true) {

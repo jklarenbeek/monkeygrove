@@ -170,6 +170,23 @@ export class BusinessController {
     )) || null;
   }
 
+  refreshLanguage() {
+    this.game.place?.refreshLanguage?.();
+    const open = document.querySelector('#screens .screen');
+    if (!open || open.querySelector('#settings-card')) return;
+    const business = ensureBusinessState(this.game.profile);
+    const order = business.activeOrder;
+    if (open.classList.contains('business-screen')) this.showBusinessOrderPanel();
+    else if (open.querySelector('#business-prep-done')) {
+      const task = this.nextOpenBusinessTask(order) || (order?.tasks || []).find((t) => t.kind === 'prep');
+      if (task?.kind === 'prep') this.handleBusinessPrep(task);
+    } else if (open.querySelector('#business-payment-done')) {
+      const task = this.nextOpenBusinessTask(order) || (order?.tasks || []).find((t) => t.kind === 'payment');
+      if (task?.kind === 'payment') this.handleBusinessPayment(task);
+    } else if (open.querySelector('[data-restock]')) this.openBusinessStock();
+    else if (open.querySelector('[data-upgrade]')) this.openBusinessUpgrades();
+  }
+
   handleBusinessPrep(task) {
     if (!task || task.kind !== 'prep') return;
     screens.showBusinessPrep({

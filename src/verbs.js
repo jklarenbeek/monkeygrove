@@ -184,6 +184,9 @@ class VerbBase {
   onAction() {}
   onKey() { return false; }
   showModel() { return this.model.show(this.ctx.problem.model); }
+  refreshLanguage() {
+    if (typeof this._panel === 'function') this.ctx.hud.setVerbPanel(this._panel());
+  }
   update() {}
   destroy() { this.model.clear(); }
 }

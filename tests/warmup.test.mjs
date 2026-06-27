@@ -28,6 +28,11 @@ test('task 5 wiring exists for playful explorer wizard and warmup flow', () => {
   assert.match(screens, /playerCard\.classList\.add\('hidden'\)/);
   assert.match(screens, /playerCard\.classList\.remove\('hidden'\)/);
   assert.match(screens, /id="wizard-cancel"/);
+  assert.match(screens, /class="menu-row title-menu"/);
+  assert.match(screens, /el\.classList\.add\('wizard-active'\)/);
+  assert.match(screens, /el\.classList\.remove\('wizard-active'\)/);
+  assert.match(screens, /if \(el\.classList\.contains\('wizard-active'\)\)/);
+  assert.match(screens, /refreshLanguageButtons\(\)/);
   assert.match(screens, /if \(!rawName\)/);
   assert.match(screens, /title\.name_required/);
   assert.match(screens, /export function showWarmup/);

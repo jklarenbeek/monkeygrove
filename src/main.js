@@ -141,6 +141,7 @@ class Game {
       onStart: () => this.showPlayerSelect(),
       onParents: () => this.showParentSelect(),
       onDuel: () => this.startDuelSetup(),
+      onLangChange: () => this.place?.refreshLanguage?.(),
     });
   }
 
@@ -187,6 +188,7 @@ class Game {
   // the story, then warm-up if their curriculum needs placing, then the hub.
   showPlayerSelect() {
     screens.showTitle({
+      onLangChange: () => this.place?.refreshLanguage?.(),
       onPlay: (pid, isNew) => {
         this.profile = selectProfile(pid);
         if (!this.profile) return;
@@ -345,9 +347,21 @@ class Game {
     screens.showSettings({
       onClose: () => screens.closeScreen(),
       onSwitchPlayer: () => this.showTitle(),
-      onLangChange: () => {},
+      onLangChange: () => this.afterLanguageChange(),
       devTools,
     });
+  }
+
+  afterLanguageChange() {
+    hud.refreshLabels();
+    this.refreshHudCounts();
+    if (this.mode === 'chamber') {
+      this.chamber.refreshLanguage();
+    } else if (this.mode === 'business') {
+      this.business?.refreshLanguage?.();
+    } else if (this.mode === 'hub') {
+      this.place?.refreshLanguage?.();
+    }
   }
 
   afterDevPresetApplied(preset) {

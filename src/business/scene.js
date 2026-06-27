@@ -87,8 +87,46 @@ export class BusinessPlace extends Place {
     this.activeStations = this.miniGameZones.bakery.stations;
     this.customers = [];
     this._customerEntities = new Set();
+    this._textSprites = [];
     this._placeZones();
     this.setActiveRecipe(opts.recipeId || 'flatbread');
+  }
+
+  _disposeTextSprite(sprite) {
+    if (!sprite) return;
+    sprite.material?.map?.dispose?.();
+    sprite.material?.dispose?.();
+    if (sprite.geometry?._owned) sprite.geometry.dispose?.();
+  }
+
+  _textSprite(key, text, opts, position) {
+    const sprite = makeTextSprite(text, opts);
+    sprite.position.copy(position);
+    this.group.add(sprite);
+    this._textSprites.push({ key, sprite, opts, position: position.clone() });
+    return sprite;
+  }
+
+  refreshLanguage() {
+    for (const record of this._textSprites) {
+      const text = record.key.startsWith('zone:')
+        ? t(this.miniGameZones[record.key.slice(5)]?.titleKey)
+        : t(record.key);
+      const next = makeTextSprite(text, record.opts);
+      next.position.copy(record.position);
+      this.group.add(next);
+      this.group.remove(record.sprite);
+      this._disposeTextSprite(record.sprite);
+      record.sprite = next;
+    }
+    for (const customer of this.customers) {
+      const next = makeTextSprite(t(customer.nameKey), { bg: '#fff8ecdd', scale: 0.48, fontSize: 34 });
+      next.position.copy(customer.label.position);
+      customer.group.add(next);
+      customer.group.remove(customer.label);
+      this._disposeCustomerLabel(customer.label);
+      customer.label = next;
+    }
   }
 
   _placeZones() {
@@ -100,9 +138,7 @@ export class BusinessPlace extends Place {
   }
 
   _placeZone(zoneId, zone) {
-    const title = makeTextSprite(t(zone.titleKey) || zone.sign, { bg: '#fff8ecdd', scale: 0.58, fontSize: 40 });
-    title.position.copy(this.worldPos(zone.signX, zone.signZ, 1.2));
-    this.group.add(title);
+    this._textSprite(`zone:${zoneId}`, t(zone.titleKey) || zone.sign, { bg: '#fff8ecdd', scale: 0.58, fontSize: 40 }, this.worldPos(zone.signX, zone.signZ, 1.2));
 
     for (const [name, def] of Object.entries(zone.stations)) {
       const station = { x: def.x, z: def.z };
@@ -115,9 +151,7 @@ export class BusinessPlace extends Place {
         lift: def.lift ?? 0,
       });
 
-      const label = makeTextSprite(t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 });
-      label.position.copy(this.worldPos(def.x, def.z, 1.15));
-      this.group.add(label);
+      this._textSprite('business.station.' + name, t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
     }
   }
 

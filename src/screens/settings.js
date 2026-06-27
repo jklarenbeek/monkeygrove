@@ -5,7 +5,7 @@ import { t, setLang } from '../i18n.js';
 import { languageButton } from '../langFlags.js';
 import { applyComfortSettings, reducedMotion } from '../a11y.js';
 import { audio } from '../audio.js';
-import { settings, persist, persistNow } from '../state.js';
+import { settings, persist, persistNow, setActiveProfileLanguage } from '../state.js';
 
 export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }) {
   const s = settings();
@@ -41,7 +41,7 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   el.querySelector('#scr-back').addEventListener('click', onClose);
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
-      setLang(b.dataset.lang); persistNow(); onLangChange?.();
+      setLang(b.dataset.lang); setActiveProfileLanguage(b.dataset.lang); persistNow(); onLangChange?.();
       showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
     });
   }

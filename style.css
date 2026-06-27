@@ -248,6 +248,26 @@ html, body {
 .menu-col { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 8px; }
 .menu-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
+.screen.wizard-active .title-menu {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 5;
+  margin: 0;
+  justify-content: flex-end;
+}
+.screen.wizard-active .title-menu #btn-duel,
+.screen.wizard-active .title-menu #btn-parents {
+  display: none;
+}
+.screen.wizard-active .title-menu .lang-toggle {
+  padding: 6px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .34);
+  box-shadow: 0 4px 0 rgba(74, 63, 53, .16);
+  backdrop-filter: blur(6px);
+}
+
 .new-player-form {
   margin-top: 14px;
 }

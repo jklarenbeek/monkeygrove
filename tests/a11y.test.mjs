@@ -116,11 +116,38 @@ test('settings screen exposes the comfort toggles, localized in both languages',
   for (const id of ['tg-motion', 'tg-font', 'tg-contrast', 'tg-colorblind', 'tg-textsize']) {
     assert.ok(screens.includes(`id="${id}"`), `settings has a ${id} toggle`);
   }
+  assert.match(screens, /setActiveProfileLanguage\(b\.dataset\.lang\)/, 'settings language updates the active profile preference');
   const dict = read('i18n/en.js') + '\n' + read('i18n/nl.js');
   for (const key of ['settings.reduce_motion', 'settings.dyslexia_font', 'settings.high_contrast', 'settings.colorblind', 'settings.text_size']) {
     const n = dict.split(`'${key}'`).length - 1;
     assert.equal(n, 2, `${key} is defined in both en and nl`);
   }
+});
+
+test('settings language changes repaint the active game screen immediately', () => {
+  const main = read('main.js');
+  const chamber = read('chamberflow.js');
+  const business = read('business/controller.js');
+  const businessScene = read('business/scene.js');
+  const verbs = read('verbs.js');
+  const hubPlace = read('chamber.js');
+  const entities = read('entities.js');
+  const screens = readScreens();
+
+  assert.match(main, /onLangChange:\s*\(\)\s*=>\s*this\.afterLanguageChange\(\)/, 'settings calls the live language refresh hook');
+  assert.match(main, /afterLanguageChange\(\)[\s\S]*hud\.refreshLabels\(\)/, 'HUD accessible labels are refreshed');
+  assert.match(main, /this\.chamber\.refreshLanguage\(\)/, 'chambers refresh without restarting the problem');
+  assert.match(main, /this\.business\?\.refreshLanguage\?\.\(\)/, 'business scenes refresh when open');
+  assert.match(main, /this\.place\?\.refreshLanguage\?\.\(\)/, 'hub place labels refresh when open');
+  assert.match(main, /showAttract\(\{[\s\S]*onLangChange:\s*\(\)\s*=>\s*this\.place\?\.refreshLanguage\?\.\(\)/, 'title attract gate labels refresh when the language buttons are used');
+  assert.match(screens, /showAttract\(\{[^{]*onLangChange[\s\S]*onLangChange\?\.\(\)/, 'title language buttons notify the 3D attract island');
+  assert.match(hubPlace, /refreshLanguage\(\)[\s\S]*gate\.updateLabel/, 'hub gate labels are rebuilt for the new locale');
+  assert.match(entities, /labelText\s*=\s*opts\.label/, 'living gate tracks the current label text');
+  assert.match(entities, /updateLabel\(text\)[\s\S]*labelText\s*=\s*text[\s\S]*makeTextSprite/, 'living gate can replace its label texture in place');
+  assert.match(chamber, /refreshLanguage\(\)[\s\S]*hud\.setBanner\(t\(g\.problem\.prompt\.key/, 'active chamber banner is translated again');
+  assert.match(verbs, /refreshLanguage\(\)[\s\S]*setVerbPanel\(this\._panel\(\)\)/, 'active chamber verb panels are translated again');
+  assert.match(business, /refreshLanguage\(\)[\s\S]*showBusinessOrderPanel\(\)/, 'open business order panels are re-rendered');
+  assert.match(businessScene, /refreshLanguage\(\)[\s\S]*_textSprites/, '3D business labels are rebuilt for the new locale');
 });
 
 test('text-scale and the colour-blind palette are opt-in and wired in CSS', () => {
@@ -174,6 +201,7 @@ test('icon-only controls carry accessible names for screen readers', () => {
   assert.match(screens, /id="scr-back"[^>]*aria-label=/, 'the back/close button has an accessible name');
   assert.match(screens, /id="business-close"[^>]*aria-label=/, 'the shop close button has an accessible name');
   assert.match(hud, /setAttribute\('aria-label'/, 'HUD round buttons get accessible names in initHud');
+  assert.match(hud, /export function refreshLabels\(/, 'HUD labels can refresh after a live language change');
 
   const dict = read('i18n/en.js') + '\n' + read('i18n/nl.js');
   for (const key of ['nav.back', 'nav.close', 'hud.hint', 'hud.action', 'hud.home']) {

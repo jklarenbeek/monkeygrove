@@ -19,7 +19,7 @@ const TRAIL_CHOICES = [
 ];
 // ---------- title ----------
 
-export function showAttract({ onStart, onParents, onDuel }) {
+export function showAttract({ onStart, onParents, onDuel, onLangChange }) {
   const ps = profiles();
   const s = settings();
   const beats = [
@@ -118,8 +118,9 @@ export function showAttract({ onStart, onParents, onDuel }) {
       audio.sfx('click');
       setLang(b.dataset.lang);
       persistNow();
+      onLangChange?.();
       stop();
-      showAttract({ onStart, onParents, onDuel });
+      showAttract({ onStart, onParents, onDuel, onLangChange });
     });
   }
   el.querySelector('#btn-parents')?.addEventListener('click', () => {
@@ -134,7 +135,7 @@ export function showAttract({ onStart, onParents, onDuel }) {
   });
 }
 
-export function showTitle({ onPlay, onParents, onDuel }) {
+export function showTitle({ onPlay, onParents, onDuel, onLangChange }) {
   const ps = profiles();
   const s = settings();
   const packs = listPacks();
@@ -166,7 +167,7 @@ export function showTitle({ onPlay, onParents, onDuel }) {
       </div>
     </div>
     <div id="new-player-row" class="new-player-form hidden"></div>
-    <div class="menu-row">
+    <div class="menu-row title-menu" id="title-menu">
       <div class="lang-toggle">
         ${languageButton('en', s.lang)}
         ${languageButton('nl', s.lang)}
@@ -178,6 +179,12 @@ export function showTitle({ onPlay, onParents, onDuel }) {
 
   const playerCard = el.querySelector('.player-card');
   const wizard = el.querySelector('#new-player-row');
+  const refreshLanguageButtons = () => {
+    const lang = settings().lang;
+    for (const button of el.querySelectorAll('[data-lang]')) {
+      button.classList.toggle('active', button.dataset.lang === lang);
+    }
+  };
   const packOptions = packs.map((pack) => `<option value="${esc(pack.id)}">${esc(curriculumPackLabel(pack))}</option>`).join('');
 
   const renderWizard = () => {
@@ -260,6 +267,7 @@ export function showTitle({ onPlay, onParents, onDuel }) {
     });
     wizard.querySelector('#wizard-cancel')?.addEventListener('click', () => {
       wizard.classList.add('hidden');
+      el.classList.remove('wizard-active');
       playerCard.classList.remove('hidden');
       audio.sfx('click');
     });
@@ -288,6 +296,7 @@ export function showTitle({ onPlay, onParents, onDuel }) {
 
   const openWizard = () => {
     playerCard.classList.add('hidden');
+    el.classList.add('wizard-active');
     wizard.classList.remove('hidden');
     wizardStep = 1;
     renderWizard();
@@ -321,7 +330,7 @@ export function showTitle({ onPlay, onParents, onDuel }) {
     let timer = null;
     tile.addEventListener('pointerdown', () => {
       timer = setTimeout(() => {
-        if (confirm(t('ui.confirm_delete'))) { deleteProfile(tile.dataset.pid); showTitle({ onPlay, onParents, onDuel }); }
+        if (confirm(t('ui.confirm_delete'))) { deleteProfile(tile.dataset.pid); showTitle({ onPlay, onParents, onDuel, onLangChange }); }
       }, 900);
     });
     for (const ev of ['pointerup', 'pointerleave']) tile.addEventListener(ev, () => clearTimeout(timer));
@@ -330,7 +339,13 @@ export function showTitle({ onPlay, onParents, onDuel }) {
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
       setLang(b.dataset.lang); persistNow();
-      showTitle({ onPlay, onParents, onDuel });
+      onLangChange?.();
+      if (el.classList.contains('wizard-active')) {
+        renderWizard();
+        refreshLanguageButtons();
+        return;
+      }
+      showTitle({ onPlay, onParents, onDuel, onLangChange });
     });
   }
   el.querySelector('#btn-parents')?.addEventListener('click', onParents);
