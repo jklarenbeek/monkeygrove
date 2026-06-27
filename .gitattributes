@@ -1,0 +1,4 @@
+# Vendored verbatim copy of @yijingjs/core (see src/yijing/PROVENANCE.md): keep it
+# byte-for-byte as copied from upstream, so it is exempt from our whitespace checks
+# (`git diff --check` / blank-at-eof). It is also ESLint-ignored in eslint.config.js.
+src/yijing/** -whitespace linguist-vendored

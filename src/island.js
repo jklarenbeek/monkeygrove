@@ -69,28 +69,32 @@ export const isBuilt = (profile, id) => ensureIsland(profile).built.includes(id)
 export const playerCost = (build) => build.cost - (build.contribution || 0);
 
 // 'built' | 'unlocked' (blueprint on the worktable) | 'locked' (still a dream)
-export function buildState(profile, build, report) {
+// opts.finaleReady (story-driven): the finale build stays locked until the founding
+// hexagram's prior lines are home, so the Crab King can never reconcile on a
+// half-drawn hexagram. Omitting it leaves the finale ungated (tests/back-compat).
+export function buildState(profile, build, report, opts = {}) {
   if (isBuilt(profile, build.id)) return 'built';
   if (progressPoints(report) < build.points) return 'locked';
   for (const need of build.needs || []) {
     if (!isBuilt(profile, need)) return 'locked';
   }
+  if (build.finale && opts.finaleReady === false) return 'locked';
   return 'unlocked';
 }
 
 // Full status list in build order, for the worktable screen and the hub.
-export function islandStatus(profile, report) {
+export function islandStatus(profile, report, opts = {}) {
   return BUILDS.map((b) => ({
     ...b,
-    state: buildState(profile, b, report),
+    state: buildState(profile, b, report, opts),
     playerCost: playerCost(b),
   }));
 }
 
 // Blueprints that just became visible and were never announced yet.
-export function newBlueprints(profile, report) {
+export function newBlueprints(profile, report, opts = {}) {
   const island = ensureIsland(profile);
-  return islandStatus(profile, report).filter(
+  return islandStatus(profile, report, opts).filter(
     (b) => b.state === 'unlocked' && !island.seen.includes(b.id),
   );
 }
@@ -100,14 +104,14 @@ export function markSeen(profile, ids) {
   for (const id of ids) if (!island.seen.includes(id)) island.seen.push(id);
 }
 
-export function canFund(profile, build, report) {
-  return buildState(profile, build, report) === 'unlocked'
+export function canFund(profile, build, report, opts = {}) {
+  return buildState(profile, build, report, opts) === 'unlocked'
     && profile.bananas >= playerCost(build);
 }
 
 // Spend and build. Caller persists and rebuilds the hub.
-export function fund(profile, build, report) {
-  if (!canFund(profile, build, report)) return false;
+export function fund(profile, build, report, opts = {}) {
+  if (!canFund(profile, build, report, opts)) return false;
   profile.bananas -= playerCost(build);
   ensureIsland(profile).built.push(build.id);
   return true;

@@ -18,6 +18,7 @@ import {
 import {
   freshStory, ensureStory, worldBands, refreshStoryLines,
   drawNarrativeLine, islandHexagram, islandBloom, advancePhase, markBeat,
+  storyProgressReport, storyFinaleReady,
 } from '../src/story/engine.js';
 import {
   CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS,
@@ -108,6 +109,25 @@ test('only the three yang world-lines move the hexagram value; yin lines hold at
   assert.equal(islandHexagram(s), FOUNDING_HEXAGRAM);
 });
 
+test('the three yang lines read as balanced but NOT complete — the finale is still owed', () => {
+  const s = freshStory();
+  // the yang trio alone already spells 42, so a value-only check would lie here
+  s.lines = [true, false, true, false, true, false];
+  const b = islandBloom(s);
+  assert.equal(b.hexagram, FOUNDING_HEXAGRAM);
+  assert.equal(b.balance, 0.5);        // perfectly balanced...
+  assert.equal(b.isRoot, true);
+  assert.equal(b.complete, false);     // ...but only 3/6 lines are home
+  assert.equal(b.wholeness, 0.5);
+  // even at 5/6 (lines 1-5 home, the finale still owed) it must not say "complete"
+  s.lines = [true, true, true, true, true, false];
+  assert.equal(islandBloom(s).complete, false);
+  assert.equal(islandBloom(s).wholeness, 5 / 6);
+  // only all six lines is complete
+  s.lines = [true, true, true, true, true, true];
+  assert.equal(islandBloom(s).complete, true);
+});
+
 // ---------------------------------------------------------------------------
 // The age fix: narrative progress decoupled from content difficulty.
 
@@ -152,6 +172,62 @@ test('younger child: worlds above the band stay future (not drawn for free)', ()
   // nothing draws until tide is mastered; higher worlds never draw for free
   assert.deepEqual(refreshStoryLines(s, reportWith([]), eligible), []);
   assert.deepEqual(refreshStoryLines(s, reportWith(worldSkills('tide')), eligible), [0]);
+});
+
+test('worldBands: a curriculum gap world is "remembered", never a soft-lock', () => {
+  // eligible in tide (0) and stump (2), nothing in garden (1) -> garden is a gap
+  const eligible = [...worldSkills('tide'), ...worldSkills('stump')];
+  const bands = worldBands(reportWith([]), eligible);
+  assert.equal(bands.tide.band, 'in');
+  assert.equal(bands.garden.band, 'below');  // gap beneath the frontier -> drawn free, not stuck
+  assert.equal(bands.stump.band, 'in');
+  assert.equal(bands.vines.band, 'above');   // beyond the frontier -> future
+});
+
+test('worldBands: an empty / unmapped band falls back to full mastery (no soft-lock)', () => {
+  const bands = worldBands(reportWith([]), ['no_such_skill']);
+  for (const w of WORLDS) assert.equal(bands[w].band, 'in');
+});
+
+// ---------------------------------------------------------------------------
+// The age fix, completed: the finale must be REACHABLE for an older child and
+// can only land on a whole hexagram.
+
+test('storyFinaleReady is true exactly when lines 1-5 are home (line 6 is the finale)', () => {
+  const s = freshStory();
+  assert.equal(storyFinaleReady(s), false);
+  s.lines = [true, true, true, true, true, false];
+  assert.equal(storyFinaleReady(s), true);
+  s.lines = [true, true, true, false, true, false]; // a hole at line 4
+  assert.equal(storyFinaleReady(s), false);
+});
+
+test('storyProgressReport credits remembered worlds so the festival/finale is reachable', () => {
+  // older child: band sits at fractions; tide/garden/stump are below (remembered)
+  const eligible = worldSkills('vines');
+  const report = reportWith(worldSkills('vines'));
+  report.worlds.vines.pct = 1; // vines fully mastered; lower worlds content-gated -> pct 0
+  const raw = WORLDS.reduce((sum, w) => sum + report.worlds[w].pct, 0);
+  assert.ok(raw < 3.4, `raw progress ${raw} can never reach the plaza (3.4)`);
+  const credited = WORLDS.reduce((sum, w) => sum + storyProgressReport(report, eligible).worlds[w].pct, 0);
+  assert.ok(credited >= 3.4, `band-aware progress ${credited} reaches the plaza`);
+  // a young child (no below-band worlds) is returned unchanged
+  const young = reportWith([]);
+  const adj = storyProgressReport(young, worldSkills('tide'));
+  for (const w of WORLDS) assert.equal(adj.worlds[w].pct, young.worlds[w].pct);
+});
+
+test('finale backfill: latching world lines + narratives yields a whole hexagram', () => {
+  const s = freshStory();
+  const eligible = worldSkills('vines');
+  // older child at the festival: lower worlds remembered, vines mastered
+  refreshStoryLines(s, reportWith(worldSkills('vines')), eligible);
+  assert.equal(storyFinaleReady(s), false);     // the reveal (line 2) is still owed
+  drawNarrativeLine(s, 1);                       // backfill the reveal
+  assert.equal(storyFinaleReady(s), true);
+  drawNarrativeLine(s, 5);                       // the finale
+  assert.deepEqual(s.lines, [true, true, true, true, true, true]);
+  assert.equal(islandBloom(s).complete, true);
 });
 
 test('drawn lines only ever rise — a later weaker report never un-draws', () => {
@@ -278,4 +354,31 @@ test('ensureStory heals a save that predates story mode', () => {
   assert.equal(healed.lines.length, 6);
   assert.equal(healed.phase, 2);
   assert.ok(Array.isArray(healed.beats));
+});
+
+test('ensureStory coerces corrupt shapes (truthy-string lines, out-of-range phase, junk beats)', () => {
+  const p = {
+    story: {
+      lines: ['yes', 1, {}, 0, '', false], // 6 long but NONE are literal true
+      phase: 99,
+      beats: [1, 'theft', null, 'reveal'],
+      crabKingReconciled: 'sure',
+    },
+  };
+  const s = ensureStory(p);
+  assert.deepEqual(s.lines, [false, false, false, false, false, false]); // no truthy string reads as drawn
+  assert.equal(islandBloom(s).complete, false);                          // so the island can't fake "whole"
+  assert.equal(s.phase, 6);                  // clamped down to LAST_CHAPTER
+  assert.deepEqual(s.beats, ['theft', 'reveal']); // only string ids survive
+  assert.equal(s.crabKingReconciled, false); // coerced to a real boolean
+
+  // a genuinely-drawn line survives; a negative phase clamps up; line 6 alone is not complete
+  const p2 = { story: { lines: [true, false, false, false, false, false], phase: -5 } };
+  const s2 = ensureStory(p2);
+  assert.equal(s2.lines[0], true);
+  assert.equal(s2.phase, 0);
+
+  // an array masquerading as the story object is replaced wholesale
+  const p3 = { story: [] };
+  assert.deepEqual(ensureStory(p3), freshStory());
 });

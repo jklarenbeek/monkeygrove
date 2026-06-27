@@ -13,6 +13,7 @@
 //
 // Like flags.portalStages, story lines only ever RISE: once a line is drawn it
 // stays drawn, even if the underlying skill later decays (forgetting curve).
+import '../polyfills.js'; // MUST precede the vendored engine: it shims Object.groupBy
 import {
   yijing_balance,
   yijing_entropy,
@@ -36,18 +37,28 @@ export function freshStory() {
   };
 }
 
-// Heal saves from before story mode (keeps state.js migration additive).
+// Heal saves from before story mode (keeps state.js migration additive). Defends
+// additively against partial/corrupt shapes: every field is coerced to its proper
+// type so a stray truthy string in `lines` can never read as a drawn line and an
+// out-of-range `phase` can never escape [0, LAST_CHAPTER].
 export function ensureStory(profile) {
-  if (!profile.story || typeof profile.story !== 'object') profile.story = freshStory();
-  const ref = freshStory();
-  for (const [k, v] of Object.entries(ref)) {
-    if (profile.story[k] === undefined) profile.story[k] = structuredClone(v);
+  const fresh = freshStory();
+  if (!profile.story || typeof profile.story !== 'object' || Array.isArray(profile.story)) {
+    profile.story = fresh;
+    return profile.story;
   }
-  if (!Array.isArray(profile.story.lines) || profile.story.lines.length !== 6) {
-    profile.story.lines = freshStory().lines;
-  }
-  if (!Array.isArray(profile.story.beats)) profile.story.beats = [];
-  return profile.story;
+  const s = profile.story;
+  // lines: exactly six booleans — only a literal `true` counts as drawn.
+  s.lines = (Array.isArray(s.lines) && s.lines.length === 6)
+    ? s.lines.map((v) => v === true)
+    : fresh.lines;
+  // phase: integer clamped to [0, LAST_CHAPTER], monotonic furthest-reached chapter.
+  s.phase = Number.isFinite(s.phase) ? Math.max(0, Math.min(LAST_CHAPTER, Math.floor(s.phase))) : 0;
+  // beats: array of string ids only (no replay of one-shot beats).
+  s.beats = Array.isArray(s.beats) ? s.beats.filter((b) => typeof b === 'string') : [];
+  // crabKingReconciled: a plain boolean flag.
+  s.crabKingReconciled = s.crabKingReconciled === true;
+  return s;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,15 +75,17 @@ export function ensureStory(profile) {
 // every world is 'in' and judged on full mastery, matching the math engine.
 export function worldBands(report, eligibleSkillIds = []) {
   const eligible = new Set(eligibleSkillIds || []);
-  const unconstrained = eligible.size === 0;
 
   // Which worlds host at least one eligible skill, by ladder order.
   const eligibleIdx = [];
   WORLDS.forEach((world, i) => {
     const skills = report.worlds[world]?.skills || [];
-    const has = unconstrained ? skills.length > 0 : skills.some((s) => eligible.has(s.id));
-    if (has) eligibleIdx.push(i);
+    if (skills.some((s) => eligible.has(s.id))) eligibleIdx.push(i);
   });
+  // Unconstrained when there is no curriculum window OR the window names skills
+  // that map to no world at all (empty/foreign pack): fall back to full-mastery on
+  // every world rather than soft-locking the whole story behind an empty band.
+  const unconstrained = eligible.size === 0 || eligibleIdx.length === 0;
   const maxEligible = eligibleIdx.length ? Math.max(...eligibleIdx) : -1;
 
   const out = {};
@@ -80,9 +93,10 @@ export function worldBands(report, eligibleSkillIds = []) {
     const skills = report.worlds[world]?.skills || [];
     const inBand = unconstrained ? skills : skills.filter((s) => eligible.has(s.id));
     let band;
-    if (inBand.length) band = 'in';
-    else if (maxEligible >= 0 && i < maxEligible) band = 'below';
-    else band = 'above';
+    if (inBand.length) band = 'in';                 // hosts in-band skills -> earn by mastery
+    else if (i < maxEligible) band = 'below';       // beneath the child's frontier (incl. a
+                                                    //   curriculum gap) -> "remembered", drawn free
+    else band = 'above';                            // beyond the frontier -> still future
 
     const mastered = band === 'in' && inBand.every((s) => s.mastered);
     const satisfied = band === 'below' || mastered;
@@ -162,6 +176,41 @@ export function islandBloom(story) {
     isRoot: yijing_isRoot(hexagram),
     wholeness: drawn / 6,
     linesDrawn: drawn,
-    complete: hexagram === FOUNDING_HEXAGRAM,
+    // "Complete" means all SIX lines are home — NOT just hexagram === 42. The three
+    // yin lines (the reveal, stump, the finale) never change the decimal value, so
+    // the yang trio alone already spells 42; gating on the value would declare the
+    // grove whole at 3/6 (before the finale). wholeness is the honest signal.
+    complete: drawn === 6 && hexagram === FOUNDING_HEXAGRAM,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Finale reachability (the age fix, completed).
+//
+// Story LINE-DRAWS are band-aware (older kids' lower worlds are "remembered"), but
+// the festival/finale is gated by island.js progress points over the FULL skill
+// ladder. An older child is content-gated out of the lower worlds, so those worlds
+// sit at pct 0 and the raw sum can never reach the plaza threshold — the finale
+// (line 6) would be unreachable for exactly the audience the age fix serves.
+//
+// storyProgressReport credits a "remembered" (below-band) world as fully restored
+// for BUILD GATING ONLY (bloom/gates still use the raw report), so the island
+// restoration loop and the finale are reachable without grinding baby math. A
+// young child has no below-band worlds, so their report is returned unchanged.
+export function storyProgressReport(report, eligibleSkillIds = []) {
+  const bands = worldBands(report, eligibleSkillIds);
+  const worlds = {};
+  for (const [w, info] of Object.entries(report.worlds)) {
+    worlds[w] = bands[w]?.band === 'below' ? { ...info, pct: 1 } : info;
+  }
+  return { ...report, worlds };
+}
+
+// The story is ready for its capstone when lines 1-5 (indices 0..4) are all home;
+// line 6 (index 5) is the finale itself. The plaza gates on this so the Crab King
+// can never reconcile on a hexagram with a hole in it (older-child / migrated /
+// dev-seeded paths included).
+export function storyFinaleReady(story) {
+  for (let i = 0; i < 5; i++) if (!story.lines[i]) return false;
+  return true;
 }

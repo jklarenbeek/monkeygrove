@@ -13,7 +13,19 @@ package is out of date. When the npm package is fixed, this folder can be delete
 and replaced with a normal dependency — re-point the imports in `src/story/` and
 `tests/story.test.mjs` back at `@yijingjs/core/...`.
 
+## Import rules (enforced by a test)
+
 **Do not hand-edit these files.** Fix bugs upstream in yijingjs and re-copy, so the
 two never diverge. Internal use only imports `yijing.js` and `bagua.js`; `tools.js`
 and `index.js` are copied for completeness but run side-effectful module-load
-computations, so import the leaf modules directly, not the barrel.
+computations (and `tools.js`'s transition-groups builder is broken), so import the
+leaf modules directly, **never the barrel**. `tests/no-yijing-barrel.test.mjs`
+fails the build if any app module imports `yijing/index.js` or `yijing/tools.js`.
+
+`yijing.js` builds its nuclear-matrix tables eagerly at import using `Object.groupBy`
+(Chrome 117+/Safari 17.4+/FF 119+). `src/polyfills.js` shims it and is imported by
+`src/story/engine.js` and `src/story/pacing.js` **before** the engine, so older
+school/Android WebViews don't crash on boot. Keep that import order if you re-copy.
+
+This folder is exempt from the project's whitespace checks (`.gitattributes`) and
+ESLint (`eslint.config.js`) so the copy can stay verbatim.

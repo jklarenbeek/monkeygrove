@@ -438,25 +438,25 @@ class Game {
       }
 
       // The Four-Directions reveal draws the second line once the first shore is
-      // home — but only at the moment its beat plays, so a preceding line-draw
-      // ceremony still shows the honest "1 of 6" before this one says "2 of 6".
-      // (No ceremony — the silent bootstrap — latches it eagerly instead.)
-      if (dueNarrativeBeat(story) === 'reveal') {
+      // home — but ONLY ever through its ceremony. The beat is keyed off the line
+      // state (dueNarrativeBeat), so latching the line silently on the title->hub
+      // bootstrap would consume the beat and the child would never see it. On the
+      // silent bootstrap we leave it pending; the next real hub transition (after a
+      // chamber/business) plays it with the honest "2 of 6".
+      if (withCeremony && dueNarrativeBeat(story) === 'reveal') {
         const revealIdx = NARRATIVE_BEATS.reveal.lineIndex;
-        if (withCeremony) {
-          queue.push((done) => {
-            drawNarrativeLine(story, revealIdx);
-            persist();
-            screens.showStoryBeat('reveal', { story }, done);
-          });
-        } else {
+        queue.push((done) => {
           drawNarrativeLine(story, revealIdx);
-          changed = true;
-        }
+          persist();
+          screens.showStoryBeat('reveal', { story }, done);
+        });
       }
 
       if (changed) persist();
-    } catch {
+    } catch (e) {
+      // Story must never block hub entry (anti-anxiety), but a silent swallow hides
+      // real regressions — surface it in dev/test so a broken spine is visible.
+      if (import.meta.env.DEV) console.error('[story] advanceStory failed (hub entry continues):', e);
       return [];
     }
     return queue;

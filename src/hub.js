@@ -19,7 +19,11 @@ import {
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines } from './mimi.js';
-import { ensureStory, drawNarrativeLine, islandBloom } from './story/engine.js';
+import { eligibleSkillIds } from './curriculum/placement.js';
+import {
+  ensureStory, drawNarrativeLine, islandBloom,
+  refreshStoryLines, storyProgressReport, storyFinaleReady,
+} from './story/engine.js';
 import { AmbientLife } from './ambient.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
@@ -192,7 +196,8 @@ export class HubController {
       }));
     }
     // island: announce blueprints Mimi just dreamed up (once each)
-    const fresh = newBlueprints(g.profile, masteryReport(g.profile.math));
+    const { buildReport, finaleReady } = this.islandGatingInputs();
+    const fresh = newBlueprints(g.profile, buildReport, { finaleReady });
     if (fresh.length) {
       markSeen(g.profile, fresh.map((b) => b.id));
       persist();
@@ -206,17 +211,36 @@ export class HubController {
     }
   }
 
+  // Build-gating inputs that make the island restoration loop age-aware. The
+  // `buildReport` credits an older child's "remembered" (below-band) worlds as
+  // restored so the festival/finale is actually reachable without grinding baby
+  // math; `finaleReady` keeps the finale locked until the prior lines are home.
+  // Bloom and living gates still read the RAW report (visual mastery), so this
+  // only moves which blueprints unlock — never how the island looks.
+  islandGatingInputs() {
+    const g = this.game;
+    const report = masteryReport(g.profile.math);
+    const eligible = eligibleSkillIds(g.profile.curriculum);
+    const story = ensureStory(g.profile);
+    return {
+      report,
+      buildReport: storyProgressReport(report, eligible),
+      finaleReady: storyFinaleReady(story),
+      story,
+    };
+  }
+
   buildHub() {
     const g = this.game;
     g.clearPlace();
-    const report = masteryReport(g.profile.math);
+    const { report, buildReport, finaleReady, story } = this.islandGatingInputs();
     const pct = {};
-    for (const [w, info] of Object.entries(report.worlds)) pct[w] = info.pct;
-    const status = islandStatus(g.profile, report);
+    for (const [w, info] of Object.entries(report.worlds)) pct[w] = info.pct; // raw -> bloom + gates
+    const status = islandStatus(g.profile, buildReport, { finaleReady });
     // living gates are built at their last celebrated stage, so growth since
     // the previous visit can pop in before the player's eyes (never shrinks)
     const gateStages = g.profile.flags.portalStages || (g.profile.flags.portalStages = {});
-    const storyBloom = islandBloom(ensureStory(g.profile)).wholeness;
+    const storyBloom = islandBloom(story).wholeness;
     g.place = new HubPlace(g.world, pct, {
       built: status.filter((b) => b.state === 'built').map((b) => b.id),
       unlocked: status.filter((b) => b.state === 'unlocked').map((b) => b.id),
@@ -436,8 +460,10 @@ export class HubController {
   // opens with the line that matters.
   _mimiPick(consume) {
     const g = this.game;
-    const report = masteryReport(g.profile.math);
-    const lines = mimiLines(g.profile, report, islandStatus(g.profile, report));
+    // Use the age-aware build report so Mimi's advice (next build, banana gap,
+    // weakest world) matches what the worktable actually offers an older child.
+    const { buildReport, finaleReady } = this.islandGatingInputs();
+    const lines = mimiLines(g.profile, buildReport, islandStatus(g.profile, buildReport, { finaleReady }));
     const line = lines[g.mimiChat % lines.length];
     if (consume) g.mimiChat++;
     if (!g.profile.flags.mimiMet) { g.profile.flags.mimiMet = true; persist(); }
@@ -494,15 +520,15 @@ export class HubController {
   openIsland() {
     const g = this.game;
     audio.sfx('click');
-    const report = masteryReport(g.profile.math);
+    const { buildReport, finaleReady, story } = this.islandGatingInputs();
     screens.showIsland({
       profile: g.profile,
-      status: islandStatus(g.profile, report),
-      bloom: islandBloom(ensureStory(g.profile)),
+      status: islandStatus(g.profile, buildReport, { finaleReady }),
+      bloom: islandBloom(story),
       onClose: () => screens.closeScreen(),
       onFund: (id) => this.fundBuild(id),
       onAltar: () => screens.showAltar({
-        story: ensureStory(g.profile),
+        story,
         onClose: () => this.openIsland(),
       }),
     });
@@ -513,7 +539,8 @@ export class HubController {
     const def = buildById(id);
     if (!def) return;
     const doFund = () => {
-      if (!fundIsland(g.profile, def, masteryReport(g.profile.math))) {
+      const { buildReport, finaleReady } = this.islandGatingInputs();
+      if (!fundIsland(g.profile, def, buildReport, { finaleReady })) {
         audio.sfx('boop');
         return;
       }
@@ -538,9 +565,15 @@ export class HubController {
       g.profile.flags.festivalDone = true;
       // The festival draws the founding hexagram's top line — the yielding sixth
       // line: the island is made whole by sharing it (letting the Crab King in),
-      // not by hoarding. Completes the Even Grove when every other line is home.
+      // not by hoarding. Normal play already gates the plaza on storyFinaleReady,
+      // but backfill defensively so the capstone always lands on a WHOLE hexagram
+      // even on a dev-seeded / migrated / interrupted path: latch every earned or
+      // remembered world line, then the Four-Directions reveal, then the finale.
       const story = ensureStory(g.profile);
-      drawNarrativeLine(story, 5);
+      const report = masteryReport(g.profile.math);
+      refreshStoryLines(story, report, eligibleSkillIds(g.profile.curriculum));
+      drawNarrativeLine(story, 1); // the Four-Directions reveal (line 2)
+      drawNarrativeLine(story, 5); // the yielding top line (line 6)
       story.crabKingReconciled = true;
       persist();
     }

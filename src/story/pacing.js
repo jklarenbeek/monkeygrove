@@ -12,6 +12,7 @@
 //   principle; problem selection still flows through mathengine's Elo targeting,
 //   which already implements that ramp. These helpers ready the spine for a future
 //   story-driven selector without overriding the tested pedagogy today.
+import '../polyfills.js'; // MUST precede the vendored engine: it shims Object.groupBy
 import { yijing_invert, yijing_neighbors, yijing_distance } from '../yijing/yijing.js';
 
 // The shadow/echo of a hexagram: every line flipped (yin<->yang). Used to render

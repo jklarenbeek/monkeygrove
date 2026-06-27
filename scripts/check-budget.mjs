@@ -1,9 +1,8 @@
 // First-load performance budget. Runs after `vite build` (see `npm run build`) and
 // FAILS the build if the first download re-bloats — the guardrail that makes the
 // lazy-fonts (TODO_01) and code-split-business (TODO_02) wins stick. Checks:
-//   1. the first-load `index` JS gzip is REPORTED (no longer a hard cap — the
-//      story mode + yijingjs engine deliberately grow it; the size still prints so a
-//      regression is visible, it just can't fail the build),
+//   1. the first-load `index` JS gzip stays under budget (the target is kids on
+//      slow school Wi-Fi / cheap Android, so this stays a HARD cap),
 //   2. no always-loaded webfont ships (none in the precache, none @font-face'd in the
 //      always-loaded CSS — the dyslexia font must stay lazy, registered at runtime),
 //   3. the PWA precache total stays under budget,
@@ -23,9 +22,12 @@ import { join } from 'node:path';
 // 2026-06-27: bumped 215 -> 217 for the unified creature roster — 10 new
 // hand-authored character meshes (8 full-body pets + chibi monkey/mimi) that the
 // hub/attract/avatar reference eagerly (~1.5 kB gzip). index was ~215.2 kB gzip.
-// 2026-06-27: the first-load JS gzip cap was DROPPED — story mode pulls in the
-// yijingjs engine and per-chapter content that intentionally grow the entry chunk.
-// The size is still printed (see check 1) so a surprise jump stays visible.
+// 2026-06-27: bumped 217 -> 235 for story mode — the vendored yijingjs engine and
+// per-chapter content land in the entry (~221 kB gzip today). Raised DELIBERATELY,
+// not removed: the cap stays a real guardrail (the target is cheap Android / school
+// Wi-Fi). When the entry approaches this again, code-split the story screens/prose
+// into a lazy chunk (like business-*/duel-*) rather than just bumping the number.
+const INDEX_JS_GZIP_BUDGET_KB = 235;   // decimal kB (÷1000), matches Vite's report
 const PRECACHE_BUDGET_KIB = 1150;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
@@ -47,15 +49,14 @@ const findAsset = (re) => {
 
 const checks = [];
 
-// 1. First-load JS: the `index` entry chunk's gzip size — REPORTED, not capped.
-//    The hard budget was dropped (story mode + yijingjs grow the entry on purpose);
-//    we still surface the number so a regression is at least visible in the log.
+// 1. First-load JS: the `index` entry chunk's gzip size — a HARD cap.
 const indexJs = findAsset(/^index-.*\.js$/);
 if (!indexJs) {
   checks.push(fail('no index-*.js entry chunk found in dist/assets'));
 } else {
   const gzipKb = gzipSync(readFileSync(indexJs)).length / 1000;
-  checks.push(pass(`first-load JS: ${gzipKb.toFixed(2)} kB gzip (no cap — reported only)`));
+  const label = `first-load JS: ${gzipKb.toFixed(2)} kB gzip (budget ${INDEX_JS_GZIP_BUDGET_KB} kB)`;
+  checks.push(gzipKb <= INDEX_JS_GZIP_BUDGET_KB ? pass(label) : fail(label));
 }
 
 // 2a. No always-loaded webfont in the shipped CSS. A lazy font is registered via the
