@@ -100,6 +100,8 @@ export class ChamberFlow {
       g.verb?.onArrive(x, z);
     };
     g.player.onBump = (x, z) => g.verb?.onBump(x, z);
+    // crabs read the player's cell to colour their wandering with curiosity
+    g.place.playerAt = () => (g.player ? { x: g.player.x, z: g.player.z } : null);
     // altar & crabs
     g.altar = null;
     if ((g.place.markers.A || []).length) {
@@ -112,12 +114,12 @@ export class ChamberFlow {
     }
     g.crabs = [];
     for (const c of g.place.markers.c || []) {
-      // patrol along the longest clear axis through the spawn point
-      const reachX = this.patrolReach(c, 'x'), reachZ = this.patrolReach(c, 'z');
-      const axis = reachX.len >= reachZ.len ? 'x' : 'z';
-      const reach = axis === 'x' ? reachX : reachZ;
-      if (reach.len < 2) continue;
-      const crab = new Crab(g.place, c.x, c.z, axis, reach.min, reach.max, 1.3 + g.rng.float() * 0.7);
+      // need room on at least one side to roam — skip a crab boxed in a pocket
+      if (this.patrolReach(c, 'x').len + this.patrolReach(c, 'z').len < 2) continue;
+      const crab = new Crab(g.place, c.x, c.z, {
+        speed: 1.3 + g.rng.float() * 0.7,
+        rng: new Rng(g.rng.int(1, 1e9)),
+      });
       g.crabs.push(crab);
       g.place.addEntity(crab);
     }
@@ -208,7 +210,7 @@ export class ChamberFlow {
       rng: g.chamberRng,
       resolve: (correct, info) => this.onResolve(correct, info),
       onTreat: (kind, n, pos) => this.onTreat(kind, n, pos),
-      onCarry: (carrying) => this.setCrabsFrozen(carrying),
+      onCarry: (carrying) => { if (carrying) this.startleCrabs(); },
       hintUsed: () => { g.usedHint = true; },
     });
     g.verb.begin();
@@ -353,8 +355,11 @@ export class ChamberFlow {
     this.game.rewards.payTreat(kind, n, pos);
   }
 
-  setCrabsFrozen(frozen) {
-    for (const c of this.game.crabs) c.frozen = frozen;
+  // The player just picked up an answer stone: every crab does a brief startled
+  // freeze, then resumes roaming. Delivering the answer stays safe regardless —
+  // the steal is suppressed while carrying (see updateChamber).
+  startleCrabs() {
+    for (const c of this.game.crabs) c.startle();
   }
 
   completeChamber(eggFull) {
@@ -421,7 +426,9 @@ export class ChamberFlow {
     const g = this.game;
     if (g.mode !== 'chamber' || !g.player || g.player.locked) return;
     for (const crab of g.crabs) {
-      if (crab.frozen || crab.cooldown > 0) continue;
+      // carrying an answer stone keeps you safe — crabs still amble about, they
+      // just won't snatch while you're focused on reaching the altar
+      if (crab.frozen || crab.cooldown > 0 || g.player.carrying) continue;
       if (crab.x === g.player.x && crab.z === g.player.z) {
         crab.cooldown = 2200;
         const steal = Math.min(BALANCE.crabSteal, g.profile.bananas);

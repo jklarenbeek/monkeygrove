@@ -5,6 +5,8 @@ import { buildVoxelMesh, withPalette } from './voxel.js';
 import { CHARS, PROPS } from './models.js';
 import { tween, ease } from './anim.js';
 import { audio } from './audio.js';
+import { Rng } from './rng.js';
+import { SOLID_MARKERS } from './config.js';
 
 // ---------- factories ----------
 
@@ -534,58 +536,144 @@ export class Pot {
   }
 }
 
+// Tide-pool crabs: cheeky banana-snatchers that scuttle the chamber floor.
+// They roam by hopping cell-to-cell with MOMENTUM (they keep a heading instead
+// of jittering), pause on a beat now and then, and shift MOOD — mostly aimless
+// wander, sometimes a curious sidle toward the player, sometimes a shy skitter
+// away — so a path never reads as a metronome. Touching one yoinks a few
+// bananas (always recoverable). When the player picks up an answer stone the
+// crabs do a brief startled freeze, then carry on; the carry itself stays safe
+// because the steal is suppressed while carrying (chamberflow.updateChamber).
+//
+// Each crab owns a seeded Rng: deterministic per seed (duel-fair) and separate
+// from the chamber/problem stream, so its per-frame dice never skew the math.
+const CRAB_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
 export class Crab {
-  constructor(place, x, z, axis, min, max, speed = 1.6) {
+  // opts: { speed (cells/sec), rng (seeded Rng) }
+  constructor(place, x, z, opts = {}) {
     this.place = place;
-    this.axis = axis; this.min = min; this.max = max;
-    this.pos = axis === 'x' ? x : z;
-    this.fixed = axis === 'x' ? z : x;
-    this.dir = 1;
-    this.speed = speed;
-    this.frozen = false;
-    this.cooldown = 0;
+    this.cell = { x, z };
+    this.prev = { x, z };               // last cell — discourages instant U-turns
+    this.heading = { dx: 0, dz: 1 };
+    this.homeH = place.cellAt(x, z)?.h ?? 0;
+    this.speed = opts.speed ?? 1.6;     // cells per second
+    this.rng = opts.rng || new Rng(((x + 1) * 73856093) ^ ((z + 1) * 19349663));
+    this.frozen = false;                // true during a startle (collision reads it)
+    this.startleT = 0;                  // ms left in a "noticed you!" pause
+    this.cooldown = 0;                  // post-yoink grace (set by chamberflow)
+    this.hop = null;                    // { from, to, cell, k, dur }
+    this.pause = 150 + this.rng.float() * 500;
+    this.t = this.rng.float() * 10;
     this.mesh = makeCharacter(CHARS.crab, 0.5, null, 'char:crab');
     place.group.add(this.mesh);
-    this.t = Math.random() * 10;
-    this._sync(0);
+    this._cellPos = place.worldPos(x, z);
+    this.mesh.position.copy(this._cellPos);
+    this.mesh.rotation.y = Math.atan2(this.heading.dx, this.heading.dz);
   }
 
-  get x() { return this.axis === 'x' ? Math.round(this.pos) : this.fixed; }
-  get z() { return this.axis === 'z' ? Math.round(this.pos) : this.fixed; }
+  // Collision (chamberflow) reads these: a crab "occupies" whichever cell it is
+  // at least halfway onto, matching the old round(pos) feel.
+  get x() { return this.hop && this.hop.k >= 0.5 ? this.hop.cell.x : this.cell.x; }
+  get z() { return this.hop && this.hop.k >= 0.5 ? this.hop.cell.z : this.cell.z; }
 
-  _sync(dtMs) {
-    this.t += dtMs / 1000;
-    const gx = this.axis === 'x' ? this.pos : this.fixed;
-    const gz = this.axis === 'z' ? this.pos : this.fixed;
-    // cache the cell's world position — worldPos allocates, and this runs
-    // every frame per crab
-    const ck = Math.round(gx) * 1000 + Math.round(gz);
-    if (this._posKey !== ck) {
-      this._posKey = ck;
-      this._pos = this.place.worldPos(Math.round(gx), Math.round(gz));
+  // A brief startled freeze, then back to roaming (player grabbed an answer).
+  startle() { this.startleT = Math.max(this.startleT, 800 + this.rng.float() * 600); }
+
+  _neighbors() {
+    const out = [];
+    for (const [dx, dz] of CRAB_DIRS) {
+      const cell = this.place.cellAt(this.cell.x + dx, this.cell.z + dz);
+      if (cell && cell.walk && cell.h === this.homeH && !SOLID_MARKERS.has(cell.ch)) {
+        out.push({ dx, dz });
+      }
     }
-    const p = this._pos;
-    const fx = this.axis === 'x' ? this.pos - Math.round(gx) : 0;
-    const fz = this.axis === 'z' ? this.pos - Math.round(gz) : 0;
-    this.mesh.position.set(p.x + fx, p.y + Math.abs(Math.sin(this.t * 9)) * 0.06, p.z + fz);
-    this.mesh.rotation.y = this.axis === 'x'
-      ? (this.dir > 0 ? Math.PI / 2 : -Math.PI / 2)
-      : (this.dir > 0 ? 0 : Math.PI);
+    return out;
+  }
+
+  _decide() {
+    const opts = this._neighbors();
+    if (!opts.length) { this.pause = 500; return; }            // boxed in — wait
+    if (this.rng.chance(0.16)) { this.pause = 250 + this.rng.float() * 950; return; } // a beat of stillness
+    // don't spin straight back the way we came, unless it's a dead end
+    let choices = opts.filter((o) => this.cell.x + o.dx !== this.prev.x || this.cell.z + o.dz !== this.prev.z);
+    if (!choices.length) choices = opts;
+    // mood: mostly neutral wander; occasionally curious (toward) or shy (away)
+    const m = this.rng.float();
+    const bias = m < 0.24 ? 1 : (m < 0.36 ? -1 : 0);
+    const player = bias ? this.place.playerAt?.() : null;
+    const weighted = [];
+    for (const o of choices) {
+      let w = 1;
+      if (o.dx === this.heading.dx && o.dz === this.heading.dz) w += 2.2; // momentum
+      if (player) {
+        const cur = Math.abs(player.x - this.cell.x) + Math.abs(player.z - this.cell.z);
+        const nxt = Math.abs(player.x - (this.cell.x + o.dx)) + Math.abs(player.z - (this.cell.z + o.dz));
+        if ((bias > 0 && nxt < cur) || (bias < 0 && nxt > cur)) w += 1.4;
+      }
+      const n = Math.max(1, Math.round(w * 2));
+      for (let i = 0; i < n; i++) weighted.push(o);
+    }
+    this._hopTo(this.rng.pick(weighted));
+  }
+
+  _hopTo(d) {
+    this.prev = { x: this.cell.x, z: this.cell.z };
+    this.heading = { dx: d.dx, dz: d.dz };
+    const next = { x: this.cell.x + d.dx, z: this.cell.z + d.dz };
+    this.hop = {
+      from: this._cellPos,
+      to: this.place.worldPos(next.x, next.z),
+      cell: next,
+      k: 0,
+      dur: (1000 / this.speed) * (0.85 + this.rng.float() * 0.4),
+    };
   }
 
   update(dtMs) {
+    this.t += dtMs / 1000;
     if (this.cooldown > 0) this.cooldown -= dtMs;
-    if (this.frozen) {
-      // frozen crabs nap: tiny slow bob, zzz handled by game
-      this.mesh.rotation.z = Math.sin(this.t) * 0.04;
-      this.t += dtMs / 1000;
-      return;
+    if (this.startleT > 0) this.startleT -= dtMs;
+    this.frozen = this.startleT > 0;
+
+    if (this.hop) { this._advance(dtMs); return; }   // always finish a hop first
+    if (this.frozen) { this._startled(); return; }   // pause on the cell, then carry on
+    if (this.pause > 0) { this.pause -= dtMs; this._idle(); return; }
+    this._decide();
+  }
+
+  _advance(dtMs) {
+    const h = this.hop;
+    h.k += dtMs / h.dur;
+    const k = Math.min(1, h.k);
+    const mesh = this.mesh;
+    mesh.position.x = h.from.x + (h.to.x - h.from.x) * k;
+    mesh.position.z = h.from.z + (h.to.z - h.from.z) * k;
+    mesh.position.y = h.from.y + Math.sin(k * Math.PI) * 0.12 + Math.abs(Math.sin(this.t * 12)) * 0.04;
+    // turn toward the heading on the shortest arc
+    const face = Math.atan2(this.heading.dx, this.heading.dz);
+    let d = face - mesh.rotation.y;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    mesh.rotation.y += d * Math.min(1, dtMs / 80);
+    mesh.rotation.z = 0;
+    if (k >= 1) {
+      this.cell = h.cell;
+      this._cellPos = h.to;
+      this.hop = null;
+      this.pause = this.rng.chance(0.4) ? 150 + this.rng.float() * 700 : 0;
     }
+  }
+
+  _idle() {
+    this.mesh.position.y = this._cellPos.y + Math.abs(Math.sin(this.t * 6)) * 0.05;
     this.mesh.rotation.z = 0;
-    this.pos += this.dir * this.speed * (dtMs / 1000);
-    if (this.pos >= this.max) { this.pos = this.max; this.dir = -1; }
-    if (this.pos <= this.min) { this.pos = this.min; this.dir = 1; }
-    this._sync(dtMs);
+  }
+
+  _startled() {
+    // tucked-in "oh! you've got the answer" wobble before carrying on
+    this.mesh.position.y = this._cellPos.y + Math.abs(Math.sin(this.t * 4)) * 0.02;
+    this.mesh.rotation.z = Math.sin(this.t * 3) * 0.06;
   }
 }
 

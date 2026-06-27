@@ -105,8 +105,23 @@ try {
   const panel = await text();
   assert.ok(/oven|🍞|🔥/i.test(panel), `order panel shows a bake status (got: ${panel.slice(0, 80)})`);
 
+  // 8. crabs: drop into a fetch chamber (its template carries crab markers) and
+  //    confirm the crabs actually roam — the wandering AI ticks without errors
+  //    and isn't a frozen metronome.
+  const skill = await evalp('Object.keys(window.__game.profile.math.skills)[0]');
+  await evalp(`window.__game.debugChamber(${JSON.stringify(skill)}, 'fetch')`);
+  await pause(500);
+  const crabCount = await evalp('window.__game.crabs.length');
+  assert.ok(crabCount > 0, `fetch chamber spawned crabs (got ${crabCount})`);
+  const snap = () => evalp('window.__game.crabs.map((c) => c.mesh.position.x.toFixed(2) + "," + c.mesh.position.z.toFixed(2))');
+  const before = await snap();
+  await pause(2500);
+  const after = await snap();
+  const moved = before.filter((b, i) => after[i] !== b).length;
+  assert.ok(moved > 0, `crabs roam over time (moved ${moved}/${crabCount})`);
+
   assert.deepEqual(errors, [], `no page errors during the run`);
-  console.log('e2e: PASSED — boot -> profile -> hub -> kitchen, no errors.');
+  console.log('e2e: PASSED — boot -> profile -> hub -> kitchen -> crabs roam, no errors.');
 } catch (e) {
   console.error('e2e: FAILED —', e.message);
   code = 1;
