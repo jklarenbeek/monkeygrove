@@ -1,13 +1,22 @@
 // Intro flow overlays: the attract loop, the title / player-select, the story
 // pages, and the Crab King finale.
-import { render, esc } from './core.js';
+import { render, esc, PET_EMOJI, flash } from './core.js';
 import { t, setLang } from '../i18n.js';
 import { languageButton } from '../langFlags.js';
 import { audio } from '../audio.js';
 import { profiles, settings, createProfile, deleteProfile, persistNow } from '../state.js';
 import { listPacks } from '../curriculum/index.js';
+import { PETS } from '../models.js';
 import { curriculumPackLabel } from './parents.js';
 
+
+const STARTER_PET_IDS = ['bunny', 'duckling', 'turtle', 'owl'];
+const TRAIL_CHOICES = [
+  { id: 'sprout', age: 6, icon: '🌱', tone: 'sprout' },
+  { id: 'climber', age: 8, icon: '🌴', tone: 'climber' },
+  { id: 'explorer', age: 10, icon: '🗿', tone: 'explorer' },
+  { id: 'unsure', age: null, icon: '✨', tone: 'unsure', placementWarmup: true },
+];
 // ---------- title ----------
 
 export function showAttract({ onStart, onParents, onDuel }) {
@@ -129,38 +138,34 @@ export function showTitle({ onPlay, onParents, onDuel }) {
   const ps = profiles();
   const s = settings();
   const packs = listPacks();
+  const starterPets = STARTER_PET_IDS.map((id) => PETS.find((pet) => pet.id === id)).filter(Boolean);
+  let wizardStep = 1;
+  let selectedPet = starterPets[0]?.id || null;
+  let selectedTrail = 'unsure';
+  let explorerName = '';
+
+  const profileIcon = (profile) => PET_EMOJI[profile.avatar?.pet] || '🐵';
+  const petName = (id) => t(PETS.find((pet) => pet.id === id)?.nameKey || 'pets.title');
+
   const el = render(`
     <h1>🐵 Monkey Grove 🍌</h1>
     <div class="tagline">${t('title.tagline')}</div>
-    <div class="card">
+    <div class="card player-card">
       <h3>${t('title.who')}</h3>
       <div class="tile-grid" id="profile-grid">
         ${ps.map((p) => `
           <div class="tile pressable" data-pid="${p.id}">
-            <div class="t-icon">🐵</div>
+            <div class="t-icon">${profileIcon(p)}</div>
             <div class="t-name">${esc(p.name)}</div>
             <div class="t-price">🍌 ${p.bananas} · 🔥 ${p.streak.count}</div>
           </div>`).join('')}
-        <div class="tile pressable" id="tile-new">
+        <div class="tile pressable new-explorer-tile" id="tile-new">
           <div class="t-icon">✨</div>
           <div class="t-name">${t('title.new_player')}</div>
         </div>
       </div>
-      <div id="new-player-row" class="new-player-form hidden">
-        <input id="new-name" maxlength="14" placeholder="${t('title.name_prompt')}"
-          style="flex:1;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
-        <input id="new-age" type="number" min="4" max="13" inputmode="numeric" placeholder="${t('title.age_prompt')}"
-          style="width:140px;font-family:inherit;font-size:18px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
-        <input id="new-birth-date" type="date" aria-label="${esc(t('title.birthday_prompt'))}"
-          style="min-width:168px;font-family:inherit;font-size:16px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto;user-select:text">
-        <select id="new-pack" aria-label="${esc(t('title.curriculum_prompt'))}"
-          style="min-width:220px;font-family:inherit;font-size:16px;font-weight:700;padding:10px 14px;border-radius:14px;border:3px solid var(--cream-2);pointer-events:auto">
-          ${packs.map((pack) => `<option value="${esc(pack.id)}">${esc(curriculumPackLabel(pack))}</option>`).join('')}
-        </select>
-        <button class="btn green" id="new-go">${t('title.start')}</button>
-        <div class="form-help">${t('title.age_help')} ${t('title.birthday_help')} ${t('title.curriculum_help')}</div>
-      </div>
     </div>
+    <div id="new-player-row" class="new-player-form hidden"></div>
     <div class="menu-row">
       <div class="lang-toggle">
         ${languageButton('en', s.lang)}
@@ -170,6 +175,146 @@ export function showTitle({ onPlay, onParents, onDuel }) {
       <button class="btn soft" id="btn-parents">${t('title.parents')}</button>
     </div>
   `);
+
+  const playerCard = el.querySelector('.player-card');
+  const wizard = el.querySelector('#new-player-row');
+  const packOptions = packs.map((pack) => `<option value="${esc(pack.id)}">${esc(curriculumPackLabel(pack))}</option>`).join('');
+
+  const renderWizard = () => {
+    const selectedPetDef = starterPets.find((pet) => pet.id === selectedPet) || starterPets[0];
+    const stepLabel = wizardStep === 1 ? t('title.wizard_step_1') : t('title.wizard_step_2');
+    wizard.innerHTML = `
+      <div class="explorer-wizard" id="new-explorer-wizard">
+        <div class="wizard-progress" aria-label="${esc(stepLabel)}">
+          <span class="wizard-step ${wizardStep === 1 ? 'active' : ''}">1</span>
+          <span class="wizard-step ${wizardStep === 2 ? 'active' : ''}">2</span>
+        </div>
+        ${wizardStep === 1 ? `
+          <div class="wizard-panel name-panel">
+            <div class="wizard-kicker">${esc(t('title.wizard_name_title'))}</div>
+            <input id="new-name" class="wizard-input" maxlength="14" value="${esc(explorerName)}" placeholder="${esc(t('title.name_prompt'))}">
+            <div class="wizard-kicker pet-kicker">${esc(t('title.wizard_pet_title'))}</div>
+            <div class="starter-pet-grid">
+              ${starterPets.map((pet) => `
+                <button class="tile pressable starter-pet ${selectedPet === pet.id ? 'equipped' : ''}" data-starter-pet="${esc(pet.id)}" aria-pressed="${selectedPet === pet.id}">
+                  <div class="voxel-plinth"><span>${PET_EMOJI[pet.id] || '🐾'}</span></div>
+                  <div class="t-name">${esc(t(pet.nameKey))}</div>
+                </button>
+              `).join('')}
+            </div>
+            <div class="wizard-actions">
+              <button class="btn soft" id="wizard-cancel">${esc(t('ui.back'))}</button>
+              <button class="btn green" id="wizard-next">${esc(t('ui.ok'))}</button>
+            </div>
+          </div>
+        ` : `
+          <div class="wizard-panel trail-panel">
+            <div class="buddy-chip"><span>${PET_EMOJI[selectedPetDef?.id] || '🐾'}</span>${esc(petName(selectedPetDef?.id))}</div>
+            <div class="wizard-kicker">${esc(t('title.wizard_trail_title'))}</div>
+            <div class="learning-trail-grid">
+              ${TRAIL_CHOICES.map((choice) => `
+                <button class="tile pressable learning-trail trail-${choice.tone} ${selectedTrail === choice.id ? 'equipped' : ''}" data-learning-trail="${esc(choice.id)}" aria-pressed="${selectedTrail === choice.id}">
+                  <div class="trail-icon">${choice.icon}</div>
+                  <div class="t-name">${esc(t(`title.trail_${choice.id}`))}</div>
+                  <div class="t-price">${esc(t(`title.trail_${choice.id}_body`))}</div>
+                </button>
+              `).join('')}
+            </div>
+            <select id="new-pack" aria-label="${esc(t('title.curriculum_prompt'))}" class="hidden">${packOptions}</select>
+            <div class="form-help">${esc(t('title.wizard_parent_note'))}</div>
+            <div class="wizard-actions">
+              <button class="btn soft" id="wizard-back">${esc(t('ui.back'))}</button>
+              <button class="btn green" id="new-go">${esc(t('title.start'))}</button>
+            </div>
+          </div>
+        `}
+      </div>`;
+
+    for (const btn of wizard.querySelectorAll('[data-starter-pet]')) {
+      btn.addEventListener('click', () => {
+        explorerName = wizard.querySelector('#new-name')?.value.trim() || explorerName;
+        selectedPet = btn.dataset.starterPet;
+        audio.sfx('click');
+        renderWizard();
+      });
+    }
+    for (const btn of wizard.querySelectorAll('[data-learning-trail]')) {
+      btn.addEventListener('click', () => {
+        selectedTrail = btn.dataset.learningTrail;
+        audio.sfx('click');
+        renderWizard();
+      });
+    }
+    wizard.querySelector('#wizard-next')?.addEventListener('click', () => {
+      const rawName = wizard.querySelector('#new-name')?.value.trim() || '';
+      if (!rawName) {
+        flash(t('title.name_required'));
+        wizard.querySelector('#new-name')?.focus();
+        audio.sfx('boop');
+        return;
+      }
+      explorerName = rawName;
+      wizardStep = 2;
+      audio.sfx('click');
+      renderWizard();
+    });
+    wizard.querySelector('#wizard-cancel')?.addEventListener('click', () => {
+      wizard.classList.add('hidden');
+      playerCard.classList.remove('hidden');
+      audio.sfx('click');
+    });
+    wizard.querySelector('#wizard-back')?.addEventListener('click', () => {
+      wizardStep = 1;
+      audio.sfx('click');
+      renderWizard();
+      wizard.querySelector('#new-name')?.focus();
+    });
+    wizard.querySelector('#new-name')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const rawName = wizard.querySelector('#new-name')?.value.trim() || '';
+        if (!rawName) {
+          flash(t('title.name_required'));
+          audio.sfx('boop');
+          return;
+        }
+        explorerName = rawName;
+        wizardStep = 2;
+        renderWizard();
+      }
+    });
+    wizard.querySelector('#new-go')?.addEventListener('click', go);
+  };
+
+  const openWizard = () => {
+    playerCard.classList.add('hidden');
+    wizard.classList.remove('hidden');
+    wizardStep = 1;
+    renderWizard();
+    wizard.querySelector('#new-name')?.focus();
+  };
+
+  const go = () => {
+    const rawName = explorerName.trim();
+    if (!rawName) {
+      wizardStep = 1;
+      renderWizard();
+      flash(t('title.name_required'));
+      wizard.querySelector('#new-name')?.focus();
+      audio.sfx('boop');
+      return;
+    }
+    const name = rawName;
+    const trail = TRAIL_CHOICES.find((choice) => choice.id === selectedTrail);
+    const age = trail?.age ?? null;
+    const packId = el.querySelector('#new-pack').value;
+    const avatarPet = selectedPet;
+    const placementWarmup = !!trail?.placementWarmup;
+    const p = createProfile(name, { age, packId, avatarPet, placementWarmup });
+    audio.sfx('correct');
+    onPlay(p.id, true);
+  };
+
   for (const tile of el.querySelectorAll('[data-pid]')) {
     tile.addEventListener('click', () => { audio.sfx('click'); onPlay(tile.dataset.pid); });
     // long-press to delete
@@ -181,24 +326,7 @@ export function showTitle({ onPlay, onParents, onDuel }) {
     });
     for (const ev of ['pointerup', 'pointerleave']) tile.addEventListener(ev, () => clearTimeout(timer));
   }
-  el.querySelector('#tile-new').addEventListener('click', () => {
-    el.querySelector('#new-player-row').classList.remove('hidden');
-    el.querySelector('#new-name').focus();
-  });
-  const go = () => {
-    const name = el.querySelector('#new-name').value.trim() || 'Monkey';
-    const ageValue = Number(el.querySelector('#new-age').value);
-    const age = Number.isFinite(ageValue) && ageValue >= 4 && ageValue <= 13 ? ageValue : null;
-    const birthDate = el.querySelector('#new-birth-date').value;
-    const packId = el.querySelector('#new-pack').value;
-    const p = createProfile(name, { age, birthDate, packId });
-    audio.sfx('correct');
-    onPlay(p.id, true);
-  };
-  el.querySelector('#new-go').addEventListener('click', go);
-  el.querySelector('#new-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-  el.querySelector('#new-age').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-  el.querySelector('#new-birth-date').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  el.querySelector('#tile-new').addEventListener('click', openWizard);
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
       setLang(b.dataset.lang); persistNow();
@@ -208,7 +336,6 @@ export function showTitle({ onPlay, onParents, onDuel }) {
   el.querySelector('#btn-parents')?.addEventListener('click', onParents);
   el.querySelector('#btn-duel')?.addEventListener('click', onDuel);
 }
-
 // ---------- story intro ----------
 
 export function showStory(onDone) {

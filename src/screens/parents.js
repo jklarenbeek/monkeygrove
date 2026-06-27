@@ -1,7 +1,7 @@
 // Parents dashboard overlay: pedagogy blurb, curriculum coverage (with optional
 // pack/birthday/stage/strictness controls), business coverage, and the per-skill
 // accuracy overview.
-import { render, backBtn, esc } from './core.js';
+import { render, backBtn, esc, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { coverageForReport, getPack, listPacks } from '../curriculum/index.js';
 import { money, businessModeLabel } from './business.js';
@@ -9,6 +9,36 @@ import { money, businessModeLabel } from './business.js';
 export function curriculumPackLabel(pack) {
   const country = pack.countryKey ? t(pack.countryKey) : pack.countryCode || pack.id;
   return `${country} - ${t(pack.titleKey)}`;
+}
+
+export function showParentProfileSelect({ profiles = [], onChoose, onBack }) {
+  const el = render(`
+    ${backBtn()}
+    <h2>${esc(t('parents.choose_child'))}</h2>
+    ${profiles.length ? `
+      <div class="card parent-picker-card">
+        <div class="tile-grid parent-profile-grid">
+          ${profiles.map((profile) => {
+            const petId = profile.avatar?.pet || profile.pets?.[0] || 'bunny';
+            const pet = PET_EMOJI[petId] || '🐵';
+            const stage = profile.curriculum?.confirmedStage || profile.curriculum?.estimatedStage;
+            const pack = profile.curriculum?.packId ? getPack(profile.curriculum.packId) : null;
+            const stageText = pack && stage ? stageLabel(pack, stage) : '';
+            return `
+              <button class="tile parent-profile-tile" data-parent-profile="${esc(profile.id)}">
+                <span class="t-icon">${pet}</span>
+                <span class="t-name">${esc(profile.name)}</span>
+                ${stageText ? `<span class="t-price">${esc(stageText)}</span>` : ''}
+              </button>`;
+          }).join('')}
+        </div>
+      </div>`
+      : `<div class="card parent-picker-card"><p>${esc(t('parents.no_profiles'))}</p></div>`}
+  `);
+  el.querySelector('#scr-back').addEventListener('click', onBack);
+  el.querySelectorAll('[data-parent-profile]').forEach((button) => {
+    button.addEventListener('click', () => onChoose?.(button.dataset.parentProfile));
+  });
 }
 
 function stageLabel(pack, stageId) {

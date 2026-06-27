@@ -33,6 +33,15 @@ test('createProfile accepts age and creates curriculum state', async () => {
   assert.equal(p.curriculum.confirmedStage, 'grade_5');
 });
 
+test('createProfile accepts starter pet and explicit placement warmup flag', async () => {
+  const state = await freshStateModule();
+  const p = state.createProfile('Ari', { avatarPet: 'owl', placementWarmup: true, today: '2026-06-15' });
+  assert.equal(p.avatar.pet, 'owl');
+  assert.deepEqual(p.pets, ['owl']);
+  assert.equal(p.flags.needsPlacementWarmup, true);
+  assert.equal(p.curriculum.ageAtStart, null);
+});
+
 test('createProfile accepts birthday for long-term age progression', async () => {
   const state = await freshStateModule();
   const p = state.createProfile('Ari', { birthDate: '2018-06-15', today: '2026-06-15' });

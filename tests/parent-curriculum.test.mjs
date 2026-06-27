@@ -48,11 +48,22 @@ test('task 8 parent business reporting is wired and translated', () => {
     assert.ok(n >= 2, `${key} needs EN and NL entries (found ${n})`);
   }
 });
+test('parent entry asks which child to view before opening results', () => {
+  assert.match(screensSource, /showParentProfileSelect/);
+  assert.match(screensSource, /parents\.choose_child/);
+  assert.match(screensSource, /data-parent-profile/);
+  assert.match(mainSource, /showParentSelect\(/);
+  assert.match(mainSource, /onParents:\s*\(\) => this\.showParentSelect/);
+  assert.match(mainSource, /showParents\(profileId = null, onClose/);
+  assert.match(mainSource, /profiles\(\)\.find\(\(profile\) => profile\.id === profileId\)/);
+});
 
 test('task 7 i18n keys exist in english and dutch', () => {
   for (const key of [
     'title.curriculum_prompt',
     'title.curriculum_help',
+    'parents.choose_child',
+    'parents.no_profiles',
     'parents.curriculum',
     'parents.curriculum_pack',
     'parents.stage',
@@ -81,12 +92,12 @@ test('parent curriculum controls expose stage and strictness change wiring', () 
   assert.match(mainSource, /rest\.stageSource\s*=\s*patch\.confirmedStage === p\.curriculum\?\.estimatedStage\s*\?\s*'auto'\s*:\s*'parent'/);
 });
 
-test('new player form sends selected curriculum pack into profile creation', () => {
+test('new explorer wizard sends trail placement and default curriculum pack into profile creation', () => {
   assert.match(screensSource, /id="new-pack"/);
-  assert.match(screensSource, /id="new-birth-date"/);
-  assert.match(screensSource, /const birthDate = el\.querySelector\('#new-birth-date'\)\.value/);
+  assert.doesNotMatch(screensSource, /id="new-birth-date"/);
+  assert.match(screensSource, /const trail = TRAIL_CHOICES\.find\(\(choice\) => choice\.id === selectedTrail\)/);
   assert.match(screensSource, /const packId = el\.querySelector\('#new-pack'\)\.value/);
-  assert.match(screensSource, /createProfile\(name, \{ age, birthDate, packId \}\)/);
+  assert.match(screensSource, /createProfile\(name, \{ age, packId, avatarPet, placementWarmup \}\)/);
 });
 
 test('showParents renders translated curriculum coverage without exposing internal ids', async () => {

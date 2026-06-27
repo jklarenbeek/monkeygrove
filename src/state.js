@@ -13,13 +13,14 @@ let save = null;
 let saveTimer = null;
 
 function freshProfile(name, opts = {}) {
+  const avatarPet = typeof opts.avatarPet === 'string' && opts.avatarPet ? opts.avatarPet : null;
   return {
     id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
     name,
-    avatar: { fur: 'classic', hat: null, trail: null, pet: null },
+    avatar: { fur: 'classic', hat: null, trail: null, pet: avatarPet },
     bananas: 0,
     egg: { points: 0, goal: BALANCE.eggGoal },
-    pets: [],
+    pets: avatarPet ? [avatarPet] : [],
     owned: { hats: [], furs: ['classic'], trails: [] },
     streak: { count: 0, lastDay: null, freezes: 0, giftDay: null },
     island: freshIsland(),
@@ -32,7 +33,7 @@ function freshProfile(name, opts = {}) {
     business: createBusinessState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
-    flags: {},
+    flags: opts.placementWarmup ? { needsPlacementWarmup: true } : {},
     created: Date.now(),
   };
 }
@@ -78,7 +79,7 @@ export function loadSave() {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.v >= 1 && Array.isArray(parsed.profiles)) {
+      if (parsed && parsed.v >= 1 && Array.isArray(parsed.profiles) && parsed.profiles.every(isObject)) {
         save = migrate(parsed);
         return save;
       }

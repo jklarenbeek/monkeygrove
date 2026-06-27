@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 // Dutch (nl) dictionary. Keys with {vars} are interpolated by t() in ../i18n.js.
 export const nl = {
   'title.tagline': 'Breng de getallen thuis!',
@@ -13,6 +14,21 @@ export const nl = {
   'title.who': 'Wie gaat er spelen?',
   'title.new_player': '+ Nieuwe ontdekker',
   'title.name_prompt': 'Hoe heet je?',
+  'title.wizard_step_1': 'Ontdekker maken, stap 1 van 2',
+  'title.wizard_step_2': 'Ontdekker maken, stap 2 van 2',
+  'title.wizard_name_title': 'Geef je ontdekker een naam',
+  'title.name_required': 'Typ eerst een naam.',
+  'title.wizard_pet_title': 'Kies je eerste maatje',
+  'title.wizard_trail_title': 'Kies een pad',
+  'title.wizard_parent_note': 'Grote mensen kunnen het leerpad later aanpassen bij Voor ouders.',
+  'title.trail_sprout': 'Spruitpad',
+  'title.trail_sprout_body': 'Kleine stappen',
+  'title.trail_climber': 'Klimpad',
+  'title.trail_climber_body': 'Klaar om te klimmen',
+  'title.trail_explorer': 'Ontdekkerspad',
+  'title.trail_explorer_body': 'Grotere tochten',
+  'title.trail_unsure': 'Ik weet het niet',
+  'title.trail_unsure_body': 'Mimi kijkt mee',
   'title.age_prompt': 'Hoe oud ben je?',
   'title.age_help': 'Zo kan het eiland rustig beginnen op een fijne plek.',
   'title.birthday_prompt': 'Verjaardag',
@@ -345,6 +361,8 @@ export const nl = {
 
   'parents.title': 'Voor ouders',
   'parents.body': 'Monkey Grove oefent rekenen zoals onderzoek zegt dat kinderen leren: eerst visuele modellen (rijtjes, getallenlijnen, eerlijk delen), geen tijdsdruk, geen straf voor fouten — elke fout laat het model zien en legt uit waarom. Een onzichtbaar systeem houdt elke vaardigheid op ongeveer 65% succes: uitdagend, nooit ontmoedigend.',
+  'parents.choose_child': 'Welke ontdekker?',
+  'parents.no_profiles': 'Nog geen ontdekkers. Start een avontuur om er een toe te voegen.',
   'parents.skills': 'Vaardigheden',
   'parents.business': 'Bakkerij/pizzeria oefening',
   'parents.curriculum': 'Leerlijn',

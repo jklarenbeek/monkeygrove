@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 // English (en) dictionary. Keys with {vars} are interpolated by t() in ../i18n.js.
 export const en = {
   // title & menus
@@ -14,6 +15,21 @@ export const en = {
   'title.who': 'Who is playing?',
   'title.new_player': '+ New explorer',
   'title.name_prompt': 'What is your name?',
+  'title.wizard_step_1': 'Explorer setup, step 1 of 2',
+  'title.wizard_step_2': 'Explorer setup, step 2 of 2',
+  'title.wizard_name_title': 'Name your explorer',
+  'title.name_required': 'Type a name first.',
+  'title.wizard_pet_title': 'Pick a first buddy',
+  'title.wizard_trail_title': 'Choose a trail',
+  'title.wizard_parent_note': 'Grown-ups can tune the learning path later in For parents.',
+  'title.trail_sprout': 'Sprout Trail',
+  'title.trail_sprout_body': 'Small steps',
+  'title.trail_climber': 'Climber Trail',
+  'title.trail_climber_body': 'Ready to climb',
+  'title.trail_explorer': 'Explorer Trail',
+  'title.trail_explorer_body': 'Bigger quests',
+  'title.trail_unsure': 'Not sure',
+  'title.trail_unsure_body': 'Mimi will check',
   'title.age_prompt': 'How old are you?',
   'title.age_help': 'This helps the island start in a good place.',
   'title.birthday_prompt': 'Birthday',
@@ -357,6 +373,8 @@ export const en = {
   // parents
   'parents.title': 'For parents',
   'parents.body': 'Monkey Grove practices arithmetic the way research says children learn it: visual models first (arrays, number lines, fair sharing), no time pressure, no punishment for mistakes — every error shows the model and explains why. An invisible rating system keeps each skill at roughly 65% success: challenging, never crushing.',
+  'parents.choose_child': 'Which explorer?',
+  'parents.no_profiles': 'No explorers yet. Start an adventure to add one.',
   'parents.skills': 'Skill overview',
   'parents.business': 'Bakery/pizzeria practice',
   'parents.curriculum': 'Curriculum',

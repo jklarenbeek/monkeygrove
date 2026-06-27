@@ -7,7 +7,7 @@ import { CHARS, PETS, HATS, FURS, MONKEY_HAT_Y } from './models.js';
 import { buildVoxelMesh } from './voxel.js';
 import { nextProblem, recordResult, masteryReport } from './mathengine.js';
 import {
-  loadSave, settings, activeProfile, selectProfile,
+  loadSave, settings, profiles, activeProfile, selectProfile,
   hatchEgg, persist, persistNow, todayString,
 } from './state.js';
 import {
@@ -139,15 +139,25 @@ class Game {
     this.hub.buildAttractIsland();
     screens.showAttract({
       onStart: () => this.showPlayerSelect(),
-      onParents: () => this.showParents(),
+      onParents: () => this.showParentSelect(),
       onDuel: () => this.startDuelSetup(),
+    });
+  }
+
+  showParentSelect(onBack = () => this.showTitle()) {
+    screens.showParentProfileSelect({
+      profiles: profiles(),
+      onChoose: (profileId) => this.showParents(profileId, () => this.showParentSelect(onBack)),
+      onBack,
     });
   }
 
   // Parent dashboard: mastery + curriculum coverage, and the controls that edit
   // birthday / pack / stage / strictness (each re-renders this screen).
-  showParents() {
-    const p = activeProfile();
+  showParents(profileId = null, onClose = () => this.showTitle()) {
+    const p = profileId
+      ? profiles().find((profile) => profile.id === profileId) || null
+      : activeProfile();
     screens.showParents({
       report: p ? masteryReport(p.math, { now: Date.now() }) : null,
       profile: p,
@@ -167,9 +177,9 @@ class Game {
         }
         p.curriculum = { ...base, ...rest };
         persistNow();
-        this.showParents();
+        this.showParents(p.id, onClose);
       },
-      onClose: () => this.showTitle(),
+      onClose,
     });
   }
 
@@ -190,13 +200,14 @@ class Game {
         else if (this.needsWarmup()) this.startWarmupThenHub();
         else this.startHub();
       },
-      onParents: () => this.showParents(),
+      onParents: () => this.showParentSelect(() => this.showPlayerSelect()),
       onDuel: () => this.startDuelSetup(),
     });
   }
 
   needsWarmup(profile = this.profile) {
-    return profile?.curriculum?.ageAtStart != null && !profile.curriculum?.warmup?.completed;
+    if (profile?.curriculum?.warmup?.completed) return false;
+    return !!profile?.flags?.needsPlacementWarmup || profile?.curriculum?.ageAtStart != null;
   }
 
   startWarmupThenHub() {
@@ -241,11 +252,13 @@ class Game {
       },
       onDone: () => {
         this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
+        if (this.profile.flags) this.profile.flags.needsPlacementWarmup = false;
         persist();
         finishWarmup(() => this.startHub());
       },
       onSkip: () => {
         this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
+        if (this.profile.flags) this.profile.flags.needsPlacementWarmup = false;
         persist();
         finishWarmup(() => this.startHub());
       },

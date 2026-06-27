@@ -15,13 +15,24 @@ const i18n = ['en', 'nl']
   .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
   .join('\n');
 
-test('task 5 wiring exists for explorer age and warmup flow', () => {
-  assert.match(screens, /id="new-age"/);
-  assert.match(screens, /id="new-birth-date"/);
+test('task 5 wiring exists for playful explorer wizard and warmup flow', () => {
+  assert.match(screens, /id="new-explorer-wizard"/);
+  assert.match(screens, /data-starter-pet/);
+  assert.match(screens, /data-learning-trail/);
+  assert.doesNotMatch(screens, /id="new-age"/);
+  assert.doesNotMatch(screens, /id="new-birth-date"/);
   assert.match(screens, /id="new-pack"/);
-  assert.match(screens, /createProfile\(name, \{ age, birthDate, packId \}\)/);
+  assert.match(screens, /createProfile\(name, \{ age, packId, avatarPet, placementWarmup \}\)/);
+  assert.match(screens, /let explorerName = '';/);
+  assert.match(screens, /explorerName = wizard\.querySelector\('#new-name'\)\?\.value\.trim\(\) \|\| explorerName;/);
+  assert.match(screens, /playerCard\.classList\.add\('hidden'\)/);
+  assert.match(screens, /playerCard\.classList\.remove\('hidden'\)/);
+  assert.match(screens, /id="wizard-cancel"/);
+  assert.match(screens, /if \(!rawName\)/);
+  assert.match(screens, /title\.name_required/);
   assert.match(screens, /export function showWarmup/);
   assert.match(main, /needsWarmup\(profile = this\.profile\)/);
+  assert.match(main, /profile\?\.flags\?\.needsPlacementWarmup/);
   assert.match(main, /startWarmupThenHub\(\)/);
   assert.match(main, /applyWarmupResult/);
   assert.match(main, /eligibleSkillIds/);
@@ -31,8 +42,14 @@ test('task 5 wiring exists for explorer age and warmup flow', () => {
 
 test('task 5 i18n keys exist in english and dutch', () => {
   for (const key of [
-    'title.age_prompt',
-    'title.age_help',
+    'title.wizard_name_title',
+    'title.wizard_pet_title',
+    'title.wizard_trail_title',
+    'title.name_required',
+    'title.trail_sprout',
+    'title.trail_climber',
+    'title.trail_explorer',
+    'title.trail_unsure',
     'placement.title',
     'placement.body',
     'placement.start',
