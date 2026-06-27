@@ -319,3 +319,24 @@ math" before they have had the chance to see it.
 Built with [Three.js](https://threejs.org/) and [Vite](https://vite.dev/).
 Inspired by cozy island games, 1980s Konami puzzle adventures, and research on
 visual arithmetic practice for struggling learners.
+
+## License
+
+Monkey Grove is **open source and dual-licensed**:
+
+- **GNU GPL v2 — the open-source license.** Free to use, run, study, share, and
+  modify under the [GPL-2.0](LICENSE) — at home, in schools, in clubs, and in
+  research, at no cost. Because the GPL-2.0 is copyleft ("share-alike"), anything you
+  distribute that includes or is derived from Monkey Grove must also be released as
+  open source under the GPL-2.0.
+- **Commercial license — for proprietary use.** If the GPL-2.0's copyleft doesn't fit
+  you (for example, you want to use Monkey Grove in a closed-source product, app, or
+  service, or under any other terms), a commercial license is available **only from
+  the author** — Johannes Klarenbeek is the sole copyright holder, and only he can
+  release you from the GPL-2.0's terms. Commercial licensing funds continued
+  development, so you're warmly invited to get in touch:
+  **[jklarenbeek@gmail.com](mailto:jklarenbeek@gmail.com)**.
+
+See [LICENSE](LICENSE) for the full terms and the complete GPL-2.0 text. The bundled
+[Three.js](https://threejs.org/) library is MIT-licensed (that notice covers Three.js
+only); the vendored `src/yijing/` engine is the author's own, under the same GPL-2.0.

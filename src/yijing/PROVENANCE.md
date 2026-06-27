@@ -13,6 +13,16 @@ package is out of date. When the npm package is fixed, this folder can be delete
 and replaced with a normal dependency — re-point the imports in `src/story/` and
 `tests/story.test.mjs` back at `@yijingjs/core/...`.
 
+## License
+
+These files are **GPL-2.0** (see `LICENSE` in this folder). Monkey Grove as a whole
+is **GPL-2.0** too — dual-licensed with a separate **commercial license** available
+**only from the author** for closed-source/proprietary use (see the root `/LICENSE`).
+Both Monkey Grove and yijingjs are authored by the same copyright holder (Johannes
+Klarenbeek), so the engine and the game share one consistent license: under the open
+license GPL-2.0 governs this copy and any redistribution; for any non-GPL use, only
+the author can grant a commercial license.
+
 ## Import rules (enforced by a test)
 
 **Do not hand-edit these files.** Fix bugs upstream in yijingjs and re-copy, so the

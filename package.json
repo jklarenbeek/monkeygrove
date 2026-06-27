@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Monkey Grove — a cozy island adventure that secretly teaches arithmetic",
+  "author": "Johannes Klarenbeek <jklarenbeek@gmail.com>",
+  "license": "GPL-2.0-only",
+  "comment_license": "Dual-licensed: open source under GPL-2.0-only, OR a separate commercial license available ONLY from the author (jklarenbeek@gmail.com) for closed-source/proprietary use. See LICENSE.",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/check-budget.mjs",
