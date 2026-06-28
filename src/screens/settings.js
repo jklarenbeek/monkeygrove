@@ -6,6 +6,7 @@ import { languageButton } from '../langFlags.js';
 import { applyComfortSettings, reducedMotion } from '../a11y.js';
 import { audio } from '../audio.js';
 import { settings, persist, persistNow, setActiveProfileLanguage } from '../state.js';
+import { GRAPHICS_SETTINGS, refreshGfx } from '../gfx.js';
 
 export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }) {
   const s = settings();
@@ -31,6 +32,13 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
           <button class="btn soft" id="tg-contrast" aria-pressed="${!!s.highContrast}">${s.highContrast ? '◑' : '○'} ${t('settings.high_contrast')}</button>
           <button class="btn soft" id="tg-colorblind" aria-pressed="${!!s.colorblind}">${s.colorblind ? '◑' : '○'} ${t('settings.colorblind')}</button>
           <button class="btn soft" id="tg-textsize">🔠 ${t('settings.text_size')}: ${Math.round((s.textScale || 1) * 100)}%</button>
+        </div>
+        <div class="menu-col">
+          <span style="font-weight:800">🎨 ${t('settings.graphics')}</span>
+          <div class="lang-toggle" id="graphics-toggle" role="group" aria-label="${t('settings.graphics')}">
+            ${GRAPHICS_SETTINGS.map((g) => `<button class="btn soft" data-graphics="${g}" aria-pressed="${(s.graphics || 'auto') === g}">${t('settings.graphics_' + g)}</button>`).join('')}
+          </div>
+          <small style="color:var(--ink-soft);font-weight:700">${t('settings.graphics_relaunch')}</small>
         </div>
         <button class="btn soft" id="switch-player">👥 ${t('settings.switch_player')}</button>
         ${devTools?.toggleHtml || ''}
@@ -76,6 +84,14 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
     applyComfortSettings(); persist();
     showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
+  for (const b of el.querySelectorAll('[data-graphics]')) {
+    b.addEventListener('click', () => {
+      s.graphics = GRAPHICS_SETTINGS.includes(b.dataset.graphics) ? b.dataset.graphics : 'auto';
+      refreshGfx(); // live-flip density/ambient/sway; GL-state flags apply next launch
+      persist();
+      showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+    });
+  }
   el.querySelector('#switch-player').addEventListener('click', onSwitchPlayer);
   el.querySelector('#settings-extra-toggle')?.addEventListener('click', () => devTools?.onToggle?.(!devTools.open));
   for (const btn of el.querySelectorAll('[data-settings-preset]')) {

@@ -41,6 +41,12 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
     this.world = new World(this.canvas);
+    // Dev-only graphics tuning panel + perf overlay (gfxdev.js). Lazy + DEV-gated so
+    // Vite keeps it out of the production bundle entirely.
+    this._gfxdev = null;
+    if (import.meta.env.DEV) {
+      import('./gfxdev.js').then((m) => { this._gfxdev = m.createGfxDev(this); }).catch(() => {});
+    }
     this.profile = null;
     this.mode = 'title';
     this.place = null;
@@ -113,6 +119,7 @@ class Game {
       updateTweens(dt);
       this.update(dt);
       this.world.update(dt);
+      this._gfxdev?.tick(dt);
     };
     requestAnimationFrame(loop);
     // track time played (only while actually visible)

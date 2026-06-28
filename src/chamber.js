@@ -20,6 +20,8 @@ import { BUILDS, applyIslandRows } from './island.js';
 import { Rng } from './rng.js';
 import { nextProblem } from './mathengine.js';
 import { t } from './i18n.js';
+import { GFX } from './gfx.js';
+import { makeContactShadow } from './blobshadow.js';
 
 // What the hand-authored templates can physically host.
 export const HOST_LIMITS = { arrayRows: 8, arrayCols: 10, baskets: 6 };
@@ -338,6 +340,18 @@ export class Place {
     }
   }
 
+  // Drop a soft contact shadow on the floor under cell (x,z) — for static fixtures,
+  // NPCs, and build clusters. On at every tier (GFX.contactShadows); shared
+  // singletons (blobshadow.js) so dispose() needs no special handling.
+  addGroundShadow(x, z, { radius = 0.4, opacity = 0.28, yOffset = 0.02 } = {}) {
+    if (!GFX.contactShadows) return null;
+    const blob = makeContactShadow({ radius, opacity, yOffset });
+    const p = this.worldPos(x, z);
+    blob.position.set(p.x, p.y + yOffset, p.z);
+    this.group.add(blob);
+    return blob;
+  }
+
   addEntity(e) { this.entities.push(e); return e; }
 
   update(dtMs) {
@@ -543,6 +557,7 @@ export class HubPlace extends Place {
       this.tree = makeProp(PROPS.palm, 2.6, 'prop:bigpalm');
       this.tree.position.copy(this.worldPos(tree.x, tree.z));
       this.group.add(this.tree);
+      this.addGroundShadow(tree.x, tree.z, { radius: 0.7, opacity: 0.22 });
       this.cellAt(tree.x, tree.z).walk = false;
     }
     const shop = (this.markers.O || [])[0];
@@ -550,18 +565,21 @@ export class HubPlace extends Place {
       const stand = makeProp(PROPS.sign, 0.85, 'prop:sign');
       stand.position.copy(this.worldPos(shop.x, shop.z));
       this.group.add(stand);
+      this.addGroundShadow(shop.x, shop.z, { radius: 0.4 });
     }
     const nest = (this.markers.N || [])[0];
     if (nest) {
       const egg = makeProp(PROPS.egg, 0.6, 'prop:egg');
       egg.position.copy(this.worldPos(nest.x, nest.z));
       this.group.add(egg);
+      this.addGroundShadow(nest.x, nest.z, { radius: 0.34 });
     }
     const mimi = (this.markers.M || [])[0];
     if (mimi) {
       this.mimi = makeCharacter(CHARS.mimi, 0.8, null, 'char:mimi');
       this.mimi.position.copy(this.worldPos(mimi.x, mimi.z));
       this.group.add(this.mimi);
+      this.addGroundShadow(mimi.x, mimi.z, { radius: 0.34 }); // companion, on-roster
       this.cellAt(mimi.x, mimi.z).walk = false;
       this.mimiHome = { x: mimi.x, z: mimi.z };
       this.mimiPos = { x: mimi.x, z: mimi.z };
@@ -738,6 +756,9 @@ export class HubPlace extends Place {
   _placeBuilt(def, spot) {
     const { x, z } = spot;
     const block = (bx, bz) => { const c = this.cellAt(bx, bz); if (c) c.walk = false; };
+    // One larger, softer blob grounds the whole cluster as a single mass (cheaper and
+    // reads better than a blob per prop). The bridge has no prop at its plot.
+    if (def.id !== 'bridge') this.addGroundShadow(x, z, { radius: 0.85, opacity: 0.18 });
     if (def.id === 'lanterns') {
       for (const dx of [-1, 0, 1]) {
         if (this.cellAt(x + dx, z)) { this._prop('lantern', 0.55, x + dx, z); block(x + dx, z); }
@@ -790,6 +811,7 @@ export class HubPlace extends Place {
     const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
     mesh.position.copy(this.worldPos(home.x, home.z));
     this.group.add(mesh);
+    this.addGroundShadow(home.x, home.z, { radius: 0.3 }); // on-roster build friend
     this.cellAt(home.x, home.z).walk = false;
     this._bob(mesh);
     this.npcs.push({ id: def.id, face: def.npc.face, x: home.x, z: home.z, mesh });

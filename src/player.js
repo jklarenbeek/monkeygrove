@@ -1,11 +1,30 @@
 // Grid-hop player controller + pet follower. Hops between cells with
 // squash & stretch; supports BFS tap-to-walk; can carry a stone mesh.
-import { TILE, STEP_H, HOP_MS, HOP_ARC } from './config.js';
+import { STEP_H, HOP_MS, HOP_ARC } from './config.js';
 import { tween, ease, squash } from './anim.js';
 import { reducedMotion } from './a11y.js';
 import { audio } from './audio.js';
+import { GFX } from './gfx.js';
+import { makeContactShadow } from './blobshadow.js';
 
 const NO_SQUASH = { sy: 1, sxz: 1 };
+
+// A ground-pinned contact shadow that tracks a hopping character on the X/Z plane
+// but never inherits its hop arc or squash (it stays flat on the floor). Lives as a
+// sibling in the place group, not a child of the bouncing mesh. Shared singleton
+// geometry/material → nothing per-character to dispose (see blobshadow.js).
+function ensureShadow(self, place, radius) {
+  if (!GFX.contactShadows) return;
+  if (!self.shadow) self.shadow = makeContactShadow({ radius });
+  place.group.add(self.shadow); // reparents from any previous place
+}
+
+function trackShadow(self) {
+  const s = self.shadow;
+  if (!s || !self.place) return;
+  const floorY = (self.place.cellAt(self.x, self.z)?.h ?? 0) * STEP_H;
+  s.position.set(self.mesh.position.x, floorY + 0.02, self.mesh.position.z);
+}
 
 export class Player {
   constructor(mesh) {
@@ -34,6 +53,8 @@ export class Player {
     const p = place.worldPos(x, z);
     this.mesh.position.copy(p);
     place.group.add(this.mesh);
+    ensureShadow(this, place, 0.32);
+    trackShadow(this);
   }
 
   get cell() { return this.place?.cellAt(this.x, this.z); }
@@ -175,6 +196,7 @@ export class Player {
       m.scale.set(this.baseScale, this.baseScale * b, this.baseScale);
       m.rotation.y += (this.facing - m.rotation.y) * Math.min(1, dtMs / 90);
     }
+    trackShadow(this); // flat on the ground, never riding the hop arc
     if (this.carrying) {
       this.carrying.position.y = this.headH + 0.18 + Math.sin(this.idleT * 4) * 0.035;
       this.carrying.rotation.y += dtMs * 0.001;
@@ -201,6 +223,8 @@ export class PetFollower {
     this.trail.length = 0;
     this.mesh.position.copy(place.worldPos(x, z));
     place.group.add(this.mesh);
+    ensureShadow(this, place, 0.22);
+    trackShadow(this);
   }
 
   notePlayerAt(x, z) {
@@ -248,5 +272,6 @@ export class PetFollower {
     } else if (!this.hopping) {
       m.scale.set(this.baseScale, this.baseScale * (1 + Math.sin(this.idleT * 4.2) * 0.03), this.baseScale);
     }
+    trackShadow(this); // flat on the ground, never riding the hop arc
   }
 }

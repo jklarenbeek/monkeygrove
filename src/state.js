@@ -59,6 +59,7 @@ function settingsDefaults() {
     lang: detectLang(), sfx: true, music: true,
     reduceMotion: null, dyslexiaFont: false, highContrast: false,
     colorblind: false, textScale: 1,
+    graphics: 'auto', // 'auto' | 'low' | 'medium' | 'high' — see gfx.js
   };
 }
 
@@ -230,9 +231,10 @@ function dayFromTimestamp(value) {
 
 export function persist() {
   if (saveTimer) return;
+  const storage = storageApi();
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    try { loadedRaw = JSON.stringify(save); storageApi()?.setItem(KEY, loadedRaw); } catch {}
+    try { loadedRaw = JSON.stringify(save); storage?.setItem(KEY, loadedRaw); } catch {}
   }, 250);
 }
 

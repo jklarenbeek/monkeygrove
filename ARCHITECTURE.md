@@ -44,6 +44,11 @@ src/
   avatar.js             AvatarRig: player monkey + pet follower mesh lifecycle (shared scenes)
   config.js             central knobs: palette, world themes (accent/bloom colors),
                         grid metrics, timings, balance, portal growth stages, QUALITY
+                        (device-tier heuristic; back-compat alias — see gfx.js)
+  gfx.js                quality tiers: resolves a frozen GFX feature-flag object from
+                        device tier + the "Graphics" setting + reducedMotion(); the
+                        single place renderer/scene features read instead of QUALITY
+  gfxdev.js             DEV-only graphics tuning panel + perf overlay (lazy, never shipped)
   i18n.js               t(key, vars) helper + EN/NL dictionaries
   langFlags.js          accessible drawn flag buttons for EN/NL language toggles
   a11y.js               comfort/accessibility: reduced motion, dyslexia font (lazy-loaded),
@@ -132,10 +137,28 @@ scripts/
   such as fur colors or per-world portal vines get their own key). No textures, no
   skeletal animation — characters animate by transform only (hop, squash & stretch,
   bob, tilt).
-- **Lighting**: hemisphere + warm directional sun (1024px PCF-soft shadow map) + faint
-  cool fill light. The sun follows the camera target so the shadow camera stays tight.
-  On low-quality devices (touch + small screen or very high DPR — `QUALITY` in
-  `config.js`) shadows are disabled entirely.
+- **Lighting**: hemisphere + warm directional sun (PCF-soft shadow map — 2048 on high,
+  1024 on medium, off on low, via `GFX.shadowMapSize`, bias re-tuned per texel size) +
+  faint cool fill light. The sun follows the camera target so the shadow camera stays
+  tight. On low-quality devices (touch + small screen or very high DPR) the real sun
+  shadow is disabled entirely. The device heuristic lives in `config.js` (`QUALITY`);
+  renderer and scene features read it through the resolved `GFX` flags in `gfx.js`.
+- **Contact shadows** (`blobshadow.js`, `GFX.contactShadows` — ON at *every* tier,
+  including low): a soft blob quad grounds each character, pet, NPC, prop, and build
+  cluster so nothing reads as floating, even where the real sun map is soft or off. One
+  shared canvas texture + plane geometry (`_cached`) + opacity-bucketed materials
+  (never `_owned`) → shared singletons that survive `Place.dispose()`; only the
+  lightweight per-place mesh wrapper is freed. Hopping characters track the blob on the
+  X/Z plane with Y pinned to the floor, so it never rides the hop arc. No shipped asset.
+- **Atmosphere** (medium/high tier, `GFX.toneMap`/`GFX.fog`): ACES filmic tone mapping
+  with a bright, warm exposure; a shared procedural gradient skydome (`sky.js` — vertex
+  colors, no asset, built once, rides with the camera); and gentle distance fog colored
+  to the sky horizon, with near/far derived from the framing in `_applyProjection` so
+  the fully-framed board never hazes a number, stone, or number-line end. The light-rig
+  intensities + exposure flow through `GFX_TUNING` so the dev panel dials them by eye.
+  All of this is **off at low tier**, which keeps today's flat linear look (and the CSS
+  body gradient as the sky). No `PALETTE` hex changes — grading is exposure/light only,
+  so low stays byte-identical.
 - **Juice**: hand-rolled tween engine (`anim.js`), particle bursts from a pooled
   `THREE.Points` per place (`entities.js`), camera shake, instanced floor-tile color
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.
@@ -326,12 +349,30 @@ machine. Free-play problem selection seeds itself randomly. `AmbientLife` forks 
 own rng stream from a single seed draw, so cosmetic critters never disturb
 duel-critical draws.
 
+## Quality tiers
+The renderer and every scene feature read a single resolved feature-flag object,
+`GFX` (`gfx.js`), instead of branching on a raw quality constant. `GFX` is resolved
+once per session from three inputs: the auto-detected device tier (`QUALITY` in
+`config.js` — the touch + small-screen / high-DPR heuristic, today's only signal), the
+player's **Graphics** setting (`auto | low | medium | high`, persisted in `settings()`,
+exposed in the settings screen), and `reducedMotion()` (which folds *motion-heavy*
+flags — ambient density, sway, DoF, camera moves, animated water — down, but never
+disables static bloom/fog/tone mapping). `resolveGfx()` is a pure function covered by a
+truth-table test. **Hard rule:** the `low` tier reproduces today's renderer, and the
+default `auto` setting leaves today's behaviour unchanged — so `GFX` is the clean
+rollback boundary every later "liveliness" phase is built behind. Performance targets:
+desktop on `high` ≈ 60 fps; tablet/phone on `medium` ≈ 30 fps+; `low` ≈ today's
+complexity. A DEV-only tuning panel + perf overlay (`gfxdev.js`, `npm run dev`) and a
+visual baseline pack (`npm run baseline` → `tmp/baseline/`, git-ignored) make every
+later phase tunable and measurable; both are excluded from the production bundle.
+
 ## Performance budget
 - Few draw calls: each place's floor is one `InstancedMesh`; voxel props share cached
   geometries and a single vertex-color material; text is canvas-texture sprites.
 - Particles live in one pooled `THREE.Points` per place; tweens run on one global
   ticker; the RAF hot path avoids per-frame allocations.
-- `renderer.setPixelRatio(min(devicePixelRatio, 2))`; shadows only at high QUALITY.
+- `renderer.setPixelRatio(min(devicePixelRatio, 2))`; shadows only at the medium/high
+  tier (`GFX.shadows`/`GFX.shadowMapSize`; `low` keeps them off, matching today).
 
 ### First-load bundle budget
 The first download has to stay light for kids on slow school Wi-Fi / cheap Android,

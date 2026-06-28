@@ -7,6 +7,17 @@ import { tween, ease } from './anim.js';
 import { audio } from './audio.js';
 import { Rng } from './rng.js';
 import { SOLID_MARKERS } from './config.js';
+import { GFX } from './gfx.js';
+import { makeContactShadow } from './blobshadow.js';
+
+// Add a soft contact shadow under a static prop group (origin at its base). On at
+// every tier (GFX.contactShadows); shared singletons → nothing extra to dispose.
+function addBlob(group, radius, opacity = 0.28) {
+  if (!GFX.contactShadows) return null;
+  const blob = makeContactShadow({ radius, opacity });
+  group.add(blob);
+  return blob;
+}
 
 // ---------- factories ----------
 
@@ -483,6 +494,7 @@ export class NumberStone {
       : makeTextSprite(String(choice.value), { bg: '#fff8ec', scale: 0.95 });
     this.label.position.y = 0.95;
     this.group.add(this.label);
+    addBlob(this.group, 0.3); // grounded on the chamber floor
     this.group.position.copy(place.worldPos(x, z));
     this.bobT = Math.random() * 10;
     place.group.add(this.group);
@@ -519,12 +531,17 @@ export class Pot {
     this.mesh = makeProp(PROPS.pot, 0.6, 'prop:pot');
     this.mesh.position.copy(place.worldPos(x, z));
     place.group.add(this.mesh);
+    // the pot's voxel mesh is scaled, so the blob can't be its child — sit it in the
+    // place group at the pot's foot, and clear it when the pot smashes.
+    this.shadow = addBlob(place.group, 0.28);
+    if (this.shadow) this.shadow.position.set(this.mesh.position.x, this.mesh.position.y + 0.02, this.mesh.position.z);
   }
 
   smash(particles) {
     if (this.smashed) return null;
     this.smashed = true;
     audio.sfx('pop');
+    if (this.shadow) { this.place.group.remove(this.shadow); this.shadow = null; }
     particles.poof(this.mesh.position.clone().add(new THREE.Vector3(0, 0.3, 0)), 18, 0xd9906f);
     const m = this.mesh;
     tween({
@@ -684,6 +701,9 @@ export class Altar {
     this.mesh = makeProp(PROPS.altar, 0.9, 'prop:altar');
     this.mesh.position.copy(place.worldPos(x, z));
     place.group.add(this.mesh);
+    // scaled voxel mesh → blob sits in the place group at the altar's foot
+    const blob = addBlob(place.group, 0.5);
+    if (blob) blob.position.set(this.mesh.position.x, this.mesh.position.y + 0.02, this.mesh.position.z);
     this.baseS = this.mesh.scale.x;
     this.glow = makeTextSprite('✨', { scale: 0.8 });
     this.glow.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.45, 0));
@@ -729,6 +749,7 @@ export class Chest {
     this.lid = makeProp(PROPS.chestLid, 0.28, 'prop:chestLid');
     this.lid.position.y = 0.55;
     this.group.add(this.base, this.lid);
+    addBlob(this.group, 0.34); // pops in with the chest, then grounded
     this.group.position.copy(place.worldPos(x, z));
     this.group.scale.setScalar(0.001);
     place.group.add(this.group);

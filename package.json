@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/e2e.mjs",
+    "baseline": "node scripts/baseline.mjs",
     "lint": "eslint .",
     "gen:icons": "node scripts/gen-icons.mjs",
     "deploy": "npm run build && npx gh-pages -d dist",

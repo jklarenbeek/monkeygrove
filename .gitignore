@@ -8,3 +8,5 @@ docs/superpowers/
 .codex-remote-attachments/
 TODO*.md
 PROGRESS*.md
+plans/
+tmp/

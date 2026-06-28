@@ -1,6 +1,8 @@
 // Renderer, isometric ortho camera rig, lighting, picking.
 import * as THREE from 'three';
-import { QUALITY, TILE } from './config.js';
+import { TILE } from './config.js';
+import { GFX, GFX_TUNING } from './gfx.js';
+import { makeSky, SKY_HORIZON } from './sky.js';
 import { reducedMotion } from './a11y.js';
 
 const ISO_DIR = new THREE.Vector3(1, 1.15, 1).normalize();
@@ -67,14 +69,38 @@ export class World {
       canvas, antialias: true, alpha: true, powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.shadows = QUALITY === 'high';
+    this.shadows = GFX.shadows;
     if (this.shadows) {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
+    // Phase 1 atmosphere — ALL gated so low tier is byte-identical to before:
+    // ACES filmic tone mapping gives the world gentle warmth; exposure is tuned
+    // bright (cheerful storybook morning, never dusky). outputColorSpace stays the
+    // three.js default sRGB. Off at low tier → today's flat-but-cheap linear look.
+    this.toneMap = GFX.toneMap;
+    if (this.toneMap) {
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = GFX_TUNING.exposure;
+    }
 
     this.scene = new THREE.Scene();
-    this.scene.background = null; // CSS sky gradient shows through
+    this.scene.background = null; // sky comes from the in-engine dome (toneMap on) or the CSS gradient (low)
+
+    // In-engine gradient sky + gentle distance haze (medium/high only). The dome is
+    // built once and shared; fog distances are derived from the framing each
+    // projection update so the fully-framed board always stays crisp (no number,
+    // stone, or number-line end is ever hazed — see _applyProjection).
+    this.sky = null;
+    this.fog = null;
+    if (this.toneMap) {
+      this.sky = makeSky();
+      this.scene.add(this.sky);
+    }
+    if (GFX.fog) {
+      this.fog = new THREE.Fog(SKY_HORIZON, 60, 160); // near/far retuned in _applyProjection
+      this.scene.fog = this.fog;
+    }
 
     this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
     this.span = 14;                       // world units visible vertically-ish
@@ -98,19 +124,34 @@ export class World {
     this.followMode = null;
     this.aspect = 1;
 
-    const hemi = new THREE.HemisphereLight(0xeaf6ff, 0xcdeac0, 0.95);
+    // Light rig. Intensities flow through GFX_TUNING so the dev sliders (gfxdev.js)
+    // dial the warm/cool/hemisphere balance in by eye. When tone mapping is on we
+    // retune for a touch more warm/cool contrast and ground-bounce — but keep fill
+    // strong so faces, props, and numbers never fall into deep shadow (bright &
+    // friendly beats moody for young learners). At low tier GFX_TUNING holds today's
+    // exact values, so the rig is byte-identical to before.
+    if (this.toneMap) {
+      GFX_TUNING.sunIntensity = 1.45;
+      GFX_TUNING.fillIntensity = 0.36;
+      GFX_TUNING.hemiIntensity = 1.05;
+    }
+    const hemi = new THREE.HemisphereLight(0xeaf6ff, 0xcdeac0, GFX_TUNING.hemiIntensity);
+    this.hemi = hemi; // kept for the dev tuning panel (gfxdev.js)
     this.scene.add(hemi);
-    this.sun = new THREE.DirectionalLight(0xfff2d8, 1.25);
+    this.sun = new THREE.DirectionalLight(0xfff2d8, GFX_TUNING.sunIntensity);
     this.sun.position.set(8, 14, 5);
     if (this.shadows) {
       this.sun.castShadow = true;
-      this.sun.shadow.mapSize.set(1024, 1024);
-      this.sun.shadow.bias = -0.0015;
+      const sz = GFX.shadowMapSize || 1024;
+      this.sun.shadow.mapSize.set(sz, sz);
+      // Finer texels (2048) need less depth bias to stay crisp without peter-panning;
+      // 1024 keeps the original tuned value. Spot-check with the Phase 0 dev sliders.
+      this.sun.shadow.bias = sz >= 2048 ? -0.0009 : -0.0015;
       this.sun.shadow.normalBias = 0.02;
     }
     this.scene.add(this.sun);
     this.scene.add(this.sun.target);
-    this.fill = new THREE.DirectionalLight(0xbfd8ff, 0.25);
+    this.fill = new THREE.DirectionalLight(0xbfd8ff, GFX_TUNING.fillIntensity);
     this.fill.position.set(-6, 8, -4);
     this.scene.add(this.fill);
 
@@ -153,6 +194,14 @@ export class World {
     this.camera.left = (-vSpan * aspect) / 2;
     this.camera.right = (vSpan * aspect) / 2;
     this.camera.updateProjectionMatrix();
+    // Keep distance haze entirely behind the framed board. The whole board is always
+    // fit into ~baseVSpan, so its view-depth spread is < baseVSpan; starting the fog
+    // past CAM_DIST + baseVSpan guarantees no in-board prop, number, stone, or
+    // number-line end is ever hazed — only the ocean/horizon beyond it softens.
+    if (this.fog) {
+      this.fog.near = CAM_DIST + baseVSpan * 1.1;
+      this.fog.far = CAM_DIST + baseVSpan * 3.2;
+    }
   }
 
   setSpan(span) {
@@ -256,6 +305,8 @@ export class World {
     const lz = this.target.z + this.pan.z + sz;
     this.camera.position.set(lx + off.x, ly + off.y, lz + off.z);
     this.camera.lookAt(lx, ly, lz);
+    // The shared skydome rides with the camera so it always surrounds the view.
+    if (this.sky) this.sky.position.copy(this.camera.position);
     // Sun follows the action so the shadow camera stays tight.
     this.sun.position.set(lx + 8, ly + 14, lz + 5);
     this.sun.target.position.set(lx, ly, lz);

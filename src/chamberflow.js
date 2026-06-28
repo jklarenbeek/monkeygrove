@@ -133,6 +133,7 @@ export class ChamberFlow {
       const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
       mesh.position.copy(g.place.worldPos(mSpot.x, mSpot.z));
       g.place.group.add(mesh);
+      g.place.addGroundShadow(mSpot.x, mSpot.z, { radius: 0.3 }); // on-roster helper, grounded
       g.place.cellAt(mSpot.x, mSpot.z).walk = false;
       const helper = { ...def, x: mSpot.x, z: mSpot.z, mesh, t: 0, excite: 0 };
       const baseY = mesh.position.y;
