@@ -141,6 +141,48 @@ export function voxelMaterial() {
   return sharedMaterial;
 }
 
+// GPU field wind (Phase 5). A variant of the voxel material whose vertex shader nudges
+// each vertex horizontally by an amount scaled by its LOCAL height — so blade tops sway
+// while bases stay planted — driven by a single shared `uTime` uniform (one write per
+// frame for the whole instanced field, no per-instance CPU state). Per-instance phase
+// comes from the instance translation so neighbouring blades don't sway in lockstep.
+// Amplitude `uWindAmp` is set to 0 under reduced-motion / low tier → a perfectly still
+// field. Isolated here so the base material everything else uses stays untouched, and
+// so the onBeforeCompile injection is easy to audit across three.js upgrades.
+const windUniforms = { uTime: { value: 0 }, uWindAmp: { value: 0 } };
+let windMat = null;
+export function windMaterial() {
+  if (windMat) return windMat;
+  windMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  windMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = windUniforms.uTime;
+    shader.uniforms.uWindAmp = windUniforms.uWindAmp;
+    shader.vertexShader = 'uniform float uTime;\nuniform float uWindAmp;\n' + shader.vertexShader;
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      [
+        '#include <begin_vertex>',
+        '#ifdef USE_INSTANCING',
+        '  float wphase = instanceMatrix[3][0] * 0.7 + instanceMatrix[3][2] * 0.9;',
+        '#else',
+        '  float wphase = 0.0;',
+        '#endif',
+        '  float wsway = max(transformed.y, 0.0) * uWindAmp;',
+        '  transformed.x += sin(uTime * 1.6 + wphase) * wsway;',
+        '  transformed.z += cos(uTime * 1.2 + wphase) * wsway * 0.6;',
+      ].join('\n'),
+    );
+  };
+  windMat._cached = true; // shared singleton — never disposed with a place
+  return windMat;
+}
+
+// One write per frame drives the whole field. amp 0 → fully static (reduced-motion/low).
+export function setWind(timeSec, amp) {
+  windUniforms.uTime.value = timeSec;
+  windUniforms.uWindAmp.value = amp;
+}
+
 const geoCache = new Map();
 
 // cacheKey: pass a stable string to reuse geometry across instances (e.g. 'crab').

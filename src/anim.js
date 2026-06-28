@@ -58,6 +58,42 @@ export function delay(ms, fn) {
 
 export function cancelAllTweens() { active.clear(); }
 
+// --- Pure animation utilities (Phase 10) — side-effect-free; callers mutate the mesh.
+// Shortest-arc eased yaw step (wraps to [-π, π]). Generalizes the inline facing lerp.
+export function dampRotateToward(cur, target, k) {
+  let d = target - cur;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return cur + d * Math.max(0, Math.min(1, k));
+}
+
+// Yaw to face a point under the +Z convention (matches Player.face()).
+export function lookAtYaw(fromX, fromZ, toX, toZ) {
+  return Math.atan2(toX - fromX, toZ - fromZ);
+}
+
+// Small additive breathing offset (Y or scale) — the shared idle bob.
+export function idleBob(t, speed = 1, amp = 0.04) {
+  return Math.abs(Math.sin(t * speed)) * amp;
+}
+
+// Hop arc height at progress k (0..1): 0 at the ends, peak at the middle.
+export function hopArc(k, height = 1) {
+  return Math.sin(k * Math.PI) * height;
+}
+
+// One-shot squash→recover for celebrations/landings (neutral at k=0 and k=1).
+export function squashPulse(k, amount = 0.2) {
+  const p = Math.sin(Math.max(0, Math.min(1, k)) * Math.PI);
+  return { sy: 1 + amount * p, sxz: 1 - amount * 0.6 * p };
+}
+
+// Damped one-shot wobble for gentle tilts (starts and settles at 0).
+export function wobble(k, amount = 0.1, freq = 3) {
+  const kk = Math.max(0, Math.min(1, k));
+  return Math.sin(kk * freq * Math.PI) * amount * (1 - kk);
+}
+
 // Squash & stretch helper for hop animations: returns {sy, sxz}
 export function squash(k) {
   // k 0..1 over a hop: anticipate squash, stretch mid-air, land squash

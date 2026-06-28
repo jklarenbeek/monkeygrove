@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { TILE } from './config.js';
 import { GFX, GFX_TUNING } from './gfx.js';
 import { makeSky, SKY_HORIZON } from './sky.js';
+import { setWind } from './voxel.js';
+import { tween, ease } from './anim.js';
 import { reducedMotion } from './a11y.js';
 
 const ISO_DIR = new THREE.Vector3(1, 1.15, 1).normalize();
@@ -323,6 +325,23 @@ export class World {
     this.shakeAmp = Math.max(this.shakeAmp, amount);
   }
 
+  // Short, eased orthographic "moment" (Phase 12): a gentle push-in/pull-back on a
+  // non-gameplay beat (hub arrival, build complete…). Animates SPAN only — the camera
+  // ANGLE (ISO_DIR) never changes, so screenDirToGridStep and picking stay valid and
+  // no input lock is needed. 'minimal' tier and reducedMotion() play nothing (snap
+  // only) → Low is identical to today. Never used during active chamber solving.
+  cameraShot({ fromSpanMul = 1.25, span = null, duration = 900, ease: e = ease.outCubic, onDone = null } = {}) {
+    if (GFX.cameraMoments === 'minimal' || reducedMotion()) { onDone?.(); return; }
+    const target = span ?? this.span;
+    const start = target * fromSpanMul;
+    this._shotTween?.cancel?.();
+    this._shotTween = tween({
+      ms: duration, ease: e,
+      onUpdate: (v, k) => { this.span = start + (target - start) * k; this._applyProjection(); },
+      onDone: () => { this.span = target; this._applyProjection(); this._shotTween = null; onDone?.(); },
+    });
+  }
+
   update(dtMs) {
     // who the camera frames: the hub always trails the player; a chamber shows
     // the whole board until the player zooms in, then trails them too.
@@ -334,6 +353,10 @@ export class World {
     const k = 1 - Math.pow(0.0015, dtMs / 1000); // smooth exp follow
     this.target.lerp(this.goal, k);
     this.shakeAmp *= Math.pow(0.0005, dtMs / 1000);
+    // GPU field wind (Phase 5): one uniform write per frame for the whole scatter
+    // field. Fully static under reduced-motion or low tier (amp 0).
+    const windAmp = (reducedMotion() || !GFX.ambientScale) ? 0 : 0.06 * GFX.ambientScale;
+    setWind((this._windT = (this._windT || 0) + dtMs / 1000), windAmp);
     this._place();
     this.renderer.render(this.scene, this.camera);
   }

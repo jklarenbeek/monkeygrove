@@ -120,8 +120,24 @@ try {
   const moved = before.filter((b, i) => after[i] !== b).length;
   assert.ok(moved > 0, `crabs roam over time (moved ${moved}/${crabCount})`);
 
+  // 9. disposal/leak guard (Phase 14): 10× hub<->chamber must not grow GL geometry
+  //    unboundedly. Shared/cached geometry persists (fine); per-place geometry must be
+  //    freed by place.dispose(). A staircase upward is a leak.
+  const geoCount = () => evalp('window.__game.world.renderer.info.memory.geometries');
+  const samples = [];
+  for (let i = 0; i < 10; i++) {
+    await evalp('window.__game.startHub()');
+    await pause(350);
+    await evalp(`window.__game.debugChamber(${JSON.stringify(skill)}, 'fetch')`);
+    await pause(350);
+    samples.push(await geoCount());
+  }
+  const baseline = samples[2]; // let the first couple of loops warm the shared caches
+  const peak = Math.max(...samples.slice(2));
+  assert.ok(peak <= baseline * 1.5 + 40, `geometry count stays bounded over 10× transitions (samples: ${samples.join(',')})`);
+
   assert.deepEqual(errors, [], `no page errors during the run`);
-  console.log('e2e: PASSED — boot -> profile -> hub -> kitchen -> crabs roam, no errors.');
+  console.log(`e2e: PASSED — boot -> profile -> hub -> kitchen -> crabs roam -> 10× transitions bounded (${samples.join(',')}), no errors.`);
 } catch (e) {
   console.error('e2e: FAILED —', e.message);
   code = 1;

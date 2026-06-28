@@ -2,14 +2,19 @@
 // No samples, no network. Node-import-safe: no AudioContext/document access
 // happens until init() is called from a user gesture.
 
+import { reducedMotion } from './a11y.js';
+
 const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
 const cents = (c) => 2 ** (c / 1200);
 const rcents = (spread) => cents((Math.random() * 2 - 1) * spread);
 
 let ctx = null;
-let master, comp, sfxBus, musicBus, noiseBuf;
+let master, comp, sfxBus, musicBus, ambienceBus, noiseBuf;
 let sfxOn = true;
 let musicOn = true;
+let ambienceOn = true;
+let ambienceKey = null;     // active scene bed: 'hub' | 'title' | 'chamber*' | 'bakery' | null
+let ambienceTimer = null;   // self-scheduling bed runner handle
 let currentTrack = null;
 let requestedMusic = null; // last music() request, honored when (re)enabled
 
@@ -535,6 +540,48 @@ function endTrack(tr) {
   setTimeout(() => { try { tr.out.disconnect(); } catch { /* context may be gone */ } }, 4000);
 }
 
+// ----------------------------------------------------------- ambient beds ---
+// Quiet, sparse, generative texture (not melody) on ambienceBus. Self-scheduling
+// short one-shots only — no persistent oscillators — so a scene change just stops
+// rescheduling (nothing to leak). Cooldowns randomised so it never patterns; density
+// drops under reducedMotion(). Every cue is well below music/sfx level.
+function bedTick() {
+  ambienceTimer = null;
+  if (!ctx || !ambienceOn || !ambienceKey) return;
+  const t = ctx.currentTime + 0.05;
+  const calm = reducedMotion();
+  const key = ambienceKey;
+  if (key === 'hub' || key === 'title') {
+    noise({ t, dur: 1.6, gain: 0.05, type: 'lowpass', freq: 600, dest: ambienceBus }); // shore swell
+    if (Math.random() < (calm ? 0.15 : 0.4)) {
+      tone({ freq: hz(84 + ((Math.random() * 5) | 0) * 2), type: 'triangle', t: t + Math.random() * 1.2, dur: 0.18, gain: 0.03, dest: ambienceBus });
+    }
+  } else if (key && key.startsWith('chamber')) {
+    if (Math.random() < 0.4) tone({ freq: hz(79 + ((Math.random() * 4) | 0) * 2), type: 'triangle', t, dur: 0.16, gain: 0.022, dest: ambienceBus });
+  } else if (key === 'bakery') {
+    tone({ freq: hz(40), type: 'sine', t, dur: 1.8, gain: 0.04, dest: ambienceBus }); // warm oven hum
+    if (Math.random() < 0.25) noise({ t: t + 0.4, dur: 0.3, gain: 0.03, type: 'lowpass', freq: 400, dest: ambienceBus });
+  }
+  ambienceTimer = setTimeout(bedTick, (calm ? 5000 : 3000) + Math.random() * 4000);
+}
+
+function startBeds() {
+  if (ambienceTimer || !ctx || !ambienceOn || !ambienceKey) return;
+  ambienceTimer = setTimeout(bedTick, 400);
+}
+
+function stopBeds() {
+  if (ambienceTimer) { clearTimeout(ambienceTimer); ambienceTimer = null; }
+}
+
+// Per-name bounded randomness so a repeated cue never grates on a child (or parent).
+const VARY = {
+  hop: { pitch: 40, gain: 0.12 }, pick: { pitch: 30, gain: 0.1 }, coin: { pitch: 30, gain: 0.1 },
+  sparkle: { pitch: 40, gain: 0.12 }, correct: { pitch: 20, gain: 0.08 }, chest: { pitch: 20, gain: 0.08 },
+  plant: { pitch: 50, gain: 0.12 }, drop: { pitch: 40, gain: 0.1 }, place: { pitch: 40, gain: 0.1 },
+  bloom: { pitch: 30, gain: 0.1 }, streak: { pitch: 30, gain: 0.1 }, pop: { pitch: 40, gain: 0.12 },
+};
+
 // ------------------------------------------------------------- public api ---
 
 export const audio = {
@@ -563,6 +610,9 @@ export const audio = {
     musicBus = ctx.createGain();
     musicBus.gain.value = 0.25;
     musicBus.connect(comp);
+    ambienceBus = ctx.createGain();        // Phase 13: quiet generative beds, under everything
+    ambienceBus.gain.value = 0.18;
+    ambienceBus.connect(comp);
 
     noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); // 1s shared white noise
     const data = noiseBuf.getChannelData(0);
@@ -578,6 +628,7 @@ export const audio = {
     if (ctx.state === 'suspended') ctx.resume();
     if (musicOn && requestedMusic && TRACKS[requestedMusic]?.loop
       && currentTrack?.name !== requestedMusic) startTrack(requestedMusic);
+    if (ambienceOn && ambienceKey) startBeds();
   },
 
   sfx(name, opts = {}) {
@@ -608,8 +659,45 @@ export const audio = {
     startTrack(name);
   },
 
+  // Like sfx(), but adds small bounded pitch/gain jitter so repeats breathe.
+  variation(name, opts = {}) {
+    if (!ctx || !sfxOn) return;
+    const r = VARY[name] || { pitch: 20, gain: 0.08 };
+    const pitch = (opts.pitch ?? 1) * rcents(r.pitch);
+    const gain = (opts.gain ?? 1) * (1 + (Math.random() * 2 - 1) * r.gain);
+    this.sfx(name, { pitch, gain });
+  },
+
+  // Start/cross to a scene's ambient bed; null stops it. Mirrors music().
+  ambience(key) {
+    ambienceKey = key || null;
+    stopBeds();
+    if (!ctx || !ambienceOn || !ambienceKey) return;
+    startBeds();
+  },
+
+  // Subscribe to the Phase 8 visual-event bus as a pure listener (never owns state).
+  // Safe no-op if the bus is absent. Maps only events not already sounded elsewhere,
+  // so cues never double up; degrades to nothing until those events are emitted.
+  attachEvents(place) {
+    if (!place || typeof place.addReactor !== 'function') return;
+    place.addReactor({
+      react: (type) => {
+        if (!ctx) return;
+        if (type === 'build-complete') this.variation('bloom');
+        else if (type === 'portal-stage-up') this.variation('sparkle');
+      },
+    });
+  },
+
   setSfx(on) {
     sfxOn = !!on;
+  },
+
+  setAmbience(on) {
+    ambienceOn = !!on;
+    if (!ambienceOn) stopBeds();
+    else if (ctx && ambienceKey) startBeds();
   },
 
   setMusic(on) {

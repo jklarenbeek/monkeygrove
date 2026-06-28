@@ -257,7 +257,18 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
   the math succeeds. (A retro CRT toggle stays on the wishlist as an
   unlockable easter egg — not built.)
 - WebAudio synth: cozy marimba/kalimba island loop, pentatonic SFX, rising
-  combo tones, friendly "boop" for wrong (never a buzzer).
+  combo tones, friendly "boop" for wrong (never a buzzer). Optional procedural
+  ambient beds (shore/birds/oven warmth) on their own mutable "Nature sounds" group.
+- **Liveliness layers (tier-gated, child-safe).** A quality-tier system (`gfx.js`,
+  Settings → Graphics: Auto/Low/Medium/High) drives in-engine sky + warm tone mapping,
+  contact shadows, prop-density scatter, an ambient ecosystem (fireflies/bees/motes),
+  gentle GPU sway, a glow language, animated water, world reactivity, build-NPC
+  routines, per-creature animation, chamber juice, and soft camera moments. All are
+  **additive and reversible**: every layer keys off a `GFX` flag, `reducedMotion()`
+  calms all motion, and **Low tier reproduces the pre-liveliness renderer**. The
+  non-negotiable bar (see Anti-anxiety guarantees): a child always reads every number,
+  prompt, button, and model instantly; nothing decorative obscures or out-competes the
+  math; a wrong answer stays a warm "try this way," never red/shake/wilt.
 
 ## Build order (each step was shippable — 1–10 shipped, secrets pending)
 1. Chamber + grid-hop player feel (touch-first) → 2. Fetch loop + juice +

@@ -62,7 +62,7 @@ export class AvatarRig {
     const def = getCreature(petId);
     if (!def || def.id !== petId || !def.canBePet) { game.pet = null; return; }
     const mesh = makeCharacter(def.small, 0.45, null, 'creature:' + def.id + ':s');
-    game.pet = new PetFollower(mesh);
+    game.pet = new PetFollower(mesh, def.anim); // per-pet personality (Phase 10)
     const spot = this.findFreeNear(near.x, near.z) || near;
     game.pet.setPlace(game.place, spot.x, spot.z);
   }

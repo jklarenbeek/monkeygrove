@@ -150,6 +150,13 @@ scripts/
   (never `_owned`) → shared singletons that survive `Place.dispose()`; only the
   lightweight per-place mesh wrapper is freed. Hopping characters track the blob on the
   X/Z plane with Y pinned to the floor, so it never rides the hop arc. No shipped asset.
+- **Camera moments** (`world.cameraShot`, `GFX.cameraMoments`): short, eased
+  orthographic push-in/pull-back on non-gameplay beats (e.g. a gentle hub-arrival
+  settle). Animates **span only** — never the angle — so `screenDirToGridStep` and
+  picking stay valid (no input lock). `'minimal'` tier and `reducedMotion()` play
+  nothing (snap only) → Low = today; never runs during chamber solving. The optional
+  perspective-hub + depth-of-field high tier is deferred (open decision #5; DoF needs
+  the deferred postprocessing composer).
 - **Atmosphere** (medium/high tier, `GFX.toneMap`/`GFX.fog`): ACES filmic tone mapping
   with a bright, warm exposure; a shared procedural gradient skydome (`sky.js` — vertex
   colors, no asset, built once, rides with the camera); and gentle distance fog colored
@@ -165,9 +172,64 @@ scripts/
   by tier × region bloom. Eligible cells keep a 1-tile clearance ring from every
   interactable, and scatter **never** sets `cell.walk` (pathing/duel-safe). Build plots
   are dressed into small "places" via `decorateSpot()`. Off at low → floor unchanged.
+- **Water** (`water.js`, `GFX.water` — 'flat' low / 'animated' med-high): `Place` owns a
+  `createWaterSurface()` handle (`{group, update, dispose, spawn*}`). 'flat' reproduces
+  today's two planes + bob exactly; 'animated' adds a scrolling highlight overlay, a
+  high-tier sparkle overlay, an instanced shore-foam rim (offset off walkable centers),
+  and per-theme tint. Procedural canvas textures (defensive draw → tests get blank but
+  valid textures); `reducedMotion()` damps motion; pooled/capped fish-shadow & bubble
+  hooks are available for the ecosystem. No pickables/collision added.
+- **Idle sway** (Phase 5, `GFX.ambientScale`): a capped set of foliage hero props gets a
+  tiny CPU "breathing" tilt; the dense scatter field sways on the **GPU** via a wind
+  variant of the voxel material (`windMaterial()` in `voxel.js`, one `uTime` uniform per
+  frame, offset scaled by vertex height). Both are fully static under `reducedMotion()`
+  or low tier (amplitude 0) — matching the Phase 0 "Low = today" guarantee.
+- **Creature animation** (Phase 10): pure transform-only helpers in `anim.js`
+  (`dampRotateToward`/`lookAtYaw`/`idleBob`/`hopArc`/`squashPulse`/`wobble`) + a per-creature
+  cosmetic `anim` profile on every roster descriptor (`getCreature(id).anim`; crab/crabKing
+  get none). Pets celebrate per-profile (double-hop/wing-flap/stretch/…); chamber helpers
+  give a happy hop on correct and ONE gentle upright tilt on wrong (never scolding).
+  Reduced-motion shrinks idle amplitude and skips big bounces. No skeletons, no assets.
+- **NPC routines** (`npc.js`, `GFX.npcRoutines`): each build friend runs a tiny
+  transform-only state machine (idle bob → wander → face-build → greet) ticked via
+  `place.entities`. `'limited'` (low) = today's quiet in-place bob (never wanders →
+  Low byte-identical); `'full'` (med/high) wanders within a small home radius. A pure
+  `npcSteppable()` predicate keeps NPCs off every interaction tile and the player's
+  cell; the claim/free `walk` handshake + synced `npcs[]` row keep tap-to-talk valid
+  mid-hop. Dedicated forked Rng (no gameplay RNG); roster-only (crab/crabKing excluded).
+- **Chamber juice** (`verbfx.js`, Phase 11): a consistent glow + ambience layer added
+  *on top of* each verb's existing distinct effects — a staged theme-colored "local
+  glow" wash on the model on correct (on the ground, never behind the banner), a gentle
+  warm shimmer on not-yet (no red/shake), light per-theme ambient motes (≪ hub), and
+  `visualEvent('correct-answer'|'wrong-answer')` broadcasts. Never imports `mathengine`
+  (math stays pure); own Rng; off at low; honors `reducedMotion()`.
+- **World reactivity** (`reactive.js`, Phase 8): a tiny event bus — `place.visualEvent(type,
+  payload)` over an opt-in `_reactors` list (`player-hop`/`correct-answer`/`wrong-answer`/
+  `build-complete`/`portal-stage-up`/…) — plus helpers `makePulse`/`onPlayerNear`/
+  `makeReactiveProp` (the portal greet-guard, generalized). Drives floor-typed landing
+  puffs, breathing nest/build glows, and proximity reactions. Purely cosmetic: never
+  touches `walk`, scoring, or the problem RNG; `wrong-answer` is a warm shimmer at most
+  (never red/shake/darken); med/high only so low = today. Reused by Phases 11 & 13.
+- **Glow language** (`glow.js`, `GFX.glowSprites` — all tiers): one dependency-free
+  additive vocabulary (`makeGlowSprite`/`makeGlowPlane`/`makeMoteField`/`pulseGlow`) for
+  "friendly magic & reward" glow; shared cached radial textures, `_owned` materials,
+  `pulseGlow` holds steady under `reducedMotion()`. High tier (`GFX.bloom`) applies a
+  gentle additive halo boost in lieu of true postprocessing bloom (the `postprocessing`
+  EffectComposer dependency is deferred — addable later behind the same `GFX.bloom`).
 - **Juice**: hand-rolled tween engine (`anim.js`), particle bursts from a pooled
   `THREE.Points` per place (`entities.js`), camera shake, instanced floor-tile color
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.
+
+## Audio life
+`audio.js` stays one procedural WebAudio engine (no samples). Phase 13 added a fourth
+bus, `ambienceBus` (quiet, under everything), driving sparse generative **ambient beds**
+(`audio.ambience('hub'|'chamber*'|'bakery'|null)`) built from scheduled short one-shots
+(no persistent oscillators → a scene change just stops rescheduling; nothing leaks).
+`audio.variation(name)` adds bounded pitch/gain jitter so repeated cues never grate;
+`audio.attachEvents(place)` subscribes to the Phase 8 visual-event bus as a pure
+listener. A third settings group (`ambience`, with `setAmbience`) silences beds
+independently. Density drops under `reducedMotion()`; everything is a no-op without an
+AudioContext, so the game is fully playable in silence.
 
 ## DOM/Canvas split
 3D world on the WebGL canvas. Everything textual (equation banner, menus, shop,
@@ -353,7 +415,11 @@ Chamber layout generation/variation and duels flow through `rng.js` (mulberry32)
 a challenge code (world + rounds + base36 seed) reproduces the identical run on any
 machine. Free-play problem selection seeds itself randomly. `AmbientLife` forks its
 own rng stream from a single seed draw, so cosmetic critters never disturb
-duel-critical draws.
+duel-critical draws. The ambient ecosystem (`ambient.js`) extends this with
+fireflies, region pollen motes, and bees (`GFX.ambientScale`-scaled, per-type
+hard-capped, `reducedMotion()`-calmed); counts come from the pure, tested
+`ambientExtras()` resolver. Existing butterflies/birds/clouds are untouched so
+Low-tier ambient density still equals today's.
 
 ## Quality tiers
 The renderer and every scene feature read a single resolved feature-flag object,
@@ -371,6 +437,20 @@ desktop on `high` ≈ 60 fps; tablet/phone on `medium` ≈ 30 fps+; `low` ≈ to
 complexity. A DEV-only tuning panel + perf overlay (`gfxdev.js`, `npm run dev`) and a
 visual baseline pack (`npm run baseline` → `tmp/baseline/`, git-ignored) make every
 later phase tunable and measurable; both are excluded from the production bundle.
+
+### Per-tier budget & kill-switches (Phase 14)
+| Tier | Frame target | Bloom | Shadows | Ambient/decor | Water |
+|---|---|---|---|---|---|
+| Desktop · High | 60 fps sustained | additive glow boost (postfx deferred) | real 2048 + contact | rich | animated + sparkle |
+| Tablet/Phone · Medium | 30 fps+ | off | real 1024 + contact | reduced | animated |
+| Low | ≈ today (pre-plan) | off | contact blob only | off (none) | flat bobbing plane |
+
+Every liveliness layer is a **kill-switch** behind a `GFX` flag: `graphics = low`
+reproduces the pre-plan renderer (no tone-map/sky/fog, no scatter/ambient extras/sway,
+no animated water, no camera moments, NPC bob-in-place, blob contact shadows only —
+the one always-on grounding aid). `reducedMotion()` independently calms every moving
+layer. The e2e run (`npm run test:e2e`) includes a 10× hub↔chamber **disposal guard**
+asserting GL geometry stays bounded (per-place objects freed; shared geometry cached).
 
 ## Performance budget
 - Few draw calls: each place's floor is one `InstancedMesh`; voxel props share cached
@@ -395,7 +475,9 @@ guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
 - **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
-- **PWA precache ≤ 1150 KiB** — today 15 entries / 1088.28 KiB.
+- **PWA precache ≤ 1200 KiB** — today 15 entries / ~1150 KiB (bumped 1150→1200 for the
+  procedural "liveliness" phases — sky/tiers/shadows/scatter/ambient/sway add code, no
+  shipped assets).
 - **The `business-*` chunk stays lazy** — the check fails if it folds back into `index`
   or the entry static-imports it (Vite would module-preload it into `index.html`).
 

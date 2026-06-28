@@ -25,6 +25,7 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
         <div class="menu-row">
           <button class="btn soft" id="tg-sfx">${s.sfx ? '🔊' : '🔇'} ${t('settings.sfx')}</button>
           <button class="btn soft" id="tg-music">${s.music ? '🎵' : '🚫'} ${t('settings.music')}</button>
+          <button class="btn soft" id="tg-ambience" aria-pressed="${s.ambience !== false}">${s.ambience !== false ? '🌊' : '🔇'} ${t('settings.ambience')}</button>
         </div>
         <div class="menu-col">
           <button class="btn soft" id="tg-motion" aria-pressed="${reducedMotion()}">${reducedMotion() ? '🐢' : '🏃'} ${t('settings.reduce_motion')}</button>
@@ -34,11 +35,10 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
           <button class="btn soft" id="tg-textsize">🔠 ${t('settings.text_size')}: ${Math.round((s.textScale || 1) * 100)}%</button>
         </div>
         <div class="menu-col">
-          <span style="font-weight:800">🎨 ${t('settings.graphics')}</span>
+          <span style="font-weight:800" title="${t('settings.graphics_relaunch')}">🎨 ${t('settings.graphics')}</span>
           <div class="lang-toggle" id="graphics-toggle" role="group" aria-label="${t('settings.graphics')}">
             ${GRAPHICS_SETTINGS.map((g) => `<button class="btn soft" data-graphics="${g}" aria-pressed="${(s.graphics || 'auto') === g}">${t('settings.graphics_' + g)}</button>`).join('')}
           </div>
-          <small style="color:var(--ink-soft);font-weight:700">${t('settings.graphics_relaunch')}</small>
         </div>
         <button class="btn soft" id="switch-player">👥 ${t('settings.switch_player')}</button>
         ${devTools?.toggleHtml || ''}
@@ -59,6 +59,10 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   });
   el.querySelector('#tg-music').addEventListener('click', () => {
     s.music = !s.music; audio.setMusic(s.music); persist();
+    showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+  });
+  el.querySelector('#tg-ambience').addEventListener('click', () => {
+    s.ambience = s.ambience === false; audio.setAmbience(s.ambience); persist();
     showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
   });
   el.querySelector('#tg-motion').addEventListener('click', () => {

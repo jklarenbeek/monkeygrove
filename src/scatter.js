@@ -11,7 +11,7 @@ import { GFX } from './gfx.js';
 import { Rng } from './rng.js';
 import { PROPS } from './models.js';
 import { makeProp } from './entities.js';
-import { buildVoxelMesh, voxelMaterial } from './voxel.js';
+import { buildVoxelMesh, windMaterial } from './voxel.js';
 
 // Base micro-props every theme gets, plus a small themed accent set. `base` is the
 // per-eligible-cell placement probability (before tier/bloom scaling); `cap` bounds
@@ -107,7 +107,8 @@ export function buildScatter(place, opts = {}) {
     const model = PROPS[key];
     if (!model) continue;
     const geo = buildVoxelMesh(model, { cacheKey: 'scatter:' + key }).geometry;
-    const inst = new THREE.InstancedMesh(geo, voxelMaterial(), items.length);
+    // windMaterial → the whole field sways on the GPU (Phase 5); amp 0 = static.
+    const inst = new THREE.InstancedMesh(geo, windMaterial(), items.length);
     items.forEach((it, i) => {
       const wp = place.worldPos(it.x, it.z);
       const s = (it.h / model.layers.length) * it.scale;

@@ -27,8 +27,13 @@ import { join } from 'node:path';
 // not removed: the cap stays a real guardrail (the target is cheap Android / school
 // Wi-Fi). When the entry approaches this again, code-split the story screens/prose
 // into a lazy chunk (like business-*/duel-*) rather than just bumping the number.
+// 2026-06-28: precache 1150 -> 1200 for the "liveliness" plan (Phases 1-5): sky,
+// quality tiers, contact shadows, micro-prop scatter, ambient ecosystem, and GPU
+// sway are all PROCEDURAL code (no shipped image/HDR/audio assets), so only the
+// always-lazy app chunks grew (~a few KiB uncompressed). index gzip stayed well
+// under cap (~227). Bumped deliberately; the cap stays a real guardrail.
 const INDEX_JS_GZIP_BUDGET_KB = 235;   // decimal kB (÷1000), matches Vite's report
-const PRECACHE_BUDGET_KIB = 1150;      // binary KiB (÷1024), matches workbox's report
+const PRECACHE_BUDGET_KIB = 1200;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
 const ASSETS = join(DIST, 'assets');

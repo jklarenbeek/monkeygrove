@@ -8,10 +8,15 @@
 // must never share the chamber rng with verbs/stones (duel fairness).
 import * as THREE from 'three';
 import { buildVoxelMesh, withPalette } from './voxel.js';
-import { makeCharacter } from './entities.js';
+import { makeCharacter, makeMoteSprite } from './entities.js';
 import { AMBIENT, getCreature } from './models.js';
 import { Rng } from './rng.js';
 import { FLOOR_CHARS } from './config.js';
+
+// Per-type hard caps (high tier). Counts from the resolver are clamped to these
+// AFTER GFX.ambientScale so no device can blow the additive-overdraw / draw-call
+// budget. The existing actors keep their established caps elsewhere.
+export const AMBIENT_CAPS = { fireflies: 32, bees: 8, motes: 24 };
 
 const WING_COLORS = [
   { id: 'pink', W: '#ffb3c6' },
@@ -331,9 +336,131 @@ class WanderingPet {
   }
 }
 
+// A soft additive glow that drifts gently upward, twinkles, and resets low —
+// fireflies near portals, pollen/magic motes in bloomed regions. Calm by design:
+// slow rise, no darting. Mirrors the portal-mote loop in entities.js. The sprite's
+// material is _owned (freed by place.dispose()).
+class GlowMote {
+  constructor(place, rng, anchor, { color = 0xfff3b8, size = 0.08, rise = 1.3 } = {}) {
+    this.rng = rng;
+    this.base = anchor;
+    this.rise = rise;
+    this.size = size;
+    this.sprite = makeMoteSprite(color, size);
+    this.phase = rng.float();
+    this.speed = 0.05 + rng.float() * 0.06;
+    this.sway = 0.4 + rng.float() * 0.6;
+    this.ox = (rng.float() - 0.5) * 0.5;
+    this.oz = (rng.float() - 0.5) * 0.5;
+    this.t = rng.float() * 10;
+    place.group.add(this.sprite);
+  }
+
+  update(dtMs) {
+    this.t += dtMs / 1000;
+    const k = (this.t * this.speed + this.phase) % 1;
+    this.sprite.position.set(
+      this.base.x + this.ox + Math.sin(this.t * this.sway + this.phase * 7) * 0.18,
+      this.base.y + 0.1 + k * this.rise,
+      this.base.z + this.oz,
+    );
+    this.sprite.material.opacity = Math.sin(k * Math.PI)
+      * (0.32 + 0.4 * Math.sin(this.t * 4 + this.phase * 9) ** 2);
+    const s = this.size * (0.85 + 0.25 * Math.sin(this.t * 3 + this.phase * 5));
+    this.sprite.scale.set(s, s, 1);
+  }
+}
+
+// A bee loops a flower/garden anchor with a quick wing-flap, pausing now and then,
+// and drifts *slightly* away from the player — never a dramatic flee. Reuses the
+// two-frame winged helper (gold wings) and cached geometry; casts no shadow.
+class Bee {
+  constructor(place, rng, anchors, playerPos) {
+    this.place = place;
+    this.rng = rng;
+    this.anchors = anchors;
+    this.playerPos = playerPos;
+    this.mesh = makeFrames(AMBIENT.butterflyOpen, AMBIENT.butterflyClosed, { W: '#ffd45e' }, 'bee:gold', 0.16);
+    this.mesh.position.copy(this._spot());
+    place.group.add(this.mesh);
+    this.flapT = 0;
+    this.frame = 0;
+    this.t = rng.float() * 5;
+    this.rest = 0;
+    this.target = this._spot();
+  }
+
+  _spot() {
+    const a = this.rng.pick(this.anchors);
+    return new THREE.Vector3(
+      a.x + (this.rng.float() - 0.5) * 1.3,
+      0.4 + this.rng.float() * 0.45,
+      a.z + (this.rng.float() - 0.5) * 1.3,
+    );
+  }
+
+  update(dtMs) {
+    this.flapT += dtMs;
+    if (this.flapT >= 70) { this.flapT = 0; this.frame = 1 - this.frame; setFrame(this.mesh, this.frame); }
+    if (this.rest > 0) { this.rest -= dtMs; return; }
+    const m = this.mesh;
+    let dx = this.target.x - m.position.x;
+    let dz = this.target.z - m.position.z;
+    const dy = this.target.y - m.position.y;
+    // gently veer away from the player (no dramatic flee)
+    const p = this.playerPos?.();
+    if (p) {
+      const pdx = m.position.x - p.x, pdz = m.position.z - p.z;
+      const pd = Math.hypot(pdx, pdz);
+      if (pd < 1.6 && pd > 0.001) { dx += (pdx / pd) * 0.8; dz += (pdz / pd) * 0.8; }
+    }
+    const dist = Math.hypot(dx, dz);
+    if (dist < 0.14) {
+      if (this.rng.chance(0.3)) this.rest = 500 + this.rng.float() * 1400;
+      this.target = this._spot();
+      return;
+    }
+    const v = (0.7 + this.rng.float() * 0.15) * (dtMs / 1000);
+    m.position.x += (dx / dist) * v;
+    m.position.z += (dz / dist) * v;
+    m.position.y += dy * Math.min(1, dtMs / 600);
+    m.rotation.y = Math.atan2(dx, dz);
+  }
+}
+
+// Pure spawn resolver for the NEW ambient actors (fireflies / bees / region motes).
+// No GL, no RNG — unit-testable. Counts are clamped to AMBIENT_CAPS after the
+// caller folds in GFX.ambientScale. The original butterflies/birds/clouds/pets are
+// left to their existing call-site math so "Low = today" holds for them.
+export function ambientExtras(ctx = {}) {
+  const {
+    mode = 'hub', avgPct = 0, garden = false, portalStages = 0, festival = false,
+    tier = 'high', ambientScale = 1, reducedMotion = false,
+  } = ctx;
+  const cap = (n, hi) => Math.max(0, Math.min(hi, Math.round(n)));
+  const s = Math.max(0, ambientScale);
+  if (mode === 'chamber') {
+    // very sparse — the puzzle owns the screen
+    return {
+      fireflies: cap(2 * s, AMBIENT_CAPS.fireflies),
+      bees: (tier === 'low' || reducedMotion) ? 0 : cap(2 * s, AMBIENT_CAPS.bees),
+      motes: cap(2 * s, AMBIENT_CAPS.motes),
+    };
+  }
+  // hub / attract
+  let bees = (tier === 'low') ? 0 : cap((garden ? 6 : 2) * s, AMBIENT_CAPS.bees);
+  if (reducedMotion) bees = Math.min(bees, 2); // bees stay, but kept calm/few
+  return {
+    fireflies: cap((portalStages * 2 + (festival ? 10 : 0)) * s, AMBIENT_CAPS.fireflies),
+    bees,
+    motes: cap((avgPct * 10 + (festival ? 6 : 0)) * s, AMBIENT_CAPS.motes),
+  };
+}
+
 export class AmbientLife {
   constructor(place, rng, {
     butterflies = 0, birds = 0, clouds = 0, pets = [], petCount = 0, playerPos = null,
+    fireflies = 0, bees = 0, motes = 0, glowAnchors = null,
   } = {}) {
     this.place = place;
     this.rng = new Rng(rng.int(1, 1e9)); // own stream — never skews game rng
@@ -374,12 +501,33 @@ export class AmbientLife {
         new WanderingPet(place, this.rng, this.openCells, this.playerPos, pets[i % pets.length]),
       );
     }
+    // New glow/winged actors (Phase 4). Glow anchors are portal/build positions when
+    // supplied, else the flower/deco anchors, else any open cell — region-scoped so
+    // fireflies/motes cluster where they belong rather than hazing the whole screen.
+    const glowSpots = (glowAnchors && glowAnchors.length)
+      ? glowAnchors
+      : (anchors.length ? anchors : this.openCells.map((c) => place.worldPos(c.x, c.z)));
+    this.fireflies = [];
+    for (let i = 0; i < fireflies && glowSpots.length; i++) {
+      this.fireflies.push(new GlowMote(place, this.rng, this.rng.pick(glowSpots), { color: 0xfff3b8, size: 0.09, rise: 1.5 }));
+    }
+    this.motes = [];
+    for (let i = 0; i < motes && glowSpots.length; i++) {
+      this.motes.push(new GlowMote(place, this.rng, this.rng.pick(glowSpots), { color: 0xfff7d8, size: 0.05, rise: 1.0 }));
+    }
+    this.bees = [];
+    for (let i = 0; i < bees && anchors.length; i++) {
+      this.bees.push(new Bee(place, this.rng, anchors, this.playerPos));
+    }
   }
 
   update(dtMs) {
     for (const c of this.clouds) c.update(dtMs);
     for (const b of this.butterflies) b.update(dtMs);
     for (const w of this.wanderers) w.update(dtMs);
+    for (const f of this.fireflies) f.update(dtMs);
+    for (const m of this.motes) m.update(dtMs);
+    for (const b of this.bees) b.update(dtMs);
     for (let i = 0; i < this.birds.length; i++) {
       const bird = this.birds[i];
       if (bird && !bird.done) { bird.update(dtMs); continue; }

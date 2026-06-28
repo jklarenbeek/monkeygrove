@@ -20,19 +20,37 @@ import { mimi, mimiChibi } from './mimi.js';
 // models.js; kept inline to avoid an import cycle through models.js.
 const MONKEY_HAT_LAYER = 11;
 
+// Per-creature cosmetic animation profile (Phase 10). Drives idle/celebration
+// personality so no two creatures move identically. Pure data — no GL. crab/crabKing
+// are absent from CREATURES, so a profile physically cannot attach to them.
+const DEFAULT_ANIM = { bounce: 1.0, idleSpeed: 1.0, celebrate: 'happy-spin', shyDistance: 1.4, scaleSquash: 0.05 };
+const CREATURE_ANIM = {
+  monkey: { bounce: 1.05, idleSpeed: 1.0, celebrate: 'cheer-hop', shyDistance: 1.4, scaleSquash: 0.06 },
+  mimi: { bounce: 1.0, idleSpeed: 1.0, celebrate: 'happy-spin', shyDistance: 1.4, scaleSquash: 0.06 },
+  bunny: { bounce: 1.15, idleSpeed: 1.2, celebrate: 'double-hop', shyDistance: 1.5, scaleSquash: 0.06 },
+  duckling: { bounce: 1.0, idleSpeed: 1.0, celebrate: 'wing-flap', shyDistance: 1.2, scaleSquash: 0.05 },
+  kitten: { bounce: 0.9, idleSpeed: 0.9, celebrate: 'stretch', shyDistance: 2.0, scaleSquash: 0.05 },
+  piglet: { bounce: 1.0, idleSpeed: 1.0, celebrate: 'wiggle', shyDistance: 1.3, scaleSquash: 0.07 },
+  redpanda: { bounce: 0.95, idleSpeed: 1.0, celebrate: 'tail-wiggle', shyDistance: 1.8, scaleSquash: 0.05 },
+  turtle: { bounce: 0.6, idleSpeed: 0.6, celebrate: 'shell-bob', shyDistance: 1.0, scaleSquash: 0.04 },
+  owl: { bounce: 0.7, idleSpeed: 0.7, celebrate: 'head-swivel', shyDistance: 2.2, scaleSquash: 0.04 },
+  dragon: { bounce: 1.1, idleSpeed: 1.1, celebrate: 'sparkle-puff', shyDistance: 1.6, scaleSquash: 0.06 },
+};
+const animFor = (id) => ({ id, ...(CREATURE_ANIM[id] || DEFAULT_ANIM) });
+
 // The two story characters double as companions: always-owned, fur-tintable,
 // and (monkey only) hat-wearing. They are never in the egg-hatch pool.
 const monkeyCreature = {
   id: 'monkey', nameKey: 'pet.monkey', rarity: 'companion',
   small: monkeyChibi, full: monkey,
   canBeAvatar: true, canBePet: true, companion: true, isDefault: true,
-  fur: true, hat: true, hatY: MONKEY_HAT_LAYER,
+  fur: true, hat: true, hatY: MONKEY_HAT_LAYER, anim: animFor('monkey'),
 };
 const mimiCreature = {
   id: 'mimi', nameKey: 'pet.mimi', rarity: 'companion',
   small: mimiChibi, full: mimi,
   canBeAvatar: true, canBePet: true, companion: true, isDefault: false,
-  fur: true, hat: false,
+  fur: true, hat: false, anim: animFor('mimi'),
 };
 
 // Pets come straight from the PETS registry so the two can never drift: same
@@ -42,7 +60,7 @@ const petCreatures = PETS.map((p) => ({
   id: p.id, nameKey: p.nameKey, rarity: p.rarity,
   small: p.model, full: p.modelFull || p.model,
   canBeAvatar: true, canBePet: true, companion: false, isDefault: false,
-  fur: false, hat: false,
+  fur: false, hat: false, anim: animFor(p.id),
 }));
 
 // Order: the star first, then his companion, then the collectible pets in

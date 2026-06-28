@@ -473,6 +473,7 @@ export const en = {
   'settings.lang': 'Language',
   'settings.sfx': 'Sounds',
   'settings.music': 'Music',
+  'settings.ambience': 'Nature sounds',
   'settings.reduce_motion': 'Calm motion',
   'settings.dyslexia_font': 'Easy-read font',
   'settings.high_contrast': 'High contrast',

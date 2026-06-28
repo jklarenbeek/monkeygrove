@@ -24,7 +24,10 @@ import {
   ensureStory, drawNarrativeLine, islandBloom,
   refreshStoryLines, storyProgressReport, storyFinaleReady,
 } from './story/engine.js';
-import { AmbientLife } from './ambient.js';
+import { AmbientLife, ambientExtras } from './ambient.js';
+import { GFX } from './gfx.js';
+import { reducedMotion } from './a11y.js';
+import { landingReaction } from './reactive.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
@@ -77,6 +80,11 @@ export class HubController {
     g.world.follow(g.player.mesh, 10.5);
     // the island at full life: butterflies, birds dropping in, clouds
     // overhead — all the same AmbientLife the real hub runs
+    const attractGlow = Object.values(g.place.portals || {}).map((s) => g.place.worldPos(s.x, s.z, 0.5));
+    const attractExtra = ambientExtras({
+      mode: 'hub', avgPct: 1, garden: true, portalStages: 16, festival: true,
+      tier: GFX.tier, ambientScale: GFX.ambientScale, reducedMotion: reducedMotion(),
+    });
     g.place.addEntity(new AmbientLife(g.place, g.rng, {
       butterflies: 7,
       birds: 3,
@@ -84,6 +92,8 @@ export class HubController {
       pets: ['bunny', 'duckling', 'redpanda', 'kitten'],
       petCount: 3,
       playerPos: () => g.player?.mesh.position,
+      ...attractExtra,
+      glowAnchors: attractGlow,
     }));
     // tour stops: the four gates (each pops its world's math as a sparkle
     // label — multiplication shown as something you FIND, not fill in),
@@ -149,6 +159,8 @@ export class HubController {
     hud.showHintButton(false);
     g.refreshHudCounts();
     audio.music('island');
+    audio.ambience('hub'); // Phase 13: shore + sparse birds bed
+    audio.attachEvents(g.place);
     g.input.maybeGestureHint();
     // daily streak
     const res = touchDailyStreak(g.profile);
@@ -258,6 +270,7 @@ export class HubController {
     }
     g.world.defaultZoom = g.input.sceneZoom('hub');
     g.world.follow(g.player.mesh, 13, { x: g.place.size.w * 0.5, z: g.place.size.d * 0.5 });
+    g.world.cameraShot({ fromSpanMul: 1.22, duration: 950 }); // Phase 12: gentle arrival settle (full tier only)
     g.player.onArrive = (x, z) => this.hubArrive(x, z);
     g.player.onBump = (x, z) => this.hubBump(x, z);
     g.place.playerAt = () => (g.player ? { x: g.player.x, z: g.player.z } : null);
@@ -270,6 +283,16 @@ export class HubController {
     const avatar = g.profile.avatar || {};
     const wanderRoster = ['bunny', 'duckling', 'kitten', 'redpanda', 'turtle', 'owl']
       .filter((id) => id !== avatar.creature && id !== avatar.pet);
+    // New ambient layer (Phase 4): fireflies brighten with portal stage, motes with
+    // bloom, bees gather at the garden — all tier-scaled and reduced-motion-aware.
+    const portalStages = ['tide', 'garden', 'stump', 'vines']
+      .reduce((sum, w) => sum + portalStage(pct[w] ?? 0), 0);
+    const hubGlow = Object.values(g.place.portals || {}).map((s) => g.place.worldPos(s.x, s.z, 0.5));
+    const hubExtra = ambientExtras({
+      mode: 'hub', avgPct, garden: builtIds.includes('garden'), portalStages,
+      festival: !!g.profile.flags.festivalDone,
+      tier: GFX.tier, ambientScale: GFX.ambientScale, reducedMotion: reducedMotion(),
+    });
     g.place.addEntity(new AmbientLife(g.place, g.rng, {
       butterflies: 2 + Math.round(avgPct * 4) + (builtIds.includes('garden') ? 2 : 0),
       birds: 1 + (builtIds.length >= 3 ? 1 : 0) + (g.profile.flags.festivalDone ? 1 : 0),
@@ -277,6 +300,8 @@ export class HubController {
       pets: wanderRoster,
       petCount: 1 + Math.round(avgPct * 2) + (builtIds.length >= 3 ? 1 : 0),
       playerPos: () => g.player?.mesh.position,
+      ...hubExtra,
+      glowAnchors: hubGlow,
     }));
   }
 
@@ -333,6 +358,7 @@ export class HubController {
     const g = this.game;
     if (g.mode !== 'hub' || !g.place?.portals) return; // stray hop after we left the hub
     g.pet?.notePlayerAt(x, z);
+    landingReaction(g.place, x, z, g.player?.mesh.position); // Phase 8: gentle landing puff + event
     for (const [worldId, spot] of Object.entries(g.place.portals)) {
       if (spot.x === x && spot.z === z) {
         g.place.gates?.[worldId]?.enter?.();

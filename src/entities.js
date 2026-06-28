@@ -242,14 +242,17 @@ function makeMoteTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-function makeMoteSprite(color, size) {
+export function makeMoteSprite(color, size) {
   const mat = new THREE.SpriteMaterial({
     map: makeMoteTexture(), color, transparent: true,
     depthWrite: false, blending: THREE.AdditiveBlending,
   });
   mat._owned = true;
   const sp = new THREE.Sprite(mat);
-  sp.scale.set(size, size, 1);
+  // High tier gives additive glow a gentle halo boost (Phase 6) — stands in for true
+  // selective bloom; low/medium are unchanged (boost = 1).
+  const b = GFX.bloom ? 1.3 : 1;
+  sp.scale.set(size * b, size * b, 1);
   return sp;
 }
 

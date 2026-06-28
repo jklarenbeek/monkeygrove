@@ -22,7 +22,16 @@ import { Rng } from './rng.js';
 import { nextProblem } from './mathengine.js';
 import { t } from './i18n.js';
 import { GFX } from './gfx.js';
+import { reducedMotion } from './a11y.js';
 import { makeContactShadow } from './blobshadow.js';
+import { makeGlowSprite } from './glow.js';
+import { createWaterSurface } from './water.js';
+import { attachBuildIdle, attachNestGlow } from './reactive.js';
+import { attachNpcRoutine } from './npc.js';
+
+// Hero props that may gently sway (CPU path A). Rocks/coconuts/lanterns/shells stay
+// rock-still; only foliage breathes.
+const SWAYABLE = new Set(['palm', 'palmSmall', 'flowerPink', 'flowerYellow', 'flowerBlue', 'bush', 'sprout']);
 
 // What the hand-authored templates can physically host.
 export const HOST_LIMITS = { arrayRows: 8, arrayCols: 10, baskets: 6 };
@@ -158,6 +167,7 @@ export class Place {
     this.theme = theme;
     this.group = new THREE.Group();
     this.entities = [];          // anything with update(dt)
+    this._reactors = [];         // anything with react(type, payload) — Phase 8 event bus
     this.size = { w: 0, d: 0 };
     this.cells = [];
     this.markers = {};
@@ -299,26 +309,17 @@ export class Place {
   }
 
   _buildWater() {
-    const { w, d } = this.size;
-    const span = Math.max(w, d) * 3;
-    const geo = new THREE.PlaneGeometry(span, span);
-    const mat = new THREE.MeshLambertMaterial({ color: PALETTE.water, transparent: true, opacity: 0.92 });
-    mat._owned = true;
-    const water = new THREE.Mesh(geo, mat);
-    water.rotation.x = -Math.PI / 2;
-    water.position.y = -0.22;
-    this.group.add(water);
-    this.water = water;
-    // second deep layer for a hint of depth
-    const deep = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: PALETTE.waterDeep }));
-    deep.material._owned = true;
-    deep.rotation.x = -Math.PI / 2;
-    deep.position.y = -0.55;
-    this.group.add(deep);
+    // Water lives in water.js (Phase 7). 'flat' (low) reproduces today's two planes +
+    // bob exactly; 'animated' (med/high) adds shimmer, sparkle, foam, and theme tint.
+    this.water = createWaterSurface(this, {
+      size: this.size, quality: GFX.water, palette: PALETTE, theme: this.theme,
+    });
+    this.group.add(this.water.group);
   }
 
   _decorate(opts) {
     const rng = new Rng(opts.seed ?? 1234);
+    this.swayProps = []; // capped hero-prop sway list (Phase 5)
     const themed = {
       hub: ['palm', 'flowerPink', 'flowerYellow', 'bush', 'palmSmall', 'flowerBlue'],
       tide: ['shell', 'rockA', 'palmSmall', 'flowerBlue', 'rockB'],
@@ -337,9 +338,29 @@ export class Place {
       prop.position.copy(p);
       prop.rotation.y = rng.float() * Math.PI * 2;
       this.group.add(prop);
+      // a small, capped set of foliage props sway (CPU); everything else stays still
+      if (SWAYABLE.has(key) && this.swayProps.length < 8) {
+        this.swayProps.push({ mesh: prop, phase: rng.float() * Math.PI * 2, amp: 0.05 + rng.float() * 0.05, freq: 0.6 + rng.float() * 0.5 });
+      }
       const cell = this.cellAt(spot.x, spot.z);
       if (key === 'palm' || key === 'rockA' || key === 'rockB') cell.walk = false;
     }
+  }
+
+  // Gentle "breathing" tilt for the capped hero-prop set. Scaled by GFX.ambientScale;
+  // fully still under reduced-motion or low tier (props rest at neutral). Blocking is
+  // on the cell, not the mesh, so a swaying prop never drifts off a readable tile.
+  _updateSway(dtMs) {
+    const props = this.swayProps;
+    if (!props || !props.length) return;
+    if (reducedMotion() || !GFX.ambientScale) {
+      if (this._swaying) { for (const s of props) s.mesh.rotation.z = 0; this._swaying = false; }
+      return;
+    }
+    this._swaying = true;
+    this._swayT = (this._swayT || 0) + dtMs / 1000;
+    const k = GFX.ambientScale;
+    for (const s of props) s.mesh.rotation.z = Math.sin(this._swayT * s.freq + s.phase) * s.amp * k;
   }
 
   // Drop a soft contact shadow on the floor under cell (x,z) — for static fixtures,
@@ -363,12 +384,23 @@ export class Place {
 
   addEntity(e) { this.entities.push(e); return e; }
 
+  // Phase 8 visual-event bus. Reactors opt in via react(type, payload); those that also
+  // need per-frame work expose update() and get ticked in the entities loop. The bus
+  // never touches game state, RNG, scoring, or pathing — purely cosmetic broadcast.
+  addReactor(r) { this._reactors.push(r); if (r.update) this.addEntity(r); return r; }
+
+  visualEvent(type, payload = {}) {
+    for (const r of this._reactors) r.react?.(type, payload); // unknown types are no-ops
+  }
+
   update(dtMs) {
     for (const e of this.entities) e.update?.(dtMs);
-    if (this.water) this.water.position.y = -0.22 + Math.sin(performance.now() / 900) * 0.02;
+    if (this.water) this.water.update(dtMs);
+    this._updateSway(dtMs);
   }
 
   dispose() {
+    this.water?.dispose?.(); // free any in-flight water-life spawns before the sweep
     this.world.scene.remove(this.group);
     this.group.traverse((o) => {
       if (o.isInstancedMesh) o.dispose(); // frees instanceMatrix/instanceColor GL buffers
@@ -567,6 +599,13 @@ export class HubPlace extends Place {
       this.tree.position.copy(this.worldPos(tree.x, tree.z));
       this.group.add(this.tree);
       this.addGroundShadow(tree.x, tree.z, { radius: 0.7, opacity: 0.22 });
+      // a soft magic glow crowns the gem tree on high tier (glow language, Phase 6);
+      // gated to bloom so low/medium stay exactly as today
+      if (GFX.bloom) {
+        const glow = makeGlowSprite(0xfff3b8, 0.5, 0.5);
+        glow.position.copy(this.worldPos(tree.x, tree.z)).add(new THREE.Vector3(0, 2.2, 0));
+        this.group.add(glow);
+      }
       this.cellAt(tree.x, tree.z).walk = false;
     }
     const shop = (this.markers.O || [])[0];
@@ -582,6 +621,7 @@ export class HubPlace extends Place {
       egg.position.copy(this.worldPos(nest.x, nest.z));
       this.group.add(egg);
       this.addGroundShadow(nest.x, nest.z, { radius: 0.34 });
+      attachNestGlow(this, nest.x, nest.z); // Phase 8: warm breathing nest glow (med/high)
     }
     const mimi = (this.markers.M || [])[0];
     if (mimi) {
@@ -772,6 +812,7 @@ export class HubPlace extends Place {
       // Non-blocking dressing turns the plot into a small inhabited place (Phase 3);
       // the plaza is the festival centerpiece → richest density.
       this.decorateSpot(spot, { role: def.id === 'plaza' ? 'festival' : 'near-build', bloom: this.storyBloom || 0.75 });
+      attachBuildIdle(this, def, spot); // a lived-in idle effect per build (Phase 8)
     }
     if (def.id === 'lanterns') {
       for (const dx of [-1, 0, 1]) {
@@ -827,8 +868,10 @@ export class HubPlace extends Place {
     this.group.add(mesh);
     this.addGroundShadow(home.x, home.z, { radius: 0.3 }); // on-roster build friend
     this.cellAt(home.x, home.z).walk = false;
-    this._bob(mesh);
-    this.npcs.push({ id: def.id, face: def.npc.face, x: home.x, z: home.z, mesh });
+    const entry = { id: def.id, face: def.npc.face, x: home.x, z: home.z, mesh };
+    this.npcs.push(entry);
+    // a small loop of life around the build (Phase 9). 'limited' (low) = today's bob.
+    attachNpcRoutine(this, mesh, spot, entry, this.npcs.length);
   }
 
   // After the festival the Crab King stays on the islet, sheepish forever.

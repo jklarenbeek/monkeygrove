@@ -13,13 +13,18 @@ import { Particles, Crab, Altar, makeCharacter, makeProp, floatLabel } from './e
 import { VERBS } from './verbs.js';
 import { PROPS, getCreature } from './models.js';
 import { nextProblem, recordResult } from './mathengine.js';
+import { tween, ease, wobble } from './anim.js';
+import { fxCorrectGlow, fxThemeAmbience } from './verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import { addBananas, persist } from './state.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
 import { audio } from './audio.js';
-import { AmbientLife } from './ambient.js';
+import { AmbientLife, ambientExtras } from './ambient.js';
+import { GFX } from './gfx.js';
+import { reducedMotion } from './a11y.js';
+import { landingReaction } from './reactive.js';
 import { delay } from './anim.js';
 import { Rng } from './rng.js';
 import { BALANCE, SOLID_MARKERS } from './config.js';
@@ -61,6 +66,8 @@ export class ChamberFlow {
     hud.showHintButton(true);
     this.presentProblem(problem);
     audio.music(problem.world ? `chamber:${problem.world}` : 'chamber');
+    audio.ambience('chamber'); // Phase 13: very sparse chamber bed
+    audio.attachEvents(g.place);
     g.input.maybeGestureHint();
     if (g.isEcho) hud.toast('✨ ' + t('play.echo_door'));
   }
@@ -83,7 +90,19 @@ export class ChamberFlow {
     g.particles = new Particles(g.place.group);
     // a touch of life, kept subtle in chambers (AmbientLife forks its own
     // rng stream, so duel-critical draws stay perfectly aligned)
-    g.place.addEntity(new AmbientLife(g.place, g.chamberRng, { butterflies: 2 }));
+    // Subtle, world-accented life — fireflies in vines, motes elsewhere — kept very
+    // sparse so the puzzle owns the screen. AmbientLife forks its own Rng off the
+    // chamberRng, so these dice never skew the problem/duel stream.
+    const chamberExtra = ambientExtras({
+      mode: 'chamber', tier: GFX.tier, ambientScale: GFX.ambientScale, reducedMotion: reducedMotion(),
+    });
+    const vines = g.currentWorld === 'vines';
+    g.place.addEntity(new AmbientLife(g.place, g.chamberRng, {
+      butterflies: 2,
+      fireflies: vines ? chamberExtra.fireflies : 0,
+      motes: vines ? 0 : chamberExtra.motes,
+    }));
+    fxThemeAmbience(g.place, g.currentWorld); // Phase 11: light per-theme ambience (≪ hub)
     g.avatar.spawnAvatar();
     const spawn = (g.place.markers.P || [{ x: 2, z: 2 }])[0];
     g.player.setPlace(g.place, spawn.x, spawn.z);
@@ -96,6 +115,7 @@ export class ChamberFlow {
     g.world.frameBoard(new THREE.Vector3(0, 0, 0), g.place.size.w, g.place.size.d, g.player.mesh);
     g.player.onArrive = (x, z) => {
       g.pet?.notePlayerAt(x, z);
+      landingReaction(g.place, x, z, g.player?.mesh.position); // Phase 8: gentle landing puff + event
       this.collectPickupAt(x, z);
       g.verb?.onArrive(x, z);
     };
@@ -147,6 +167,18 @@ export class ChamberFlow {
       });
       g.helper = helper;
     }
+  }
+
+  // Warm helper body-language (Phase 10). 'correct' → a happy hop (excite bump);
+  // 'wrong' → ONE gentle, slow, upright concerned tilt — encouraging, never a frown,
+  // droop, recoil, or red. Skipped under reduced motion (the words still encourage).
+  helperReact(kind) {
+    const h = this.game.helper;
+    if (!h) return;
+    if (kind === 'correct') { h.excite = 1; return; }
+    if (reducedMotion()) return;
+    const m = h.mesh;
+    tween({ ms: 700, ease: ease.outQuad, onUpdate: (v, k) => { m.rotation.z = wobble(k, 0.12, 2); }, onDone: () => { m.rotation.z = 0; } });
   }
 
   // Everything the helper says goes through here: name tag + their face.
@@ -250,6 +282,10 @@ export class ChamberFlow {
     }, { now: Date.now() });
     g.profile.stats[correct ? 'correct' : 'wrong']++;
     persist();
+    this.helperReact(correct ? 'correct' : 'wrong'); // warm body-language (Phase 10)
+    // Phase 11: broadcast so the world reacts gently (additively, never wilting).
+    const pos = g.altar?.mesh.position || g.player?.mesh.position;
+    g.place?.visualEvent?.(correct ? 'correct-answer' : 'wrong-answer', { world: g.currentWorld, position: pos });
     if (correct) this.onCorrect(res, info);
     else this.onWrong(res, info);
   }
@@ -266,6 +302,12 @@ export class ChamberFlow {
     hud.solveBanner(g.problem.equation.replace(/[?⬚]/, String(g.problem.answer)));
     hud.setCombo(g.combo);
     g.pet?.celebrate();
+    // Phase 11 "local glow" beat: a short theme wash on the model (altar/player), a
+    // staged ~90ms after lock-in — on the ground, never behind the banner.
+    delay(reducedMotion() ? 0 : 90, () => {
+      if (g.flowToken === undefined || g.mode !== 'chamber') return;
+      fxCorrectGlow(g.place, g.altar?.mesh.position || g.player?.mesh.position, g.currentWorld);
+    });
     // confetti, banana fountain, egg fill, gem/mastery toasts (egg-just-filled
     // result decides whether completeChamber hatches)
     const eggFull = g.rewards.payCorrect(g.combo, res);

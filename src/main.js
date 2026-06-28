@@ -104,6 +104,7 @@ class Game {
       audio.init();
       audio.setSfx(settings().sfx);
       audio.setMusic(settings().music);
+      audio.setAmbience(settings().ambience);
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
     };

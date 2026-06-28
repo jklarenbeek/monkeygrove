@@ -1,7 +1,7 @@
 // Grid-hop player controller + pet follower. Hops between cells with
 // squash & stretch; supports BFS tap-to-walk; can carry a stone mesh.
 import { STEP_H, HOP_MS, HOP_ARC } from './config.js';
-import { tween, ease, squash } from './anim.js';
+import { tween, ease, squash, squashPulse, wobble } from './anim.js';
 import { reducedMotion } from './a11y.js';
 import { audio } from './audio.js';
 import { GFX } from './gfx.js';
@@ -204,17 +204,22 @@ export class Player {
   }
 }
 
-// A pet hops along the player's breadcrumb trail, two steps behind.
+// A pet hops along the player's breadcrumb trail, two steps behind. Each pet carries
+// a cosmetic `anim` profile (Phase 10) so idle pacing and the celebration read as that
+// creature's personality — no two pets move identically.
+const DEFAULT_ANIM = { bounce: 1.0, idleSpeed: 1.0, celebrate: 'happy-spin', scaleSquash: 0.05 };
+
 export class PetFollower {
-  constructor(mesh) {
+  constructor(mesh, anim = null) {
     this.mesh = mesh;
+    this.anim = anim || DEFAULT_ANIM;
     this.trail = [];
     this.x = 0; this.z = 0;
     this.hopping = false;
     this.place = null;
     this.idleT = Math.random() * 10;
     this.baseScale = mesh.scale.x || 1;
-    this.happy = 0; // >0 → does a flip
+    this.celebrating = false;
   }
 
   setPlace(place, x, z) {
@@ -234,16 +239,47 @@ export class PetFollower {
     if (this.trail.length > 6) this.trail.shift();
   }
 
-  celebrate() { this.happy = 1; }
+  // Per-pet celebration dispatched on the creature's profile (Phase 10). Transform-only
+  // (scale + yaw + tilt) so it never desyncs the floor position; calmer under reduced
+  // motion; dragon's sparkle-puff requests a tiny cosmetic burst via place.fx.
+  celebrate() {
+    if (this.celebrating) return;
+    this.celebrating = true;
+    const m = this.mesh;
+    const base = this.baseScale;
+    const type = this.anim.celebrate;
+    if (reducedMotion()) {
+      tween({
+        ms: 360,
+        onUpdate: (v, k) => { const p = squashPulse(k, 0.08); m.scale.set(base * p.sxz, base * p.sy, base * p.sxz); },
+        onDone: () => { m.scale.setScalar(base); this.celebrating = false; },
+      });
+      return;
+    }
+    const ry0 = m.rotation.y;
+    tween({
+      ms: 720, ease: ease.outQuad,
+      onUpdate: (v, k) => {
+        let sy = 1, sxz = 1, rz = 0, ry = ry0;
+        if (type === 'double-hop' || type === 'cheer-hop') { const p = squashPulse((k * 2) % 1, 0.24); sy = p.sy; sxz = p.sxz; }
+        else if (type === 'happy-spin' || type === 'head-swivel') { ry = ry0 + k * Math.PI * 2; }
+        else if (type === 'stretch' || type === 'shell-bob') { const p = squashPulse(k, 0.28); sy = p.sy; sxz = p.sxz; }
+        else { rz = wobble(k, 0.35, 5); } // wing-flap / wiggle / tail-wiggle / sparkle-puff
+        m.scale.set(base * sxz, base * sy, base * sxz);
+        m.rotation.set(0, ry, rz);
+      },
+      onDone: () => { m.rotation.set(0, ry0, 0); m.scale.setScalar(base); this.celebrating = false; },
+    });
+    if (type === 'sparkle-puff' && this.place?.fx) {
+      const c = m.position.clone(); c.y += 0.4;
+      this.place.fx.emit(c, 10, { colors: [0xfff3b8, 0xc9a6ff], speed: 1.2, up: 1.6, life: 700, spread: 0.3 });
+    }
+  }
 
   update(dtMs) {
     this.idleT += dtMs / 1000;
     const m = this.mesh;
-    if (this.happy > 0) {
-      this.happy -= dtMs / 600;
-      m.rotation.x = (1 - Math.max(0, this.happy)) * Math.PI * 2;
-      if (this.happy <= 0) m.rotation.x = 0;
-    }
+    if (this.celebrating) return; // the celebrate tween owns the transform briefly
     if (!this.hopping && this.trail.length > 2 && this.place) {
       const next = this.trail.shift();
       const dx = next.x - this.x, dz = next.z - this.z;
@@ -270,7 +306,8 @@ export class PetFollower {
         });
       }
     } else if (!this.hopping) {
-      m.scale.set(this.baseScale, this.baseScale * (1 + Math.sin(this.idleT * 4.2) * 0.03), this.baseScale);
+      const a = this.anim;
+      m.scale.set(this.baseScale, this.baseScale * (1 + Math.sin(this.idleT * 4.2 * a.idleSpeed) * a.scaleSquash), this.baseScale);
     }
     trackShadow(this); // flat on the ground, never riding the hop arc
   }
