@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { TILE, STEP_H, PALETTE, WORLD_THEME, MARKERS, FLOOR_CHARS } from './config.js';
 import { makeProp, makeCharacter, makeTextSprite, LivingPortal } from './entities.js';
 import { PROPS, CHARS, getCreature } from './models.js';
+import { buildScatter, decorateSpot } from './scatter.js';
 import { BUILDS, applyIslandRows } from './island.js';
 import { Rng } from './rng.js';
 import { nextProblem } from './mathengine.js';
@@ -195,6 +196,7 @@ export class Place {
     this._buildFloor(opts);
     this._buildWater();
     this._decorate(opts);
+    this._scatter(opts);
     return this;
   }
 
@@ -351,6 +353,13 @@ export class Place {
     this.group.add(blob);
     return blob;
   }
+
+  // Cosmetic micro-prop carpet (Phase 3) — see scatter.js. Skipped at low tier so the
+  // floor is identical to before; never mutates cell.walk (pathing-safe).
+  _scatter(opts = {}) { buildScatter(this, opts); }
+
+  // Dress a build plot/spot into a small inhabited "place" (non-blocking).
+  decorateSpot(spot, opts) { decorateSpot(this, spot, opts); }
 
   addEntity(e) { this.entities.push(e); return e; }
 
@@ -758,7 +767,12 @@ export class HubPlace extends Place {
     const block = (bx, bz) => { const c = this.cellAt(bx, bz); if (c) c.walk = false; };
     // One larger, softer blob grounds the whole cluster as a single mass (cheaper and
     // reads better than a blob per prop). The bridge has no prop at its plot.
-    if (def.id !== 'bridge') this.addGroundShadow(x, z, { radius: 0.85, opacity: 0.18 });
+    if (def.id !== 'bridge') {
+      this.addGroundShadow(x, z, { radius: 0.85, opacity: 0.18 });
+      // Non-blocking dressing turns the plot into a small inhabited place (Phase 3);
+      // the plaza is the festival centerpiece → richest density.
+      this.decorateSpot(spot, { role: def.id === 'plaza' ? 'festival' : 'near-build', bloom: this.storyBloom || 0.75 });
+    }
     if (def.id === 'lanterns') {
       for (const dx of [-1, 0, 1]) {
         if (this.cellAt(x + dx, z)) { this._prop('lantern', 0.55, x + dx, z); block(x + dx, z); }

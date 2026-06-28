@@ -315,6 +315,47 @@ const flowerBlue = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// Micro-props (Phase 3) — tiny cosmetic dressing scattered via InstancedMesh.
+// Chunky, low-voxel shapes that read as floor *texture*, never as interactables.
+// ---------------------------------------------------------------------------
+const grassA = {
+  palette: { g: '#7fc26a', G: '#5fb46a' },
+  layers: [
+    ['.g.', 'gGg', '.g.'],
+    ['...', '.G.', '...'],
+  ],
+};
+const grassB = {
+  palette: { g: '#86c970', G: '#62b06a' },
+  layers: [
+    ['g.g', '.G.', 'g.g'],
+    ['...', '.G.', '...'],
+    ['...', '.g.', '...'],
+  ],
+};
+const pebble = {
+  palette: { p: '#b8b2a8', d: '#9a948a' },
+  layers: [
+    ['.pp.', 'pddp', '.pp.'],
+  ],
+};
+const mushroom = {
+  palette: { S: '#f4f0e6', C: '#e0728a', c: '#c85a72' },
+  layers: [
+    ['...', '.S.', '...'],
+    ['.C.', 'CcC', '.C.'],
+  ],
+};
+const crystal = {
+  palette: { C: '#c9a6ff', t: '#e6d6ff' },
+  layers: [
+    ['...', '.C.', '...'],
+    ['...', '.C.', '...'],
+    ['...', '.t.', '...'],
+  ],
+};
+
 // Round clay pot with a hollow rim — number stones hide inside.
 const pot = {
   palette: { D: '#d9906f', d: '#b8714f', c: '#e8a988' },
@@ -687,6 +728,7 @@ export const PROPS = {
   sign, rockA, rockB,
   lantern, shell, sprout, berry, stall, oven,
   counter, prepBoard, pizzaPan, doughBowl, toppingCrate, coinTray, orderBoard, shopTable,
+  grassA, grassB, pebble, mushroom, crystal,
 };
 
 // ---------------------------------------------------------------------------

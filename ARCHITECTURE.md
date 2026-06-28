@@ -159,6 +159,12 @@ scripts/
   All of this is **off at low tier**, which keeps today's flat linear look (and the CSS
   body gradient as the sky). No `PALETTE` hex changes — grading is exposure/light only,
   so low stays byte-identical.
+- **Prop density** (`scatter.js`, `GFX.decorDensity` — 0 low / 1 medium / 2 high): a
+  cosmetic micro-prop carpet (grass/pebbles/flowers + themed accents) rendered as one
+  `InstancedMesh` per type, deterministic from a Rng forked off the board seed, scaled
+  by tier × region bloom. Eligible cells keep a 1-tile clearance ring from every
+  interactable, and scatter **never** sets `cell.walk` (pathing/duel-safe). Build plots
+  are dressed into small "places" via `decorateSpot()`. Off at low → floor unchanged.
 - **Juice**: hand-rolled tween engine (`anim.js`), particle bursts from a pooled
   `THREE.Points` per place (`entities.js`), camera shake, instanced floor-tile color
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.
