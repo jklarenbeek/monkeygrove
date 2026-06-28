@@ -618,6 +618,7 @@ export class HubController {
       const near = g.avatar.findFreeNear(spot.x, spot.z);
       if (near) { g.player.setPlace(g.place, near.x, near.z); g.avatar.respawnPet(); }
       const pos = g.place.worldPos(spot.x, spot.z, 0.9);
+      g.place.visualEvent?.('build-complete', { id: def.id, spot, position: pos });
       audio.sfx('bloom');
       delay(250, () => g.particles?.confetti(pos, 44));
       delay(850, () => g.particles?.confetti(pos.clone().add(new THREE.Vector3(0.4, 0.3, -0.3)), 28));

@@ -390,6 +390,7 @@ export class Place {
   addReactor(r) { this._reactors.push(r); if (r.update) this.addEntity(r); return r; }
 
   visualEvent(type, payload = {}) {
+    this.water?.react?.(type, payload);
     for (const r of this._reactors) r.react?.(type, payload); // unknown types are no-ops
   }
 

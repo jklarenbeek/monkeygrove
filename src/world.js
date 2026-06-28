@@ -65,6 +65,13 @@ export function screenDirToGridStep(sx, sy) {
 const ZOOM_MIN = 0.8;
 const ZOOM_MAX = 4;
 
+// Phase 10 (opt-in via GFX.perspectiveHub): a narrow-FOV perspective camera gives the
+// HUB gentle toy-diorama depth. It keeps the exact ISO_DIR angle — only the projection
+// and camera distance change — so screenDirToGridStep() and picking stay valid and no
+// input lock is needed. Chambers (frameBoard) ALWAYS stay orthographic.
+const PERSP_FOV = 28;                                   // degrees — narrow, diorama-ish
+const PERSP_TAN = Math.tan((PERSP_FOV * Math.PI) / 360); // tan(fov/2)
+
 export class World {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({
@@ -104,7 +111,15 @@ export class World {
       this.scene.fog = this.fog;
     }
 
-    this.camera = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
+    this.orthoCam = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
+    // Optional perspective hub camera (Phase 10) — built ONLY when the feature flag is
+    // on, so the default rig is byte-identical to before. `this.camera` is always the
+    // ACTIVE camera; pick(), _place(), and render() all read it, so framing methods
+    // just point it at the right one (chambers force ortho; hub uses persp when on).
+    this.perspCam = GFX.perspectiveHub ? new THREE.PerspectiveCamera(PERSP_FOV, 1, 0.1, 400) : null;
+    this.camera = this.orthoCam;
+    this.perspDist = CAM_DIST;            // camera distance along ISO_DIR (perspective)
+    this._perspOff = new THREE.Vector3(); // reused per-frame in _place (no GC churn)
     this.span = 14;                       // world units visible vertically-ish
     this.fitBoard = null;                 // when set: keep this {w,d} board fully in frame
     this.target = new THREE.Vector3();    // smoothed look-at
@@ -160,13 +175,38 @@ export class World {
     this.raycaster = new THREE.Raycaster();
     this.pickables = []; // set by current place (floor meshes with .gridInfo)
 
+    // Selective bloom / DoF (Phase 9/10) — HIGH tier only, and lazily loaded so the
+    // postprocessing addons never enter the first-load `index` chunk (budget-guarded in
+    // scripts/check-budget.mjs). Until it resolves — or if the chunk fails to load —
+    // update() falls back to the plain direct render path, so nothing ever breaks.
+    this.composer = null;
+
     window.addEventListener('resize', () => this.resize());
     this.resize();
+    if (GFX.bloom || GFX.dof) this._initComposer();
+  }
+
+  async _initComposer() {
+    if (this._composerInit) return;
+    this._composerInit = true;
+    try {
+      const { createComposer } = await import('./postfx.js');
+      const c = await createComposer(this.renderer, {
+        width: window.innerWidth, height: window.innerHeight, halfRes: GFX.bloomHalfRes,
+        amount: 0.3 * (GFX_TUNING.bloomIntensity || 1), // calm by default; dev slider scales it
+      });
+      if (c) {
+        c.setSize(window.innerWidth, window.innerHeight);
+        if (this.camera.isPerspectiveCamera && GFX.dof) c.setDofParams({ focus: this.perspDist });
+        this.composer = c;
+      }
+    } catch { this.composer = null; }
   }
 
   resize() {
     const w = window.innerWidth, h = window.innerHeight;
     this.renderer.setSize(w, h, false);
+    this.composer?.setSize(w, h);
     this.aspect = w / h;
     // fit-board mode (chambers): the whole diorama must stay visible on ANY
     // aspect — stones in the far corner can't hide off-screen, and number-line
@@ -191,19 +231,43 @@ export class World {
     const baseVSpan = this.fitBoard ? this.span : Math.max(this.span, (this.span * 1.15) / aspect);
     this.baseVSpan = baseVSpan;
     const vSpan = baseVSpan / this.zoom;
-    this.camera.top = vSpan / 2;
-    this.camera.bottom = -vSpan / 2;
-    this.camera.left = (-vSpan * aspect) / 2;
-    this.camera.right = (vSpan * aspect) / 2;
-    this.camera.updateProjectionMatrix();
+    // Distance from camera to the look-at plane. Ortho is a fixed rig distance; the
+    // perspective hub camera backs off just far enough that a `vSpan`-tall slice fills
+    // the frame at PERSP_FOV — so both projections frame the same board, only the
+    // perspective one adds gentle depth falloff.
+    let camDist = CAM_DIST;
+    if (this.camera.isPerspectiveCamera) {
+      camDist = this.perspDist = vSpan / (2 * PERSP_TAN);
+      this.camera.fov = PERSP_FOV;
+      this.camera.aspect = aspect;
+      this.camera.near = 0.1;
+      this.camera.far = 400;
+      this.camera.updateProjectionMatrix();
+      // Keep DoF focused on the look-at plane so the player/build stays crisp.
+      if (this.composer && GFX.dof) this.composer.setDofParams({ focus: this.perspDist });
+    } else {
+      this.camera.top = vSpan / 2;
+      this.camera.bottom = -vSpan / 2;
+      this.camera.left = (-vSpan * aspect) / 2;
+      this.camera.right = (vSpan * aspect) / 2;
+      this.camera.updateProjectionMatrix();
+    }
     // Keep distance haze entirely behind the framed board. The whole board is always
     // fit into ~baseVSpan, so its view-depth spread is < baseVSpan; starting the fog
-    // past CAM_DIST + baseVSpan guarantees no in-board prop, number, stone, or
+    // past camDist + baseVSpan guarantees no in-board prop, number, stone, or
     // number-line end is ever hazed — only the ocean/horizon beyond it softens.
     if (this.fog) {
-      this.fog.near = CAM_DIST + baseVSpan * 1.1;
-      this.fog.far = CAM_DIST + baseVSpan * 3.2;
+      this.fog.near = camDist + baseVSpan * 1.1;
+      this.fog.far = camDist + baseVSpan * 3.2;
     }
+  }
+
+  // Point the active camera at the ortho or perspective rig. Framing methods call this:
+  // chambers force ortho (math must stay perfectly readable); hub/static scenes use the
+  // perspective camera when the feature flag built one. A no-op when already active.
+  _useCamera(cam) {
+    if (!cam || this.camera === cam) return;
+    this.camera = cam;
   }
 
   setSpan(span) {
@@ -247,6 +311,7 @@ export class World {
 
   // Frame a static diorama (hub overview / chamber)
   lookAt(center, span) {
+    this._useCamera(this.perspCam || this.orthoCam); // hub/static may use perspective
     this.fitBoard = null;
     this.followObj = null;
     this.followMode = null;
@@ -260,6 +325,7 @@ export class World {
   }
 
   follow(obj, span, bound) {
+    this._useCamera(this.perspCam || this.orthoCam); // hub follow may use perspective
     this.fitBoard = null;
     this.followObj = obj;
     this.followMode = 'always';
@@ -278,6 +344,7 @@ export class World {
   // resize). When a followObj is given, the camera follows it once the player
   // zooms in past the fit, while min zoom keeps the whole board in view.
   frameBoard(center, w, d, followObj = null) {
+    this._useCamera(this.orthoCam); // chambers ALWAYS orthographic — math stays readable
     this.followObj = followObj;
     this.followMode = followObj ? 'zoomed' : null;
     this.fitBoard = { w, d };
@@ -295,7 +362,11 @@ export class World {
   }
 
   _place() {
-    const off = CAM_OFF;
+    // Same ISO_DIR angle for both cameras — only the distance differs, so the on-screen
+    // grid directions (and thus input mapping + picking) are identical either way.
+    const off = this.camera.isPerspectiveCamera
+      ? this._perspOff.copy(ISO_DIR).multiplyScalar(this.perspDist)
+      : CAM_OFF;
     let sx = 0, sz = 0;
     if (this.shakeAmp > 0.001) {
       sx = (Math.random() - 0.5) * this.shakeAmp;
@@ -358,7 +429,25 @@ export class World {
     const windAmp = 0.06 * ambientMotionScale(GFX, reducedMotion());
     setWind((this._windT = (this._windT || 0) + dtMs / 1000), windAmp);
     this._place();
-    this.renderer.render(this.scene, this.camera);
+    // High tier renders through the lazy selective-bloom composer (DoF only when the
+    // perspective hub camera is active). Everywhere else — and until/if the composer
+    // loads — this is the exact direct render path as before.
+    const dof = !!(this.composer && GFX.dof && this.camera.isPerspectiveCamera);
+    if (this.composer && (GFX.bloom || dof)) {
+      this.composer.render(this.scene, this.camera, { dof });
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
+  // Release GPU resources owned by the world (composer render targets, renderer). The
+  // World is a session singleton today, so this is mainly for tests and a clean
+  // teardown hook; per-place GL objects are freed by Place.dispose().
+  dispose() {
+    this._shotTween?.cancel?.();
+    this.composer?.dispose();
+    this.composer = null;
+    this.renderer.dispose?.();
   }
 
   // Returns the first pickable intersection ({point, object}) or null.

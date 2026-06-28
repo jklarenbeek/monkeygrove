@@ -42,6 +42,29 @@ function glowTexture(soft = 0.4) {
 export function glowSizeBoost() { return GFX.bloom ? 1.35 : 1.0; }
 export function glowOpacityBoost() { return GFX.bloom ? 1.25 : 1.0; }
 
+// --- Selective-bloom tagging (Phase 9) -------------------------------------------
+// The bloom layer + tag helpers live HERE (always-loaded, dependency-free) so any
+// scene module can mark "this object glows" without pulling in the heavy lazy
+// post-processing chunk (src/postfx.js, which owns the EffectComposer). On High tier
+// the composer renders ONLY this layer into the bloom buffer; everywhere else these
+// tags are simply inert. NEVER tag a text/number/prompt label — bloom must never sit
+// on readable text. See src/postfx.js for the render-side contract.
+export const BLOOM_LAYER = 11;
+
+export function tagBloom(obj, recursive = true) {
+  if (!obj) return obj;
+  obj.layers.enable(BLOOM_LAYER);
+  if (recursive && obj.children) for (const c of obj.children) tagBloom(c, true);
+  return obj;
+}
+
+export function untagBloom(obj, recursive = true) {
+  if (!obj) return obj;
+  obj.layers.disable(BLOOM_LAYER);
+  if (recursive && obj.children) for (const c of obj.children) untagBloom(c, true);
+  return obj;
+}
+
 // Camera-facing soft additive dot — gem cores, stars, sparkles, fireflies.
 export function makeGlowSprite(color, radius = 0.1, opacity = 1) {
   const mat = new THREE.SpriteMaterial({
@@ -54,6 +77,7 @@ export function makeGlowSprite(color, radius = 0.1, opacity = 1) {
   const s = radius * 2 * glowSizeBoost();
   sp.scale.set(s, s, 1);
   sp.userData.baseOpacity = opacity;
+  tagBloom(sp);   // glow language IS the bloom language (inert below High tier)
   return sp;
 }
 
@@ -68,6 +92,7 @@ export function makeGlowPlane(color, size = 1, opacity = 0.5) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(size * glowSizeBoost(), size * glowSizeBoost()), mat);
   m.geometry._owned = true; // per-instance geometry → freed with the place
   m.userData.baseOpacity = opacity;
+  tagBloom(m);    // glow language IS the bloom language (inert below High tier)
   return m;
 }
 

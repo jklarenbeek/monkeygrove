@@ -32,8 +32,15 @@ import { join } from 'node:path';
 // sway are all PROCEDURAL code (no shipped image/HDR/audio assets), so only the
 // always-lazy app chunks grew (~a few KiB uncompressed). index gzip stayed well
 // under cap (~227). Bumped deliberately; the cap stays a real guardrail.
+// 2026-06-28: precache 1200 -> 1235 for true selective bloom + depth-of-field. These
+// ship NO new npm dependency — they reuse three.js's own bundled
+// postprocessing addons (EffectComposer/UnrealBloomPass/BokehPass/OutputPass + the
+// tiny postfx chunk, ~29 KiB raw across 8 lazy chunks). They stay OUT of the first-load
+// index (dynamic import + the guard below) but ARE precached for offline High-tier
+// play, so the offline total grew. index gzip is unchanged-tier (~234). Bumped
+// deliberately so the ~0.3 KiB margin became real headroom; the cap stays a guardrail.
 const INDEX_JS_GZIP_BUDGET_KB = 235;   // decimal kB (÷1000), matches Vite's report
-const PRECACHE_BUDGET_KIB = 1200;      // binary KiB (÷1024), matches workbox's report
+const PRECACHE_BUDGET_KIB = 1235;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
 const ASSETS = join(DIST, 'assets');
@@ -128,6 +135,23 @@ if (!businessChunk) {
   checks.push(fail('index.html preloads the business chunk — it is no longer lazy'));
 } else {
   checks.push(pass('bakery business chunk stays lazy'));
+}
+
+// 5. Selective bloom / DoF post-processing stays lazy: world.js reaches it only via a
+//    dynamic `import('./postfx.js')`, so the three.js postprocessing addons land in
+//    their own `postfx-*` chunk and NEVER in the first-load `index` (nor get
+//    module-preloaded from the entry). High-tier-only magic must not tax kids on slow
+//    Wi-Fi. Mirrors the bakery business-chunk guard above. The chunk only exists once
+//    Phase 9's bloom path is built; absence is a regression, not an exemption.
+const postfxChunk = assets.find((f) => /^postfx-.*\.js$/.test(f));
+if (!postfxChunk) {
+  checks.push(fail('no postfx-*.js chunk — the bloom/DoF post-processing folded back into index'));
+} else if (indexHtml.includes('postfx-')) {
+  checks.push(fail('index.html preloads the postfx chunk — bloom/DoF is no longer lazy'));
+} else if (indexJs && /UnrealBloomPass|EffectComposer/.test(readFileSync(indexJs, 'utf8'))) {
+  checks.push(fail('index chunk contains post-processing code — it must stay in postfx-*'));
+} else {
+  checks.push(pass('bloom/DoF postfx chunk stays lazy'));
 }
 
 if (checks.includes(false)) {

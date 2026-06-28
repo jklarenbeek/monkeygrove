@@ -22,10 +22,22 @@ const SHOT = process.env.MG_SHOT || '/tmp/mg-shot.png';
 const PROFILE = process.env.MG_PROFILE || '/tmp/mg-playtest-profile';
 const CHROME = process.env.MG_CHROME || '/usr/bin/google-chrome';
 
+// MG_VIEWPORT="WIDTHxHEIGHT" (default 900x660) — lets the visual-baseline workflow
+// capture desktop (1280x800) and mobile-portrait (390x844) from the same helper
+// without code edits. Garbage values fall back to the default rather than crashing.
+const DEFAULT_VIEWPORT = { width: 900, height: 660 };
+function parseViewport(s) {
+  const m = /^(\d+)x(\d+)$/.exec((s || '').trim());
+  if (!m) return DEFAULT_VIEWPORT;
+  const width = Number(m[1]), height = Number(m[2]);
+  return width > 0 && height > 0 ? { width, height } : DEFAULT_VIEWPORT;
+}
+const viewport = parseViewport(process.env.MG_VIEWPORT);
+
 const ctx = await chromium.launchPersistentContext(PROFILE, {
   executablePath: CHROME,
   headless: true,
-  viewport: { width: 900, height: 660 },
+  viewport,
   args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'],
 });
 const page = ctx.pages()[0] || await ctx.newPage();

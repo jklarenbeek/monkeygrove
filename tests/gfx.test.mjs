@@ -75,6 +75,26 @@ test('reducedMotion folds motion-heavy flags down but leaves static look intact'
   assert.equal(calm.toneMap, lively.toneMap, 'tone mapping is not disabled by reduce-motion');
 });
 
+test('Phase 9/10 contract: only High enables the bloom/DoF composer path', () => {
+  // Low/Medium MUST stay on the plain renderer.render() path (bloom false), so the
+  // postprocessing chunk is never even loaded; High turns on selective bloom (half-res)
+  // and depth-of-field. perspectiveHub is a real boolean flag on every tier (default
+  // off — a feature-flagged opt-in per the rollout plan).
+  const low = resolveGfx({ tier: 'high', setting: 'low' });
+  const medium = resolveGfx({ tier: 'high', setting: 'medium' });
+  const high = resolveGfx({ tier: 'high', setting: 'high' });
+
+  assert.equal(low.bloom, false, 'low: direct render, no composer');
+  assert.equal(medium.bloom, false, 'medium: direct render, no composer');
+  assert.equal(high.bloom, true, 'high: selective bloom on');
+  assert.equal(high.bloomHalfRes, true, 'high blooms at half-res for fill-rate');
+  assert.equal(high.dof, true, 'high can depth-of-field the perspective hub');
+
+  for (const g of [low, medium, high]) {
+    assert.equal(typeof g.perspectiveHub, 'boolean', 'perspectiveHub is always a boolean flag');
+  }
+});
+
 test('ambient motion scale keeps low tier decor and wind fully static', () => {
   const low = resolveGfx({ tier: 'high', setting: 'low', reducedMotion: false });
   const high = resolveGfx({ tier: 'high', setting: 'high', reducedMotion: false });

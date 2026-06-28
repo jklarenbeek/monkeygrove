@@ -9,7 +9,7 @@
 //   MG_GRAPHICS=low npm run baseline # force a tier (default: auto)
 //
 // Capture on a fixed seed/profile + pinned viewports so diffs stay meaningful; only
-// re-baseline deliberately (see PHASE_0 §5).
+// re-baseline deliberately (see docs/visual-baseline.md).
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';

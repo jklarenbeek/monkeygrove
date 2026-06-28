@@ -68,7 +68,9 @@ test('world.js wires tone mapping, sky, and fog behind the tier flags', () => {
   assert.match(w, /toneMappingExposure = GFX_TUNING\.exposure/, 'exposure is tunable');
   assert.match(w, /if \(this\.toneMap\)[\s\S]*makeSky\(\)/, 'the dome is added only when grading is on');
   assert.match(w, /if \(GFX\.fog\)[\s\S]*new THREE\.Fog\(SKY_HORIZON/, 'fog gated by GFX.fog, colored to the horizon');
-  assert.match(w, /this\.fog\.near = CAM_DIST/, 'fog distances are derived from the framing so the board stays crisp');
+  // Fog distances are derived from the active camera distance (CAM_DIST for ortho, the
+  // computed perspDist for the Phase 10 hub) so the framed board always stays crisp.
+  assert.match(w, /this\.fog\.near = camDist/, 'fog distances are derived from the framing so the board stays crisp');
 });
 
 test('the light rig reads its intensities from GFX_TUNING (dev-tunable, low = defaults)', () => {

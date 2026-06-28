@@ -16,7 +16,12 @@ import { FLOOR_CHARS } from './config.js';
 // Per-type hard caps (high tier). Counts from the resolver are clamped to these
 // AFTER GFX.ambientScale so no device can blow the additive-overdraw / draw-call
 // budget. The existing actors keep their established caps elsewhere.
-export const AMBIENT_CAPS = { fireflies: 32, bees: 8, motes: 24 };
+export const AMBIENT_CAPS = {
+  fireflies: 32,
+  bees: 8,
+  motes: 24,
+  water: [8, 5, 3], // ripples, bubbles, fish
+};
 
 const WING_COLORS = [
   { id: 'pink', W: '#ffb3c6' },
@@ -439,12 +444,20 @@ export function ambientExtras(ctx = {}) {
   } = ctx;
   const cap = (n, hi) => Math.max(0, Math.min(hi, Math.round(n)));
   const s = Math.max(0, ambientScale);
+  const waterStill = tier === 'low' || reducedMotion;
+  const dry = [0, 0, 0];
+  const wc = AMBIENT_CAPS.water;
   if (mode === 'chamber') {
     // very sparse — the puzzle owns the screen
     return {
       fireflies: cap(2 * s, AMBIENT_CAPS.fireflies),
       bees: (tier === 'low' || reducedMotion) ? 0 : cap(2 * s, AMBIENT_CAPS.bees),
       motes: cap(2 * s, AMBIENT_CAPS.motes),
+      water: waterStill ? dry : [
+        cap(1 * s, wc[0]),
+        cap(1 * s, wc[1]),
+        tier !== 'high' ? 0 : cap(0.6 * s, wc[2]),
+      ],
     };
   }
   // hub / attract
@@ -454,6 +467,11 @@ export function ambientExtras(ctx = {}) {
     fireflies: cap((portalStages * 2 + (festival ? 10 : 0)) * s, AMBIENT_CAPS.fireflies),
     bees,
     motes: cap((avgPct * 10 + (festival ? 6 : 0)) * s, AMBIENT_CAPS.motes),
+    water: waterStill ? dry : [
+      cap((4 + avgPct * 4 + (festival ? 2 : 0)) * s, wc[0]),
+      cap((2 + avgPct * 2) * s, wc[1]),
+      cap((1 + (avgPct >= 0.5 ? 1 : 0) + (festival ? 1 : 0)) * s, wc[2]),
+    ],
   };
 }
 
@@ -461,6 +479,7 @@ export class AmbientLife {
   constructor(place, rng, {
     butterflies = 0, birds = 0, clouds = 0, pets = [], petCount = 0, playerPos = null,
     fireflies = 0, bees = 0, motes = 0, glowAnchors = null,
+    water = null,
   } = {}) {
     this.place = place;
     this.rng = new Rng(rng.int(1, 1e9)); // own stream — never skews game rng
@@ -519,6 +538,42 @@ export class AmbientLife {
     for (let i = 0; i < bees && anchors.length; i++) {
       this.bees.push(new Bee(place, this.rng, anchors, this.playerPos));
     }
+    const [waterRipples = 0, waterBubbles = 0, waterFish = 0] = water || [];
+    this.waterMoments = (waterRipples || waterBubbles || waterFish)
+      ? { r: waterRipples, b: waterBubbles, f: waterFish, rt: 0, bt: 350, ft: 700 }
+      : null;
+  }
+
+  _waterAnchor() {
+    const anchors = this.place.water?.lifeAnchors || [];
+    return anchors.length ? this.rng.pick(anchors) : null;
+  }
+
+  _updateWater(dtMs) {
+    const w = this.waterMoments;
+    if (!w) return;
+    const a = this._waterAnchor();
+    if (!a) return;
+    w.rt -= dtMs; w.bt -= dtMs; w.ft -= dtMs;
+    if (w.r && w.rt <= 0) {
+      this.place.water?.spawnShoreRipple?.(a);
+      w.rt = (1900 + this.rng.float() * 3600) / Math.max(1, w.r);
+    }
+    if (w.b && w.bt <= 0) {
+      this.place.water?.spawnBubble?.({
+        ...a,
+        x: a.x + (this.rng.float() - 0.5) * 0.22,
+        z: a.z + (this.rng.float() - 0.5) * 0.22,
+      });
+      w.bt = (3200 + this.rng.float() * 5400) / Math.max(1, w.b);
+    }
+    if (w.f && w.ft <= 0) {
+      this.place.water?.spawnFishShadow?.(a, {
+        side: this.rng.chance(0.5) ? 1 : -1,
+        speed: 0.32 + this.rng.float() * 0.24,
+      });
+      w.ft = (6200 + this.rng.float() * 9000) / Math.max(1, w.f);
+    }
   }
 
   update(dtMs) {
@@ -528,6 +583,7 @@ export class AmbientLife {
     for (const f of this.fireflies) f.update(dtMs);
     for (const m of this.motes) m.update(dtMs);
     for (const b of this.bees) b.update(dtMs);
+    this._updateWater(dtMs);
     for (let i = 0; i < this.birds.length; i++) {
       const bird = this.birds[i];
       if (bird && !bird.done) { bird.update(dtMs); continue; }

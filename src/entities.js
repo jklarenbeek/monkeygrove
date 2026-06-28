@@ -9,6 +9,7 @@ import { Rng } from './rng.js';
 import { SOLID_MARKERS } from './config.js';
 import { GFX } from './gfx.js';
 import { makeContactShadow } from './blobshadow.js';
+import { tagBloom } from './glow.js';
 
 // Add a soft contact shadow under a static prop group (origin at its base). On at
 // every tier (GFX.contactShadows); shared singletons → nothing extra to dispose.
@@ -249,10 +250,11 @@ export function makeMoteSprite(color, size) {
   });
   mat._owned = true;
   const sp = new THREE.Sprite(mat);
-  // High tier gives additive glow a gentle halo boost (Phase 6) — stands in for true
-  // selective bloom; low/medium are unchanged (boost = 1).
+  // High tier gives additive glow a gentle halo boost (Phase 6) AND now feeds true
+  // selective bloom (Phase 9) via the bloom layer tag; low/medium are unchanged.
   const b = GFX.bloom ? 1.3 : 1;
   sp.scale.set(size * b, size * b, 1);
+  tagBloom(sp);
   return sp;
 }
 
@@ -294,6 +296,7 @@ export class LivingPortal {
     this.glowMat._owned = true;
     const glow = new THREE.Mesh(glowGeo, this.glowMat);
     glow.position.set(0, 3.5 * this.s, 1.06 * this.s);
+    tagBloom(glow);   // portal film blooms on High (Phase 9)
     this.body.add(glow);
 
     // label floats clear of the full-bloom crown (2.08) and the star (2.10)

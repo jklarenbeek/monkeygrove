@@ -214,8 +214,33 @@ scripts/
   additive vocabulary (`makeGlowSprite`/`makeGlowPlane`/`makeMoteField`/`pulseGlow`) for
   "friendly magic & reward" glow; shared cached radial textures, `_owned` materials,
   `pulseGlow` holds steady under `reducedMotion()`. High tier (`GFX.bloom`) applies a
-  gentle additive halo boost in lieu of true postprocessing bloom (the `postprocessing`
-  EffectComposer dependency is deferred — addable later behind the same `GFX.bloom`).
+  gentle additive halo boost AND feeds the true selective-bloom composer below.
+  `glow.js` also owns the lightweight bloom-tagging surface — `BLOOM_LAYER` +
+  `tagBloom()`/`untagBloom()` — so any scene module can mark "this object glows" without
+  importing the heavy post-processing chunk. Every glow-helper output is auto-tagged, so
+  portals/motes/stars/reward washes bloom on High with no per-call-site work. **Never
+  tag a text/number label** — bloom must never sit on readable math.
+- **Selective bloom + DoF** (`postfx.js`, **High tier only**, `GFX.bloom`/`GFX.dof`):
+  true post-processing built ENTIRELY from three.js's own bundled addons
+  (`three/examples/jsm/postprocessing/*`) — **no extra npm dependency**. `world.js`
+  reaches it via a dynamic `import('./postfx.js')`, so EffectComposer / UnrealBloomPass /
+  BokehPass land in their own lazy `postfx-*` chunk that NEVER enters the first-load
+  `index` (guarded in `check-budget.mjs`, mirroring the bakery chunk). Low/Medium keep
+  the plain `renderer.render()` path. Selection is by **render layer**, not the textbook
+  "darken every non-bloom mesh" trick (which would wrongly bloom the sprite-based number
+  labels): the bloom pass masks the camera to `BLOOM_LAYER`. The MAIN scene renders
+  DIRECTLY to the canvas (byte-identical to before — same tone mapping, no double-grade),
+  then the bloom buffer is composited ON TOP with an additive full-screen quad, so bloom
+  can only ADD a soft halo, never wash out or recolor. Depth-of-field (Phase 10) routes
+  the main render through `[RenderPass → BokehPass → OutputPass]` and is the one path that
+  needs the perspective camera. Both are off below High; DoF is off under `reducedMotion`.
+- **Camera rig** (`world.js`): isometric, fixed `ISO_DIR` angle. Default is an
+  `OrthographicCamera`; chambers ALWAYS use it (`frameBoard` forces ortho so math stays
+  perfectly readable). An optional narrow-FOV `PerspectiveCamera` (`GFX.perspectiveHub`,
+  **feature-flagged off by default**) gives the hub gentle toy-diorama depth — same
+  `ISO_DIR` angle, only the projection + distance differ, so `screenDirToGridStep()` and
+  picking are provably unchanged (`tests/camera.test.mjs`). DoF attaches only when this
+  perspective camera is active. `cameraShot()` animates SPAN only (never the angle).
 - **Juice**: hand-rolled tween engine (`anim.js`), particle bursts from a pooled
   `THREE.Points` per place (`entities.js`), camera shake, instanced floor-tile color
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.

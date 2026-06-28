@@ -81,6 +81,10 @@ export function createGfxDev(game) {
     if (w.hemi) w.hemi.intensity = GFX_TUNING.hemiIntensity;
     // exposure only does anything when tone mapping is on (medium/high tier)
     if (w.toneMap && w.renderer) w.renderer.toneMappingExposure = GFX_TUNING.exposure;
+    // bloom slider drives the composer's MASTER amount (the additive-quad opacity), so
+    // it scales the whole bloom 0→off across the slider range. 0.3 is the build-time
+    // base in world.js (bloomIntensity = 1). High tier only; no-op until it has loaded.
+    if (w.composer) w.composer.setBloom({ amount: 0.3 * (GFX_TUNING.bloomIntensity || 1) });
   };
 
   root.addEventListener('input', (e) => {

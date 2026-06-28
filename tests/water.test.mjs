@@ -1,5 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { createWaterSurface } from '../src/water.js';
 import { PALETTE } from '../src/config.js';
@@ -24,6 +25,13 @@ function stubCanvas() {
       }),
     }),
   };
+}
+
+async function waitForWaterFx(water) {
+  for (let i = 0; i < 50 && water.lifeAnchors.length === 0; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    water.update(16);
+  }
 }
 
 test('flat water reproduces today: exactly two planes in the base palette', () => {
@@ -51,18 +59,76 @@ test('flat water spawns nothing (hooks are no-ops without the animated tier)', (
   const before = water.group.children.length;
   water.spawnFishShadow({ x: 0, z: 0 });
   water.spawnBubble({ x: 0, z: 0 });
+  water.spawnShoreRipple({ x: 0, z: 0 });
+  assert.equal(water.lifeAnchors.length, 0, 'flat water has no active water-life anchors');
   assert.equal(water.group.children.length, before, 'no spawns on flat water');
 });
 
-test('animated water adds shimmer + foam overlays beyond the two base planes', () => {
+test('animated water lazy-loads shimmer + foam overlays beyond the two base planes', async () => {
   const prevDoc = globalThis.document;
   stubCanvas();
   try {
     const place = fakePlace(8, 8);
     const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'tide' });
+    assert.equal(water.group.children.filter((o) => o.isMesh).length, 2, 'animated water starts as readable base planes');
+    await waitForWaterFx(water);
     assert.ok(water.group.children.length > 2, 'overlays/foam added on animated water');
     assert.doesNotThrow(() => water.update(300));
   } finally {
     if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
   }
+});
+
+test('animated water exposes safe shoreline anchors for ambient life', async () => {
+  const prevDoc = globalThis.document;
+  stubCanvas();
+  try {
+    const place = fakePlace(6, 6);
+    const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'hub' });
+    await waitForWaterFx(water);
+    assert.ok(water.lifeAnchors.length > 0, 'shoreline anchors are exposed');
+    assert.ok(water.lifeAnchors.every((a) => Number.isFinite(a.x) && Number.isFinite(a.z)), 'anchors have world positions');
+    assert.ok(water.lifeAnchors.every((a) => Number.isFinite(a.outX) && Number.isFinite(a.outZ)), 'anchors include outward water direction');
+    assert.ok(water.lifeAnchors.every((a) => a.kind === 'shore'), 'anchors are typed');
+  } finally {
+    if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
+  }
+});
+
+test('animated water can spawn shoreline ripples and dispose them', async () => {
+  const prevDoc = globalThis.document;
+  stubCanvas();
+  try {
+    const place = fakePlace(6, 6);
+    const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'hub' });
+    await waitForWaterFx(water);
+    const before = water.group.children.length;
+    water.spawnShoreRipple(water.lifeAnchors[0]);
+    assert.ok(water.group.children.length > before, 'a local shoreline ripple was added');
+    water.dispose();
+    assert.equal(water.group.children.length, before, 'dispose clears active water moments');
+  } finally {
+    if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
+  }
+});
+
+test('animated water reacts to world events with local ripples', async () => {
+  const prevDoc = globalThis.document;
+  stubCanvas();
+  try {
+    const place = fakePlace(6, 6);
+    const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'hub' });
+    await waitForWaterFx(water);
+    const before = water.group.children.length;
+    water.react('correct-answer', { position: { x: 0, z: 0 } });
+    assert.ok(water.group.children.length > before, 'correct-answer creates a local water response');
+  } finally {
+    if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
+  }
+});
+
+test('animated water effects are loaded through a lazy chunk', () => {
+  const src = readFileSync(new URL('../src/water.js', import.meta.url), 'utf8');
+  assert.match(src, /import\(['"]\.\/waterfx\.js['"]\)/, 'water.js dynamically imports waterfx');
+  assert.doesNotMatch(src, /from ['"]\.\/waterfx\.js['"]/, 'waterfx must not be statically imported');
 });
