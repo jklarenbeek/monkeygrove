@@ -1,10 +1,8 @@
 // Monkey Grove — game controller: boot, loop, flow, input, juice.
 import * as THREE from 'three';
 import { World } from './world.js';
-import { Player, PetFollower } from './player.js';
-import { Particles, makeCharacter } from './entities.js';
-import { CHARS, PETS, HATS, FURS, MONKEY_HAT_Y } from './models.js';
-import { buildVoxelMesh } from './voxel.js';
+import { Particles } from './entities.js';
+import { PETS } from './models.js';
 import { nextProblem, recordResult, masteryReport } from './mathengine.js';
 import {
   loadSave, settings, profiles, activeProfile, selectProfile,
@@ -21,7 +19,6 @@ import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
 import { isBuilt } from './island.js';
 import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine } from './story/engine.js';
 import { lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS } from './story/chapters.js';
-import { t } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
 import { audio } from './audio.js';

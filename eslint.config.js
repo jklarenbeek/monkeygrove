@@ -16,7 +16,7 @@ export default [
   // Build output and generated assets — never lint these. src/yijing/** is a
   // verbatim vendored copy of @yijingjs/core (see src/yijing/PROVENANCE.md): we
   // never hand-edit it, so it isn't held to this project's house style.
-  { ignores: ['dist/**', 'dev-dist/**', 'public/**', 'assets/**', 'node_modules/**', 'src/yijing/**'] },
+  { ignores: ['dist/**', 'dev-dist/**', 'public/**', 'assets/**', 'node_modules/**', 'tmp/**', 'src/yijing/**'] },
 
   // Recommended correctness baseline (no-undef, no-dupe-keys, valid-typeof, …).
   js.configs.recommended,

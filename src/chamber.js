@@ -21,7 +21,7 @@ import { BUILDS, applyIslandRows } from './island.js';
 import { Rng } from './rng.js';
 import { nextProblem } from './mathengine.js';
 import { t } from './i18n.js';
-import { GFX } from './gfx.js';
+import { GFX, ambientMotionScale } from './gfx.js';
 import { reducedMotion } from './a11y.js';
 import { makeContactShadow } from './blobshadow.js';
 import { makeGlowSprite } from './glow.js';
@@ -353,13 +353,13 @@ export class Place {
   _updateSway(dtMs) {
     const props = this.swayProps;
     if (!props || !props.length) return;
-    if (reducedMotion() || !GFX.ambientScale) {
+    const k = ambientMotionScale(GFX, reducedMotion());
+    if (!k) {
       if (this._swaying) { for (const s of props) s.mesh.rotation.z = 0; this._swaying = false; }
       return;
     }
     this._swaying = true;
     this._swayT = (this._swayT || 0) + dtMs / 1000;
-    const k = GFX.ambientScale;
     for (const s of props) s.mesh.rotation.z = Math.sin(this._swayT * s.freq + s.phase) * s.amp * k;
   }
 

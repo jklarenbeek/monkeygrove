@@ -11,8 +11,14 @@ import {
   NumberStone, Pot, makeProp, makeTextSprite, floatLabel,
 } from './entities.js';
 import { PROPS } from './models.js';
-import { PALETTE, OCCUPIED_MARKERS } from './config.js';
+import { OCCUPIED_MARKERS } from './config.js';
 import { t } from './i18n.js';
+import {
+  fxArrayGrowCell,
+  fxFetchCorrect,
+  fxNumberLinePulse,
+  fxShareDeal,
+} from './verbfx.js';
 
 // ---------- shared: paint a visual model onto the chamber floor ----------
 
@@ -98,7 +104,7 @@ export class FloorModel {
       return true;
     }
     if (model.kind === 'baskets') {
-      const { total, baskets, quotient, remainder } = model.params;
+      const { baskets, quotient, remainder } = model.params;
       const spot = this._findRect(baskets * 2 - 1, 2);
       if (!spot) return false;
       for (let b = 0; b < baskets; b++) {
@@ -144,7 +150,6 @@ export class FloorModel {
     if (model.kind === 'strip') {
       // addition/subtraction strip: a cells + b cells
       const { a, b, op } = model.params;
-      const W = Math.min(a + Math.abs(b), 12);
       const spot = this._findRect(Math.min(a, 12), 2);
       if (!spot) return false;
       const paint = (count, z, color, off = 0) => {
@@ -396,6 +401,7 @@ export class FetchVerb extends VerbBase {
   // SEE from across the room.
   _starBurst(mesh, apos) {
     const { place, particles } = this.ctx;
+    fxFetchCorrect(this.ctx, { altarPos: apos, stoneMesh: mesh });
     this.ctx.altar?.cheer();
     particles.confetti(apos.clone().add(new THREE.Vector3(0, 0.3, 0)), 34);
     // the stone melts down into the altar as the star is born from it
@@ -619,7 +625,7 @@ export class ArrayVerb extends VerbBase {
     const { rows, cols, total, given } = problem.model.params;
     const rect = this._rect();
     const r = rect.z1 - rect.z0 + 1, c = rect.x1 - rect.x0 + 1, n = r * c;
-    let ok = false;
+    let ok;
     if (given === 'both') ok = (r === rows && c === cols) || (r === cols && c === rows);
     else if (given === 'rows') ok = (r === rows && n === total);
     else ok = n === total && r > 1 && c > 1;
@@ -629,6 +635,8 @@ export class ArrayVerb extends VerbBase {
       // press mid-celebration must not touch the disposed place)
       let i = 0;
       for (let z = 0; z < r; z++) {
+        this._later(z * c * 36, () =>
+          fxArrayGrowCell(this.ctx, { rect, row: z, col: 0, count: (z + 1) * c }));
         for (let x = 0; x < c; x++) {
           const wp = place.worldPos(rect.x0 + x, rect.z0 + z, 0.06);
           this._later(i * 36, () => {
@@ -768,6 +776,7 @@ export class LineVerb extends VerbBase {
     this.readyPulseAt = now + 1200;
     const { place, particles } = this.ctx;
     const pos = place.worldPos(x, z, 0.52);
+    fxNumberLinePulse(this.ctx, { x, z, kind: 'ready' });
     particles.emit(pos, 10, {
       colors: [0xffd966, 0xffffff, 0xc9a6ff],
       speed: 0.8, up: 1.0, life: 620, spread: 0.18,
@@ -818,6 +827,7 @@ export class LineVerb extends VerbBase {
       this.done = true;
       // knot + flowers bloom along the vine
       const kp = place.worldPos(player.x, player.z, 0.15);
+      fxNumberLinePulse(this.ctx, { x: player.x, z: player.z, kind: 'correct' });
       this.knot = makeProp(PROPS.flowerPink, 0.3, 'prop:flowerPink');
       this.knot.position.copy(kp);
       place.group.add(this.knot);
@@ -874,7 +884,7 @@ export class LineVerb extends VerbBase {
 
 export class ShareVerb extends VerbBase {
   begin() {
-    const { place, problem, hud, rng } = this.ctx;
+    const { place, problem, hud } = this.ctx;
     const { total, baskets } = problem.model.params;
     this.total = total;
     this.pile = total;
@@ -959,6 +969,7 @@ export class ShareVerb extends VerbBase {
       onDone: () => {
         place.group.remove(coco);
         audio.sfx('drop');
+        fxShareDeal(this.ctx, { basket: b, fair: false });
         this._updateLabel(b);
         this._updatePile();
       },
@@ -1009,12 +1020,13 @@ export class ShareVerb extends VerbBase {
   onAction() {
     if (this.done) return;
     const { problem } = this.ctx;
-    const { baskets, quotient, remainder } = problem.model.params;
+    const { quotient, remainder } = problem.model.params;
     const counts = this.baskets.map((b) => b.count);
     const allEqual = counts.every((c) => c === counts[0]);
     if (allEqual && counts[0] === quotient && this.pile === remainder) {
       this.done = true;
       for (const b of this.baskets) {
+        fxShareDeal(this.ctx, { basket: b, fair: true });
         this.ctx.particles.confetti(this.ctx.place.worldPos(b.x, b.z, 0.5), 12);
       }
       if (remainder > 0) {

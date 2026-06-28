@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 // English (en) dictionary. Keys with {vars} are interpolated by t() in ../i18n.js.
 export const en = {
   // title & menus

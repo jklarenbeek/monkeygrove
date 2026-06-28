@@ -83,7 +83,6 @@ test('applyWarmupResult can preserve partial warmup without completing it', () =
 test('showWarmup ignores repeated clicks after a choice or skip is already handled', async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
-  const originalNavigator = globalThis.navigator;
   const originalLocalStorage = globalThis.localStorage;
   const originalSetTimeout = globalThis.setTimeout;
   const originalClearTimeout = globalThis.clearTimeout;

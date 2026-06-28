@@ -86,6 +86,14 @@ export function resolveGfx({ tier = 'high', setting = 'auto', reducedMotion = fa
   return Object.freeze(gfx);
 }
 
+// Motion budget for decorative, non-essential liveliness such as prop sway and
+// GPU field wind. Low keeps a small `ambientScale` for sparse ambient actors, but
+// the Phase 5 Low-tier contract says static decor/wind must be fully off.
+export function ambientMotionScale(gfx = GFX, isReduced = gfx?.reducedMotion) {
+  if (!gfx || isReduced || gfx.tier === 'low') return 0;
+  return Math.max(0, gfx.ambientScale || 0);
+}
+
 // Read the persisted Graphics setting, defaulting to 'auto'. Defensive: settings()
 // touches localStorage, which can be unavailable (SSR / tests before loadSave).
 function readSetting() {

@@ -3,7 +3,7 @@ import { BUILDS, freshIsland } from './island.js';
 import { getPack } from './curriculum/index.js';
 import { createCurriculumState } from './curriculum/placement.js';
 import { BALANCE } from './config.js';
-import { createBusinessState, ensureBusinessState } from './business/engine.js';
+import { ensureBusinessState } from './business/engine.js';
 import { CREATURES, CHARS, HATS, PROPS, AMBIENT } from './models.js';
 
 export const DEV_PRESETS = [

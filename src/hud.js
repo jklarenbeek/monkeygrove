@@ -107,7 +107,7 @@ let modelTimer = null;
 export function showModelPanel(model) {
   if (!model || model.kind === 'none') return false;
   const p = $('model-panel');
-  let html = '';
+  let html;
   if (model.kind === 'array') {
     const { rows, cols } = model.params;
     if (cols > 12) {

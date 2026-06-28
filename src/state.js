@@ -102,8 +102,8 @@ function backupCorruptSave(raw) {
 }
 
 export function loadSave() {
-  let raw = null;
-  try { raw = storageApi()?.getItem(KEY); } catch { raw = null; } // storage can be disabled
+  let raw;
+  try { raw = storageApi()?.getItem(KEY) ?? null; } catch { raw = null; } // storage can be disabled
   if (save && raw === loadedRaw) return save;
   if (raw) {
     try {

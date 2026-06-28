@@ -1,4 +1,3 @@
-/* eslint-disable max-lines */
 // Dutch (nl) dictionary. Keys with {vars} are interpolated by t() in ../i18n.js.
 export const nl = {
   'title.tagline': 'Breng de getallen thuis!',

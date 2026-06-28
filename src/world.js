@@ -1,7 +1,7 @@
 // Renderer, isometric ortho camera rig, lighting, picking.
 import * as THREE from 'three';
 import { TILE } from './config.js';
-import { GFX, GFX_TUNING } from './gfx.js';
+import { GFX, GFX_TUNING, ambientMotionScale } from './gfx.js';
 import { makeSky, SKY_HORIZON } from './sky.js';
 import { setWind } from './voxel.js';
 import { tween, ease } from './anim.js';
@@ -355,7 +355,7 @@ export class World {
     this.shakeAmp *= Math.pow(0.0005, dtMs / 1000);
     // GPU field wind (Phase 5): one uniform write per frame for the whole scatter
     // field. Fully static under reduced-motion or low tier (amp 0).
-    const windAmp = (reducedMotion() || !GFX.ambientScale) ? 0 : 0.06 * GFX.ambientScale;
+    const windAmp = 0.06 * ambientMotionScale(GFX, reducedMotion());
     setWind((this._windT = (this._windT || 0) + dtMs / 1000), windAmp);
     this._place();
     this.renderer.render(this.scene, this.camera);
