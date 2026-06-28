@@ -1,9 +1,9 @@
-// World reactivity (Phase 8) — the "everything gently notices you" layer. A handful
+// World reactivity — the "everything gently notices you" layer. A handful
 // of tiny, additive, motion-gated helpers plus a shared landing reaction. Everything
 // here is COSMETIC: it never touches cell.walk, scoring, the problem/duel RNG, or a
 // tap target, and it never wilts/darkens/startles. Generalizes the one hand-coded
 // reaction that already shipped (LivingPortal's greet) into reusable pieces that
-// Phase 11 (math juice) and Phase 13 (audio) also build on.
+// the math-chamber juice and audio layers also build on.
 import * as THREE from 'three';
 import { reducedMotion } from './a11y.js';
 import { GFX } from './gfx.js';
@@ -94,7 +94,7 @@ export function landingReaction(place, x, z, worldPos) {
   place.fx.poof(c, Math.round(7 * GFX.ambientScale), color);
 }
 
-// A warm breathing glow that makes the egg nest feel alive (Phase 8). Med/high only.
+// A warm breathing glow that makes the egg nest feel alive. Med/high only.
 export function attachNestGlow(place, nx, nz) {
   if (!GFX.toneMap) return;
   const glow = makeGlowSprite(0xffe9a8, 0.26, 0.25);
@@ -103,7 +103,7 @@ export function attachNestGlow(place, nx, nz) {
   place.addReactor(makePulse(glow, { prop: 'opacity', base: 0.22, amp: 0.16, hz: 0.35 }));
 }
 
-// A small lived-in idle effect per build (Phase 8). Med/high only so low = today.
+// A small lived-in idle effect per build. Med/high only so low = today.
 // Reuses the pooled Particles (smoke) and the glow language (warm pulse).
 export function attachBuildIdle(place, def, spot) {
   if (!GFX.toneMap) return;

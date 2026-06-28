@@ -20,7 +20,7 @@ import { mimi, mimiChibi } from './mimi.js';
 // models.js; kept inline to avoid an import cycle through models.js.
 const MONKEY_HAT_LAYER = 11;
 
-// Per-creature cosmetic animation profile (Phase 10). Drives idle/celebration
+// Per-creature cosmetic animation profile. Drives idle/celebration
 // personality so no two creatures move identically. Pure data — no GL. crab/crabKing
 // are absent from CREATURES, so a profile physically cannot attach to them.
 const DEFAULT_ANIM = { bounce: 1.0, idleSpeed: 1.0, celebrate: 'happy-spin', shyDistance: 1.4, scaleSquash: 0.05 };

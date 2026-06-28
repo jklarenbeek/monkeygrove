@@ -205,7 +205,7 @@ export class Player {
 }
 
 // A pet hops along the player's breadcrumb trail, two steps behind. Each pet carries
-// a cosmetic `anim` profile (Phase 10) so idle pacing and the celebration read as that
+// a cosmetic `anim` profile so idle pacing and the celebration read as that
 // creature's personality — no two pets move identically.
 const DEFAULT_ANIM = { bounce: 1.0, idleSpeed: 1.0, celebrate: 'happy-spin', scaleSquash: 0.05 };
 
@@ -239,7 +239,7 @@ export class PetFollower {
     if (this.trail.length > 6) this.trail.shift();
   }
 
-  // Per-pet celebration dispatched on the creature's profile (Phase 10). Transform-only
+  // Per-pet celebration dispatched on the creature's profile. Transform-only
   // (scale + yaw + tilt) so it never desyncs the floor position; calmer under reduced
   // motion; dragon's sparkle-puff requests a tiny cosmetic burst via place.fx.
   celebrate() {

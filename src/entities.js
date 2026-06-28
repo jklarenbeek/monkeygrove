@@ -250,8 +250,8 @@ export function makeMoteSprite(color, size) {
   });
   mat._owned = true;
   const sp = new THREE.Sprite(mat);
-  // High tier gives additive glow a gentle halo boost (Phase 6) AND now feeds true
-  // selective bloom (Phase 9) via the bloom layer tag; low/medium are unchanged.
+  // High tier gives additive glow a gentle halo boost AND feeds true
+  // selective bloom via the bloom layer tag; low/medium are unchanged.
   const b = GFX.bloom ? 1.3 : 1;
   sp.scale.set(size * b, size * b, 1);
   tagBloom(sp);
@@ -296,7 +296,7 @@ export class LivingPortal {
     this.glowMat._owned = true;
     const glow = new THREE.Mesh(glowGeo, this.glowMat);
     glow.position.set(0, 3.5 * this.s, 1.06 * this.s);
-    tagBloom(glow);   // portal film blooms on High (Phase 9)
+    tagBloom(glow);   // portal film blooms on High
     this.body.add(glow);
 
     // label floats clear of the full-bloom crown (2.08) and the star (2.10)

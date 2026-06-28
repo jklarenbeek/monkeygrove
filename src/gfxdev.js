@@ -3,7 +3,7 @@
 // bundle entirely (like devtools.js). It mounts a small floating panel to the body
 // with live sliders (sun/fill/hemi/bloom/water/ambient), action buttons (capture
 // screenshot, freeze ambient, toggle perf overlay), and a perf readout
-// (frame-time bucket, renderer.info, entity counts) so later phases are tunable
+// (frame-time bucket, renderer.info, entity counts) so visual features are tunable
 // without code edits and measurable without guesswork.
 import { GFX, GFX_TUNING } from './gfx.js';
 
@@ -71,8 +71,8 @@ export function createGfxDev(game) {
     </div>`;
   document.body.appendChild(root);
 
-  // --- live light tuning (the only flags wired in Phase 0; later phases read the
-  //     rest of GFX_TUNING) -------------------------------------------------------
+  // --- live light tuning (the light intensities wired into the renderer; other
+  //     features read the rest of GFX_TUNING) -------------------------------------
   const applyLights = () => {
     const w = game?.world;
     if (!w) return;

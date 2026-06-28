@@ -21,7 +21,7 @@
 //   soft halo around magic — it can never wash out, darken, or recolor the scene, and
 //   there is zero double-tone-mapping risk on the default path.
 //
-//   Depth-of-field (Phase 10, opt-in, perspective-hub + High only) is the one path
+//   Depth-of-field (opt-in, perspective-hub + High only) is the one path
 //   that must process the main image, so it routes the main render through a small
 //   EffectComposer [RenderPass → BokehPass → OutputPass]; the additive bloom halo is
 //   then composited identically on top. DoF is never used in chambers.

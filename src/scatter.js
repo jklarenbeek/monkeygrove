@@ -1,4 +1,4 @@
-// Prop density (Phase 3) — a cosmetic micro-prop carpet rendered as one
+// Prop density — a cosmetic micro-prop carpet rendered as one
 // InstancedMesh per type. Pure planning (deterministic, testable) + the GL build,
 // kept out of chamber.js to stay within its size budget.
 //
@@ -107,7 +107,7 @@ export function buildScatter(place, opts = {}) {
     const model = PROPS[key];
     if (!model) continue;
     const geo = buildVoxelMesh(model, { cacheKey: 'scatter:' + key }).geometry;
-    // windMaterial → the whole field sways on the GPU (Phase 5); amp 0 = static.
+    // windMaterial → the whole field sways on the GPU; amp 0 = static.
     const inst = new THREE.InstancedMesh(geo, windMaterial(), items.length);
     items.forEach((it, i) => {
       const wp = place.worldPos(it.x, it.z);

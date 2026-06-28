@@ -2,8 +2,8 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { resolveGfx, GFX, GRAPHICS_SETTINGS, detectDeviceTier, ambientMotionScale } from '../src/gfx.js';
 
-// Phase 0 guarantee: the `low` tier reproduces today's renderer (shadows were on only
-// at high QUALITY). Phase 2 then raised the high-tier shadow map 1024 → 2048 and added
+// Baseline guarantee: the `low` tier reproduces today's renderer (shadows were on only
+// at high QUALITY). A later change raised the high-tier shadow map 1024 → 2048 and added
 // always-on contact shadows. So the tier→map mapping is now low 0 / medium 1024 /
 // high 2048, and contactShadows is true at every tier.
 
@@ -14,7 +14,7 @@ test('low tier reproduces today: no shadows', () => {
   assert.equal(low.shadowMapSize, 0);
 });
 
-test('shadow map size maps low→0 / medium→1024 / high→2048 (Phase 2)', () => {
+test('shadow map size maps low→0 / medium→1024 / high→2048', () => {
   assert.equal(resolveGfx({ tier: 'high', setting: 'low' }).shadowMapSize, 0);
   assert.equal(resolveGfx({ tier: 'high', setting: 'medium' }).shadowMapSize, 1024);
   assert.equal(resolveGfx({ tier: 'high', setting: 'high' }).shadowMapSize, 2048);
@@ -75,11 +75,11 @@ test('reducedMotion folds motion-heavy flags down but leaves static look intact'
   assert.equal(calm.toneMap, lively.toneMap, 'tone mapping is not disabled by reduce-motion');
 });
 
-test('Phase 9/10 contract: only High enables the bloom/DoF composer path', () => {
+test('render contract: only High enables the bloom/DoF composer path', () => {
   // Low/Medium MUST stay on the plain renderer.render() path (bloom false), so the
   // postprocessing chunk is never even loaded; High turns on selective bloom (half-res)
   // and depth-of-field. perspectiveHub is a real boolean flag on every tier (default
-  // off — a feature-flagged opt-in per the rollout plan).
+  // off — a feature-flagged opt-in, kept off until proven).
   const low = resolveGfx({ tier: 'high', setting: 'low' });
   const medium = resolveGfx({ tier: 'high', setting: 'medium' });
   const high = resolveGfx({ tier: 'high', setting: 'high' });

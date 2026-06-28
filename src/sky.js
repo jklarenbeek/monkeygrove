@@ -6,8 +6,8 @@
 //
 // Why vertex colors on a MeshBasicMaterial instead of a custom ShaderMaterial: a
 // built-in material flows through the renderer's tone-mapping + sRGB output pipeline
-// automatically, so the sky is graded identically to the rest of the world (Phase 1
-// turns ACES tone mapping on). A raw ShaderMaterial would bypass that grading and
+// automatically, so the sky is graded identically to the rest of the world (when
+// ACES tone mapping is on). A raw ShaderMaterial would bypass that grading and
 // the sky would clash with the scene. Unlit (Basic) so the gradient is exactly the
 // authored sky, not lit by the sun.
 import * as THREE from 'three';

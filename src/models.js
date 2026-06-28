@@ -316,7 +316,7 @@ const flowerBlue = {
 };
 
 // ---------------------------------------------------------------------------
-// Micro-props (Phase 3) — tiny cosmetic dressing scattered via InstancedMesh.
+// Micro-props — tiny cosmetic dressing scattered via InstancedMesh.
 // Chunky, low-voxel shapes that read as floor *texture*, never as interactables.
 // ---------------------------------------------------------------------------
 const grassA = {

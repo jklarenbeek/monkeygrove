@@ -1,4 +1,4 @@
-// Build NPC routines (Phase 9) — moves life into the build "homes" Phase 3 dressed.
+// Build NPC routines — moves life into the build "homes" the micro-prop dressing set up.
 // A tiny transform-only state machine (idle bob → wander → work → wave) ticked through
 // the existing place.entities path. Kind companions only: never blocks an interaction
 // tile or the player's cell, never needy or scary, and tap-to-talk always wins.

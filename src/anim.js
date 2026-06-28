@@ -58,7 +58,7 @@ export function delay(ms, fn) {
 
 export function cancelAllTweens() { active.clear(); }
 
-// --- Pure animation utilities (Phase 10) — side-effect-free; callers mutate the mesh.
+// --- Pure animation utilities — side-effect-free; callers mutate the mesh.
 // Shortest-arc eased yaw step (wraps to [-π, π]). Generalizes the inline facing lerp.
 export function dampRotateToward(cur, target, k) {
   let d = target - cur;

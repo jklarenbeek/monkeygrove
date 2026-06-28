@@ -520,7 +520,7 @@ export class AmbientLife {
         new WanderingPet(place, this.rng, this.openCells, this.playerPos, pets[i % pets.length]),
       );
     }
-    // New glow/winged actors (Phase 4). Glow anchors are portal/build positions when
+    // New glow/winged actors. Glow anchors are portal/build positions when
     // supplied, else the flower/deco anchors, else any open cell — region-scoped so
     // fireflies/motes cluster where they belong rather than hazing the whole screen.
     const glowSpots = (glowAnchors && glowAnchors.length)

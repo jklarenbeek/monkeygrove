@@ -1,9 +1,9 @@
-// Quality tiers — the foundation every later "liveliness" phase keys off.
+// Quality tiers — the foundation every "liveliness" feature keys off.
 //
 // Instead of the old binary QUALITY ('low' | 'high'), the renderer and every scene
 // feature read a single resolved feature-flag object, `GFX`, computed ONCE per
 // session from three inputs: the auto-detected device tier, the player's "Graphics"
-// setting, and reducedMotion(). Later phases ask `GFX.bloom`, `GFX.fog`,
+// setting, and reducedMotion(). Feature code asks `GFX.bloom`, `GFX.fog`,
 // `GFX.decorDensity`, … instead of scattering ad-hoc `if (QUALITY === 'high')`
 // checks — and so there is a single, testable place that guarantees a clean
 // rollback boundary.
@@ -13,9 +13,10 @@
 //   2. The default 'auto' setting leaves today's behaviour unchanged (on a desktop
 //      that means today's `high`; on a low-end touch device today's `low`).
 // Because of (1)/(2) the per-tier table below is intentionally conservative: only
-// `shadows`/`shadowMapSize` are wired up in Phase 0 (world.js). Every other flag is
-// declared so later phases have a home, but flipping one on is that phase's job, not
-// this one's — so `high` keeps shadowMapSize at today's 1024 (Phase 2 raises it).
+// `shadows`/`shadowMapSize` are wired up by the renderer (world.js). Every other flag
+// is declared so individual features have a home, but flipping one on is that feature's
+// job, not this table's — so `high` keeps shadowMapSize at today's 1024 (the high-tier
+// shadow pass raises it).
 import { QUALITY } from './config.js';
 import { settings } from './state.js';
 import { reducedMotion as a11yReducedMotion } from './a11y.js';
@@ -28,7 +29,7 @@ export const GRAPHICS_SETTINGS = ['auto', 'low', 'medium', 'high'];
 // the player explicitly opts into it.
 export function detectDeviceTier() { return QUALITY; }
 
-// Per-tier flag sets. Tune per phase; keep the `low` column == today's renderer.
+// Per-tier flag sets. Tune per feature; keep the `low` column == today's renderer.
 const TIERS = {
   low: {
     tier: 'low',
@@ -54,7 +55,7 @@ const TIERS = {
   },
   high: {
     tier: 'high',
-    // Phase 2 raised the high-tier sun shadow map 1024 → 2048 (crisper, with bias
+    // The high tier raises the sun shadow map 1024 → 2048 (crisper, with bias
     // re-tuned for the finer texel in world.js). Medium stays 1024; low stays off.
     shadows: true, shadowMapSize: 2048, contactShadows: true,
     toneMap: true, fog: true,
@@ -88,7 +89,7 @@ export function resolveGfx({ tier = 'high', setting = 'auto', reducedMotion = fa
 
 // Motion budget for decorative, non-essential liveliness such as prop sway and
 // GPU field wind. Low keeps a small `ambientScale` for sparse ambient actors, but
-// the Phase 5 Low-tier contract says static decor/wind must be fully off.
+// the Low-tier contract says static decor/wind must be fully off.
 export function ambientMotionScale(gfx = GFX, isReduced = gfx?.reducedMotion) {
   if (!gfx || isReduced || gfx.tier === 'low') return 0;
   return Math.max(0, gfx.ambientScale || 0);
@@ -130,9 +131,9 @@ export function refreshGfx() {
 
 // ---------------------------------------------------------------------------
 // Dev-only live tuning overrides. The dev tuning panel (devtools.js) writes here;
-// later phases read these so a value can be dialed in without a code edit. Defaults
+// feature code reads these so a value can be dialed in without a code edit. Defaults
 // match today's look, so this object is a no-op until a slider is moved. NEVER read
-// in production paths beyond the phase that owns each knob — it exists for tuning.
+// in production paths beyond the feature that owns each knob — it exists for tuning.
 export const GFX_TUNING = {
   sunIntensity: 1.25,     // world.js DirectionalLight (today's low-tier value)
   fillIntensity: 0.25,    // world.js fill light (today's low-tier value)

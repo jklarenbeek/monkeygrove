@@ -53,7 +53,7 @@ test('atmosphere flags are off at low and on at medium/high', () => {
 
 test('the default light rig values are today\'s exact intensities (low tier is unchanged)', () => {
   // world.js only overrides these when GFX.toneMap is on; the defaults must match
-  // the pre-Phase-1 renderer so low tier renders identically.
+  // the original renderer so low tier renders identically.
   assert.equal(GFX_TUNING.sunIntensity, 1.25);
   assert.equal(GFX_TUNING.fillIntensity, 0.25);
   assert.equal(GFX_TUNING.hemiIntensity, 0.95);
@@ -69,7 +69,7 @@ test('world.js wires tone mapping, sky, and fog behind the tier flags', () => {
   assert.match(w, /if \(this\.toneMap\)[\s\S]*makeSky\(\)/, 'the dome is added only when grading is on');
   assert.match(w, /if \(GFX\.fog\)[\s\S]*new THREE\.Fog\(SKY_HORIZON/, 'fog gated by GFX.fog, colored to the horizon');
   // Fog distances are derived from the active camera distance (CAM_DIST for ortho, the
-  // computed perspDist for the Phase 10 hub) so the framed board always stays crisp.
+  // computed perspDist for the perspective hub) so the framed board always stays crisp.
   assert.match(w, /this\.fog\.near = camDist/, 'fog distances are derived from the framing so the board stays crisp');
 });
 

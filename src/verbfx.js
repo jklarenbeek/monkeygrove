@@ -1,4 +1,4 @@
-// Math-chamber juice (Phase 11) — the consistent glow + ambience layer the verbs and
+// Math-chamber juice — the consistent glow + ambience layer the verbs and
 // chamber flow add ON TOP of their existing, already-distinct effects (star birth,
 // row sprouts, splash, basket wobble). The pedagogical bar is strict: nothing here
 // hides a number, the equation banner, an answer zone, or the model; a not-yet answer

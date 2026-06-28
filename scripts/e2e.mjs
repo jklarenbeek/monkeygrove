@@ -120,7 +120,7 @@ try {
   const moved = before.filter((b, i) => after[i] !== b).length;
   assert.ok(moved > 0, `crabs roam over time (moved ${moved}/${crabCount})`);
 
-  // 9. disposal/leak guard (Phase 14): 10× hub<->chamber must not grow GL geometry
+  // 9. disposal/leak guard: 10× hub<->chamber must not grow GL geometry
   //    unboundedly. Shared/cached geometry persists (fine); per-place geometry must be
   //    freed by place.dispose(). A staircase upward is a leak.
   const geoCount = () => evalp('window.__game.world.renderer.info.memory.geometries');

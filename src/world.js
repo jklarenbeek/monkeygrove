@@ -65,7 +65,7 @@ export function screenDirToGridStep(sx, sy) {
 const ZOOM_MIN = 0.8;
 const ZOOM_MAX = 4;
 
-// Phase 10 (opt-in via GFX.perspectiveHub): a narrow-FOV perspective camera gives the
+// Opt-in via GFX.perspectiveHub: a narrow-FOV perspective camera gives the
 // HUB gentle toy-diorama depth. It keeps the exact ISO_DIR angle — only the projection
 // and camera distance change — so screenDirToGridStep() and picking stay valid and no
 // input lock is needed. Chambers (frameBoard) ALWAYS stay orthographic.
@@ -83,7 +83,7 @@ export class World {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
-    // Phase 1 atmosphere — ALL gated so low tier is byte-identical to before:
+    // Tone-mapping atmosphere — ALL gated so low tier is byte-identical to before:
     // ACES filmic tone mapping gives the world gentle warmth; exposure is tuned
     // bright (cheerful storybook morning, never dusky). outputColorSpace stays the
     // three.js default sRGB. Off at low tier → today's flat-but-cheap linear look.
@@ -112,7 +112,7 @@ export class World {
     }
 
     this.orthoCam = new THREE.OrthographicCamera(-10, 10, 10, -10, 0.1, 200);
-    // Optional perspective hub camera (Phase 10) — built ONLY when the feature flag is
+    // Optional perspective hub camera — built ONLY when the feature flag is
     // on, so the default rig is byte-identical to before. `this.camera` is always the
     // ACTIVE camera; pick(), _place(), and render() all read it, so framing methods
     // just point it at the right one (chambers force ortho; hub uses persp when on).
@@ -162,7 +162,7 @@ export class World {
       const sz = GFX.shadowMapSize || 1024;
       this.sun.shadow.mapSize.set(sz, sz);
       // Finer texels (2048) need less depth bias to stay crisp without peter-panning;
-      // 1024 keeps the original tuned value. Spot-check with the Phase 0 dev sliders.
+      // 1024 keeps the original tuned value. Spot-check with the dev sliders (gfxdev.js).
       this.sun.shadow.bias = sz >= 2048 ? -0.0009 : -0.0015;
       this.sun.shadow.normalBias = 0.02;
     }
@@ -175,7 +175,7 @@ export class World {
     this.raycaster = new THREE.Raycaster();
     this.pickables = []; // set by current place (floor meshes with .gridInfo)
 
-    // Selective bloom / DoF (Phase 9/10) — HIGH tier only, and lazily loaded so the
+    // Selective bloom / DoF — HIGH tier only, and lazily loaded so the
     // postprocessing addons never enter the first-load `index` chunk (budget-guarded in
     // scripts/check-budget.mjs). Until it resolves — or if the chunk fails to load —
     // update() falls back to the plain direct render path, so nothing ever breaks.
@@ -396,7 +396,7 @@ export class World {
     this.shakeAmp = Math.max(this.shakeAmp, amount);
   }
 
-  // Short, eased orthographic "moment" (Phase 12): a gentle push-in/pull-back on a
+  // Short, eased orthographic "moment": a gentle push-in/pull-back on a
   // non-gameplay beat (hub arrival, build complete…). Animates SPAN only — the camera
   // ANGLE (ISO_DIR) never changes, so screenDirToGridStep and picking stay valid and
   // no input lock is needed. 'minimal' tier and reducedMotion() play nothing (snap
@@ -424,7 +424,7 @@ export class World {
     const k = 1 - Math.pow(0.0015, dtMs / 1000); // smooth exp follow
     this.target.lerp(this.goal, k);
     this.shakeAmp *= Math.pow(0.0005, dtMs / 1000);
-    // GPU field wind (Phase 5): one uniform write per frame for the whole scatter
+    // GPU field wind: one uniform write per frame for the whole scatter
     // field. Fully static under reduced-motion or low tier (amp 0).
     const windAmp = 0.06 * ambientMotionScale(GFX, reducedMotion());
     setWind((this._windT = (this._windT || 0) + dtMs / 1000), windAmp);

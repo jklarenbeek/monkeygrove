@@ -60,7 +60,7 @@ function settingsDefaults() {
     reduceMotion: null, dyslexiaFont: false, highContrast: false,
     colorblind: false, textScale: 1,
     graphics: 'auto', // 'auto' | 'low' | 'medium' | 'high' — see gfx.js
-    ambience: true,   // procedural ambient beds (audio.js, Phase 13)
+    ambience: true,   // procedural ambient beds (audio.js)
   };
 }
 

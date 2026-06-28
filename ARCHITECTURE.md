@@ -179,12 +179,12 @@ scripts/
   and per-theme tint. Procedural canvas textures (defensive draw → tests get blank but
   valid textures); `reducedMotion()` damps motion; pooled/capped fish-shadow & bubble
   hooks are available for the ecosystem. No pickables/collision added.
-- **Idle sway** (Phase 5, `GFX.ambientScale`): a capped set of foliage hero props gets a
+- **Idle sway** (`GFX.ambientScale`): a capped set of foliage hero props gets a
   tiny CPU "breathing" tilt; the dense scatter field sways on the **GPU** via a wind
   variant of the voxel material (`windMaterial()` in `voxel.js`, one `uTime` uniform per
   frame, offset scaled by vertex height). Both are fully static under `reducedMotion()`
-  or low tier (amplitude 0) — matching the Phase 0 "Low = today" guarantee.
-- **Creature animation** (Phase 10): pure transform-only helpers in `anim.js`
+  or low tier (amplitude 0) — matching the "Low = today" guarantee.
+- **Creature animation**: pure transform-only helpers in `anim.js`
   (`dampRotateToward`/`lookAtYaw`/`idleBob`/`hopArc`/`squashPulse`/`wobble`) + a per-creature
   cosmetic `anim` profile on every roster descriptor (`getCreature(id).anim`; crab/crabKing
   get none). Pets celebrate per-profile (double-hop/wing-flap/stretch/…); chamber helpers
@@ -197,19 +197,20 @@ scripts/
   `npcSteppable()` predicate keeps NPCs off every interaction tile and the player's
   cell; the claim/free `walk` handshake + synced `npcs[]` row keep tap-to-talk valid
   mid-hop. Dedicated forked Rng (no gameplay RNG); roster-only (crab/crabKing excluded).
-- **Chamber juice** (`verbfx.js`, Phase 11): a consistent glow + ambience layer added
+- **Chamber juice** (`verbfx.js`): a consistent glow + ambience layer added
   *on top of* each verb's existing distinct effects — a staged theme-colored "local
   glow" wash on the model on correct (on the ground, never behind the banner), a gentle
   warm shimmer on not-yet (no red/shake), light per-theme ambient motes (≪ hub), and
   `visualEvent('correct-answer'|'wrong-answer')` broadcasts. Never imports `mathengine`
   (math stays pure); own Rng; off at low; honors `reducedMotion()`.
-- **World reactivity** (`reactive.js`, Phase 8): a tiny event bus — `place.visualEvent(type,
+- **World reactivity** (`reactive.js`): a tiny event bus — `place.visualEvent(type,
   payload)` over an opt-in `_reactors` list (`player-hop`/`correct-answer`/`wrong-answer`/
   `build-complete`/`portal-stage-up`/…) — plus helpers `makePulse`/`onPlayerNear`/
   `makeReactiveProp` (the portal greet-guard, generalized). Drives floor-typed landing
   puffs, breathing nest/build glows, and proximity reactions. Purely cosmetic: never
   touches `walk`, scoring, or the problem RNG; `wrong-answer` is a warm shimmer at most
-  (never red/shake/darken); med/high only so low = today. Reused by Phases 11 & 13.
+  (never red/shake/darken); med/high only so low = today. Reused by the chamber-juice
+  and audio-life layers.
 - **Glow language** (`glow.js`, `GFX.glowSprites` — all tiers): one dependency-free
   additive vocabulary (`makeGlowSprite`/`makeGlowPlane`/`makeMoteField`/`pulseGlow`) for
   "friendly magic & reward" glow; shared cached radial textures, `_owned` materials,
@@ -231,7 +232,7 @@ scripts/
   labels): the bloom pass masks the camera to `BLOOM_LAYER`. The MAIN scene renders
   DIRECTLY to the canvas (byte-identical to before — same tone mapping, no double-grade),
   then the bloom buffer is composited ON TOP with an additive full-screen quad, so bloom
-  can only ADD a soft halo, never wash out or recolor. Depth-of-field (Phase 10) routes
+  can only ADD a soft halo, never wash out or recolor. Depth-of-field routes
   the main render through `[RenderPass → BokehPass → OutputPass]` and is the one path that
   needs the perspective camera. Both are off below High; DoF is off under `reducedMotion`.
 - **Camera rig** (`world.js`): isometric, fixed `ISO_DIR` angle. Default is an
@@ -246,12 +247,12 @@ scripts/
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.
 
 ## Audio life
-`audio.js` stays one procedural WebAudio engine (no samples). Phase 13 added a fourth
-bus, `ambienceBus` (quiet, under everything), driving sparse generative **ambient beds**
+`audio.js` stays one procedural WebAudio engine (no samples). A fourth audio bus,
+`ambienceBus` (quiet, under everything), drives sparse generative **ambient beds**
 (`audio.ambience('hub'|'chamber*'|'bakery'|null)`) built from scheduled short one-shots
 (no persistent oscillators → a scene change just stops rescheduling; nothing leaks).
 `audio.variation(name)` adds bounded pitch/gain jitter so repeated cues never grate;
-`audio.attachEvents(place)` subscribes to the Phase 8 visual-event bus as a pure
+`audio.attachEvents(place)` subscribes to the world-reactivity visual-event bus as a pure
 listener. A third settings group (`ambience`, with `setAmbience`) silences beds
 independently. Density drops under `reducedMotion()`; everything is a no-op without an
 AudioContext, so the game is fully playable in silence.
@@ -457,21 +458,21 @@ flags — ambient density, sway, DoF, camera moves, animated water — down, but
 disables static bloom/fog/tone mapping). `resolveGfx()` is a pure function covered by a
 truth-table test. **Hard rule:** the `low` tier reproduces today's renderer, and the
 default `auto` setting leaves today's behaviour unchanged — so `GFX` is the clean
-rollback boundary every later "liveliness" phase is built behind. Performance targets:
+rollback boundary every later "liveliness" layer is built behind. Performance targets:
 desktop on `high` ≈ 60 fps; tablet/phone on `medium` ≈ 30 fps+; `low` ≈ today's
 complexity. A DEV-only tuning panel + perf overlay (`gfxdev.js`, `npm run dev`) and a
 visual baseline pack (`npm run baseline` → `tmp/baseline/`, git-ignored) make every
-later phase tunable and measurable; both are excluded from the production bundle.
+later visual change tunable and measurable; both are excluded from the production bundle.
 
-### Per-tier budget & kill-switches (Phase 14)
+### Per-tier budget & kill-switches
 | Tier | Frame target | Bloom | Shadows | Ambient/decor | Water |
 |---|---|---|---|---|---|
-| Desktop · High | 60 fps sustained | additive glow boost (postfx deferred) | real 2048 + contact | rich | animated + sparkle |
+| Desktop · High | 60 fps sustained | additive glow boost + selective bloom | real 2048 + contact | rich | animated + sparkle |
 | Tablet/Phone · Medium | 30 fps+ | off | real 1024 + contact | reduced | animated |
-| Low | ≈ today (pre-plan) | off | contact blob only | off (none) | flat bobbing plane |
+| Low | ≈ baseline renderer | off | contact blob only | off (none) | flat bobbing plane |
 
 Every liveliness layer is a **kill-switch** behind a `GFX` flag: `graphics = low`
-reproduces the pre-plan renderer (no tone-map/sky/fog, no scatter/ambient extras/sway,
+reproduces the baseline renderer (no tone-map/sky/fog, no scatter/ambient extras/sway,
 no animated water, no camera moments, NPC bob-in-place, blob contact shadows only —
 the one always-on grounding aid). `reducedMotion()` independently calms every moving
 layer. The e2e run (`npm run test:e2e`) includes a 10× hub↔chamber **disposal guard**
@@ -501,7 +502,7 @@ guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
 - **PWA precache ≤ 1200 KiB** — today 15 entries / ~1150 KiB (bumped 1150→1200 for the
-  procedural "liveliness" phases — sky/tiers/shadows/scatter/ambient/sway add code, no
+  procedural "liveliness" layers — sky/tiers/shadows/scatter/ambient/sway add code, no
   shipped assets).
 - **The `business-*` chunk stays lazy** — the check fails if it folds back into `index`
   or the entry static-imports it (Vite would module-preload it into `index.html`).

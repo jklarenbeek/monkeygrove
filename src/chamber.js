@@ -167,7 +167,7 @@ export class Place {
     this.theme = theme;
     this.group = new THREE.Group();
     this.entities = [];          // anything with update(dt)
-    this._reactors = [];         // anything with react(type, payload) — Phase 8 event bus
+    this._reactors = [];         // anything with react(type, payload) — the world-reactivity event bus
     this.size = { w: 0, d: 0 };
     this.cells = [];
     this.markers = {};
@@ -309,7 +309,7 @@ export class Place {
   }
 
   _buildWater() {
-    // Water lives in water.js (Phase 7). 'flat' (low) reproduces today's two planes +
+    // Water lives in water.js. 'flat' (low) reproduces today's two planes +
     // bob exactly; 'animated' (med/high) adds shimmer, sparkle, foam, and theme tint.
     this.water = createWaterSurface(this, {
       size: this.size, quality: GFX.water, palette: PALETTE, theme: this.theme,
@@ -319,7 +319,7 @@ export class Place {
 
   _decorate(opts) {
     const rng = new Rng(opts.seed ?? 1234);
-    this.swayProps = []; // capped hero-prop sway list (Phase 5)
+    this.swayProps = []; // capped hero-prop sway list (gentle foliage breathing)
     const themed = {
       hub: ['palm', 'flowerPink', 'flowerYellow', 'bush', 'palmSmall', 'flowerBlue'],
       tide: ['shell', 'rockA', 'palmSmall', 'flowerBlue', 'rockB'],
@@ -375,7 +375,7 @@ export class Place {
     return blob;
   }
 
-  // Cosmetic micro-prop carpet (Phase 3) — see scatter.js. Skipped at low tier so the
+  // Cosmetic micro-prop carpet — see scatter.js. Skipped at low tier so the
   // floor is identical to before; never mutates cell.walk (pathing-safe).
   _scatter(opts = {}) { buildScatter(this, opts); }
 
@@ -384,7 +384,7 @@ export class Place {
 
   addEntity(e) { this.entities.push(e); return e; }
 
-  // Phase 8 visual-event bus. Reactors opt in via react(type, payload); those that also
+  // Visual-event bus. Reactors opt in via react(type, payload); those that also
   // need per-frame work expose update() and get ticked in the entities loop. The bus
   // never touches game state, RNG, scoring, or pathing — purely cosmetic broadcast.
   addReactor(r) { this._reactors.push(r); if (r.update) this.addEntity(r); return r; }
@@ -600,7 +600,7 @@ export class HubPlace extends Place {
       this.tree.position.copy(this.worldPos(tree.x, tree.z));
       this.group.add(this.tree);
       this.addGroundShadow(tree.x, tree.z, { radius: 0.7, opacity: 0.22 });
-      // a soft magic glow crowns the gem tree on high tier (glow language, Phase 6);
+      // a soft magic glow crowns the gem tree on high tier (additive glow sprite);
       // gated to bloom so low/medium stay exactly as today
       if (GFX.bloom) {
         const glow = makeGlowSprite(0xfff3b8, 0.5, 0.5);
@@ -622,7 +622,7 @@ export class HubPlace extends Place {
       egg.position.copy(this.worldPos(nest.x, nest.z));
       this.group.add(egg);
       this.addGroundShadow(nest.x, nest.z, { radius: 0.34 });
-      attachNestGlow(this, nest.x, nest.z); // Phase 8: warm breathing nest glow (med/high)
+      attachNestGlow(this, nest.x, nest.z); // warm breathing nest glow (med/high)
     }
     const mimi = (this.markers.M || [])[0];
     if (mimi) {
@@ -810,10 +810,10 @@ export class HubPlace extends Place {
     // reads better than a blob per prop). The bridge has no prop at its plot.
     if (def.id !== 'bridge') {
       this.addGroundShadow(x, z, { radius: 0.85, opacity: 0.18 });
-      // Non-blocking dressing turns the plot into a small inhabited place (Phase 3);
+      // Non-blocking dressing turns the plot into a small inhabited place;
       // the plaza is the festival centerpiece → richest density.
       this.decorateSpot(spot, { role: def.id === 'plaza' ? 'festival' : 'near-build', bloom: this.storyBloom || 0.75 });
-      attachBuildIdle(this, def, spot); // a lived-in idle effect per build (Phase 8)
+      attachBuildIdle(this, def, spot); // a lived-in idle effect per build
     }
     if (def.id === 'lanterns') {
       for (const dx of [-1, 0, 1]) {
@@ -871,7 +871,7 @@ export class HubPlace extends Place {
     this.cellAt(home.x, home.z).walk = false;
     const entry = { id: def.id, face: def.npc.face, x: home.x, z: home.z, mesh };
     this.npcs.push(entry);
-    // a small loop of life around the build (Phase 9). 'limited' (low) = today's bob.
+    // a small loop of life around the build (NPC routine). 'limited' (low) = today's bob.
     attachNpcRoutine(this, mesh, spot, entry, this.npcs.length);
   }
 

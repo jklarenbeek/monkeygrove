@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { audio } from '../src/audio.js';
 
-// Phase 13: with no/blocked AudioContext, every new entry point must be a safe no-op
+// Silent-audio safety: with no/blocked AudioContext, every new entry point must be a safe no-op
 // so the game is fully playable in silence and import-safe in tests/SSR.
 test('ambient/variation/event API never throws without an AudioContext', () => {
   assert.doesNotThrow(() => {

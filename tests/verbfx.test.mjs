@@ -18,7 +18,7 @@ test('themeAccent pulls from WORLD_THEME (never hardcoded), with a hub fallback'
   assert.equal(themeAccent('nope'), WORLD_THEME.hub.accent, 'unknown world → hub accent');
 });
 
-test('verbfx exports the full Phase 11 helper contract', () => {
+test('verbfx exports the full chamber-juice helper contract', () => {
   for (const name of [
     'fxFetchCorrect',
     'fxArrayGrowCell',
@@ -33,20 +33,20 @@ test('verbfx exports the full Phase 11 helper contract', () => {
   }
 });
 
-test('each chamber verb calls its matching Phase 11 helper', () => {
+test('each chamber verb calls its matching chamber-juice helper', () => {
   assert.match(verbs, /fxFetchCorrect\(/, 'Fetch calls fxFetchCorrect');
   assert.match(verbs, /fxArrayGrowCell\(/, 'Array calls fxArrayGrowCell');
   assert.match(verbs, /fxNumberLinePulse\(/, 'Number line calls fxNumberLinePulse');
   assert.match(verbs, /fxShareDeal\(/, 'Share calls fxShareDeal');
 });
 
-test('verbfx emits the Phase 8 visual-event vocabulary from the chamber flow, not a parallel bus', () => {
+test('verbfx emits the visual-event vocabulary from the chamber flow, not a parallel bus', () => {
   const flow = readFileSync(new URL('../src/chamberflow.js', import.meta.url), 'utf8');
   assert.match(flow, /visualEvent\?\.\((?:correct|\s|\?|:|'|")*'correct-answer'/, 'emits correct-answer');
   assert.match(flow, /'wrong-answer'/, 'emits wrong-answer');
 });
 
-test('mathengine.js is untouched by this phase (still declares itself pure)', () => {
+test('mathengine.js is untouched by the juice layer (still declares itself pure)', () => {
   const eng = readFileSync(new URL('../src/mathengine.js', import.meta.url), 'utf8');
   assert.match(eng.slice(0, 200), /pure/i, 'mathengine still documents its purity');
 });

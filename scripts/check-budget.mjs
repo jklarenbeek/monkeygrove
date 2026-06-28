@@ -27,7 +27,7 @@ import { join } from 'node:path';
 // not removed: the cap stays a real guardrail (the target is cheap Android / school
 // Wi-Fi). When the entry approaches this again, code-split the story screens/prose
 // into a lazy chunk (like business-*/duel-*) rather than just bumping the number.
-// 2026-06-28: precache 1150 -> 1200 for the "liveliness" plan (Phases 1-5): sky,
+// 2026-06-28: precache 1150 -> 1200 for the liveliness work — sky,
 // quality tiers, contact shadows, micro-prop scatter, ambient ecosystem, and GPU
 // sway are all PROCEDURAL code (no shipped image/HDR/audio assets), so only the
 // always-lazy app chunks grew (~a few KiB uncompressed). index gzip stayed well
@@ -142,7 +142,7 @@ if (!businessChunk) {
 //    their own `postfx-*` chunk and NEVER in the first-load `index` (nor get
 //    module-preloaded from the entry). High-tier-only magic must not tax kids on slow
 //    Wi-Fi. Mirrors the bakery business-chunk guard above. The chunk only exists once
-//    Phase 9's bloom path is built; absence is a regression, not an exemption.
+//    the bloom path is built; absence is a regression, not an exemption.
 const postfxChunk = assets.find((f) => /^postfx-.*\.js$/.test(f));
 if (!postfxChunk) {
   checks.push(fail('no postfx-*.js chunk — the bloom/DoF post-processing folded back into index'));

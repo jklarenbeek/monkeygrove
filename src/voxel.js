@@ -141,7 +141,7 @@ export function voxelMaterial() {
   return sharedMaterial;
 }
 
-// GPU field wind (Phase 5). A variant of the voxel material whose vertex shader nudges
+// GPU field wind. A variant of the voxel material whose vertex shader nudges
 // each vertex horizontally by an amount scaled by its LOCAL height — so blade tops sway
 // while bases stay planted — driven by a single shared `uTime` uniform (one write per
 // frame for the whole instanced field, no per-instance CPU state). Per-instance phase

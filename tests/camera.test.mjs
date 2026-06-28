@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { screenDirToGridStep } from '../src/world.js';
 
-// Phase 12 guards: camera "moments" animate span/target only — never the angle — so
+// Camera-moment guards: camera "moments" animate span/target only — never the angle — so
 // the screen→grid input mapping must be exactly what it is today. This truth table is
 // the regression fence: if a camera change ever rotates input, it breaks here.
 test('screenDirToGridStep maps the four screen diagonals to four distinct grid hops', () => {

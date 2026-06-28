@@ -1,4 +1,4 @@
-// Visual baseline pack — the "before" evidence every later liveliness phase diffs
+// Visual baseline pack — the "before" evidence every later liveliness change diffs
 // against to prove "Low = today" and "a child can still read everything". Boots the
 // real WebGL game in headless Chrome, walks to each key scene, and writes a PNG per
 // (scene × viewport × motion) into tmp/baseline/ (git-ignored — large binaries stay

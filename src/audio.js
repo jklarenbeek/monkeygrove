@@ -610,7 +610,7 @@ export const audio = {
     musicBus = ctx.createGain();
     musicBus.gain.value = 0.25;
     musicBus.connect(comp);
-    ambienceBus = ctx.createGain();        // Phase 13: quiet generative beds, under everything
+    ambienceBus = ctx.createGain();        // quiet generative beds, under everything
     ambienceBus.gain.value = 0.18;
     ambienceBus.connect(comp);
 
@@ -676,7 +676,7 @@ export const audio = {
     startBeds();
   },
 
-  // Subscribe to the Phase 8 visual-event bus as a pure listener (never owns state).
+  // Subscribe to the world-reactivity visual-event bus as a pure listener (never owns state).
   // Safe no-op if the bus is absent. Maps only events not already sounded elsewhere,
   // so cues never double up; degrades to nothing until those events are emitted.
   attachEvents(place) {

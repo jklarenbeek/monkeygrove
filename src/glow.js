@@ -1,14 +1,15 @@
-// Glow language (Phase 6, Layer A) — one dependency-free vocabulary for "friendly
+// Glow language — one dependency-free vocabulary for "friendly
 // magic and reward" glow that every magical/reward object uses instead of hand-rolling
 // sprites. All outputs are ADDITIVE, depthWrite:false, mark their material `_owned`
 // (so place.dispose() frees them), and reuse shared radial-gradient canvas textures
 // bucketed by softness (no shipped images). Runs at EVERY tier via GFX.glowSprites.
 //
 // High tier (GFX.bloom) gets a gentle additive "boost" — larger, brighter haloes —
-// which stands in for true selective-bloom postprocessing. The full EffectComposer
-// path (the `postprocessing` dependency, plan open-decision #2) is intentionally
-// deferred to protect the first-load budget; it can be slotted in later behind the
-// same GFX.bloom flag without touching call sites.
+// AND feeds the true selective-bloom composer in postfx.js (which renders these tagged
+// glows into a bloom buffer and adds a soft halo on top). The composer is built only
+// from three.js's own bundled addons in a lazy chunk, so no extra dependency reaches
+// the first-load budget. The boost stands on its own at medium/low (where the composer
+// never loads), so call sites never need to know which path is active.
 //
 // HARD child-safety rule: glow reads as warmth, never glare, and never sits behind a
 // number/prompt/button. Keep opacities gentle and never place a bright glow directly
@@ -42,7 +43,7 @@ function glowTexture(soft = 0.4) {
 export function glowSizeBoost() { return GFX.bloom ? 1.35 : 1.0; }
 export function glowOpacityBoost() { return GFX.bloom ? 1.25 : 1.0; }
 
-// --- Selective-bloom tagging (Phase 9) -------------------------------------------
+// --- Selective-bloom tagging -----------------------------------------------------
 // The bloom layer + tag helpers live HERE (always-loaded, dependency-free) so any
 // scene module can mark "this object glows" without pulling in the heavy lazy
 // post-processing chunk (src/postfx.js, which owns the EffectComposer). On High tier
