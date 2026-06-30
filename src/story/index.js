@@ -4,3 +4,4 @@ export * from './constants.js';
 export * from './engine.js';
 export * from './chapters.js';
 export * from './pacing.js';
+export * from './tree.js';

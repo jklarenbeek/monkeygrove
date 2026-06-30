@@ -37,7 +37,7 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
 - New Explorers choose a country/curriculum pack and can enter an optional age
   (4-13) or birthday. For the shipped `NL_PO` curriculum pack, current age
   estimates a Dutch primary stage (`grade_1`...`grade_8` internally, shown to
-  parents as Groep 1...8).
+  parents as Grade 1...8).
 - A short warm-up after the intro story gives Mimi a few tiny number quests
   before the hub. It adjusts the placement band (`below`, `on_track`, `ahead`)
   without putting a permanent label on the child.

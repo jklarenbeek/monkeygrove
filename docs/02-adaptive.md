@@ -75,7 +75,7 @@ Monkey Grove currently uses the recommended hybrid approach:
 
 - **Curriculum gate first**: the selected curriculum pack and current age create
   a lower bound for eligible skills. For the shipped `NL_PO` pack, an
-  11-year-old starts at Groep 8-level probes rather than early addition.
+  11-year-old starts at Grade 8-level probes rather than early addition.
 - **Aging over years**: birthday-based profiles recompute current age on later
   sessions and can promote the automatic lower bound upward. Age-only profiles
   store the date the age was captured so they can still advance by elapsed years.

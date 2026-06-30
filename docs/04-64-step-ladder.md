@@ -1,7 +1,7 @@
 # Monkey Grove — The 64-Step Mastery Ladder
 
 *Design note: replacing the 18-skill ladder with a 64-step, research-grounded
-progression that works whether a child starts in groep 3 or groep 8.*
+progression that works whether a child starts in grade 3 or grade 8.*
 
 Peildatum: juni 2026. Companion to `03-curriculum.nl.md`.
 
@@ -14,15 +14,15 @@ Two questions:
 1. **Can the 18-skill ladder become a 64-step ladder?** Yes — and the research
    supports finer granularity, *if* the steps are real learning-trajectory levels
    and not 64 arbitrary slices. 64 is a good number: it gives ~8 meaningful steps
-   per groep across groep 1–8, which matches how fact-fluency and number
+   per grade across grade 1–8, which matches how fact-fluency and number
    progressions actually decompose in the literature. (It's also a clean power of
    two — `0..63`, 6 bits — if you want a compact `u8` skill id with room to spare.)
 
-2. **Can a child who starts in groep 8 also begin at step 1 and climb the whole
+2. **Can a child who starts in grade 8 also begin at step 1 and climb the whole
    ladder?** Yes, but not by force-marching them through 63 baby steps. The
    evidence-based pattern is **placement + compaction**: every learner shares the
    *same* 64-step ladder, but where they *enter* and how fast they *compact*
-   already-mastered steps differs. A late-starting groep-8 child plays the same
+   already-mastered steps differs. A late-starting grade-8 child plays the same
    story arc from the start, but the early world clears in fast "you already know
    this" confirmations, and real practice concentrates wherever their actual gaps
    are. The story stays whole; the grind does not repeat.
@@ -61,10 +61,10 @@ Wilson and Rosenshine's guided-practice band). A confirmation that fails 35% of 
 time feels like punishment, not review.
 
 **Fine-grained skill nodes are established practice in the best adaptive systems.** A
-2025 analysis of competency structures notes that both Grasple and MathAcademy use very fine-grained nodes focused around skills — things students actually do — and MathAcademy subdivides their topics into layers called 'knowledge points'. *Design consequence:* 64 nodes is not excessive; it's in line with how MathAcademy/Grasple decompose. But skill-decomposition theory warns the split should stop at a useful floor: decomposition continues until the skills are at such a rudimentary level that it would be a pragmatically wasted effort to continue further. 64 is about right for arithmetic groep 1–8; going to 128 would start splitting hairs.
+2025 analysis of competency structures notes that both Grasple and MathAcademy use very fine-grained nodes focused around skills — things students actually do — and MathAcademy subdivides their topics into layers called 'knowledge points'. *Design consequence:* 64 nodes is not excessive; it's in line with how MathAcademy/Grasple decompose. But skill-decomposition theory warns the split should stop at a useful floor: decomposition continues until the skills are at such a rudimentary level that it would be a pragmatically wasted effort to continue further. 64 is about right for arithmetic grade 1–8; going to 128 would start splitting hairs.
 
 **Math is sequentially scaffolded, so prerequisite gaps must be filled — but only
-the ones that actually exist.** Project ACHIEVE's review stresses that math is more sequentially scaffolded than literacy, with certain skills laying the foundation as prerequisites to a next set of skills, and that off-track students who are taught only at grade level stay behind. The modern remediation pattern separates two skill types: Target Skills are the grade-level readiness skills a student must master to engage with current instruction; Supporting Skills are the prerequisite building blocks beneath each Target Skill, and students only work on the Supporting Skills they actually need — no unnecessary backtracking through content they already understand, and no hit to their confidence from covering old ground. *Design consequence:* this is the whole answer to your groep-8 question. A late starter's **Target band** is groep 8; the ladder *below* it is a reservoir of **Supporting steps** they drop into only on evidence of a gap. (See §4.)
+the ones that actually exist.** Project ACHIEVE's review stresses that math is more sequentially scaffolded than literacy, with certain skills laying the foundation as prerequisites to a next set of skills, and that off-track students who are taught only at grade level stay behind. The modern remediation pattern separates two skill types: Target Skills are the grade-level readiness skills a student must master to engage with current instruction; Supporting Skills are the prerequisite building blocks beneath each Target Skill, and students only work on the Supporting Skills they actually need — no unnecessary backtracking through content they already understand, and no hit to their confidence from covering old ground. *Design consequence:* this is the whole answer to your grade-8 question. A late starter's **Target band** is grade 8; the ladder *below* it is a reservoir of **Supporting steps** they drop into only on evidence of a gap. (See §4.)
 
 **Mastery learning works precisely because it refuses to advance on unmastered
 prerequisites — and the variance between fast and slow learners shrinks when it's
@@ -89,25 +89,25 @@ attainers. *Design consequence:* "addition" isn't one step; it's a short stairca
 ## 2. Architecture of the 64-step ladder
 
 **Layout.** 64 steps, id `0..63`, grouped into **8 bands** of **8 steps** each.
-Band `b = floor(step / 8)` corresponds to groep `b + 1`. So:
+Band `b = floor(step / 8)` corresponds to grade `b + 1`. So:
 
-- Band 0 → Groep 1 (steps 0–7, informal/observational)
-- Band 1 → Groep 2 (steps 8–15)
-- Band 2 → Groep 3 (steps 16–23)
+- Band 0 → Grade 1 (steps 0–7, informal/observational)
+- Band 1 → Grade 2 (steps 8–15)
+- Band 2 → Grade 3 (steps 16–23)
 - …
-- Band 7 → Groep 8 (steps 56–63)
+- Band 7 → Grade 8 (steps 56–63)
 
-**Groep 1–2 and Elo.** `03-curriculum.nl.md` notes that a 4–5-year-old should get
-no fail-sensitive sums. That maps cleanly here: **Band 0 (groep 1) is fully `[obs]`
-— no Elo**, observation/voorbereidend only. Band 1 (groep 2) *does* carry ratings,
-because groep 2 is the first group with SLO eind-doelen (the 2017 tussendoelen begin
-at eind groep 2) — but its **earliest steps (8–9) stay soft**: scored gently, never
+**Grade 1–2 and Elo.** `03-curriculum.nl.md` notes that a 4–5-year-old should get
+no fail-sensitive sums. That maps cleanly here: **Band 0 (grade 1) is fully `[obs]`
+— no Elo**, observation/voorbereidend only. Band 1 (grade 2) *does* carry ratings,
+because grade 2 is the first group with SLO eind-doelen (the 2017 tussendoelen begin
+at eind grade 2) — but its **earliest steps (8–9) stay soft**: scored gently, never
 gating, so a child still in the kleuter-overgang is never punished. This is a slight
-refinement of doc 03's "geen getoetste ratings voor `grade_1`/`grade_2`": groep 1
-stays observational, groep 2 becomes lightly rated in line with the SLO framework.
+refinement of doc 03's "geen getoetste ratings voor `grade_1`/`grade_2`": grade 1
+stays observational, grade 2 becomes lightly rated in line with the SLO framework.
 
-This keeps a clean `step → groep` mapping (`groep = (step >> 3) + 1`) while giving
-each groep 8 fine-grained internal levels — enough to express the strategy
+This keeps a clean `step → grade` mapping (`grade = (step >> 3) + 1`) while giving
+each grade 8 fine-grained internal levels — enough to express the strategy
 staircases the research calls for.
 
 **Each step carries five fields** (suggested schema, adapt to `mathengine.js`):
@@ -115,7 +115,7 @@ staircases the research calls for.
 ```
 {
   id: 0..63,
-  band: 0..7,              // groep - 1
+  band: 0..7,              // grade - 1
   domain: GETALLEN | VERHOUDINGEN | METEN_MEETKUNDE | VERBANDEN,
   world: tidepools | banana | sharing | vine | business | (hub/observational),
   name_nl, name_en,        // a *level of thinking*, not "harder sums"
@@ -140,19 +140,18 @@ multi-step, misconception traps, "explain why"). The Elo rating moves a child
   diagnostic, not punitive).
 - **Confirmation** (placement probes, compaction, Echo-Door spaced review):
   target ~**85–90%**. These exist to *verify* mastery, so they should feel easy
-  and affirming. A child re-confirming groep-3 addition in groep 8 should breeze
-  through it.
+  and affirming. A child re-confirming grade-3 addition in grade 8 should breeze through it.
 
 ---
 
 ## 3. The 64 steps
 
-Notation: **F/T/S** bounds live in `03-curriculum.nl.md` per groep; here each step
+Notation: **F/T/S** bounds live in `03-curriculum.nl.md` per grade; here each step
 names the *level of thinking* and its world. `▷` = Monkey Grove world.
 `[obs]` = observational/informal, no Elo. Strategy staircases (count-on →
 make-ten → derived facts, etc.) are drawn straight from the fact-fluency research.
 
-### Band 0 — Groep 1 (steps 0–7) · foundations `[obs]`  ▷ hub / Tide Pools intro
+### Band 0 — grade 1 (steps 0–7) · foundations `[obs]`  ▷ hub / Tide Pools intro
 | # | Step (level of thinking) | Model |
 |---|--------------------------|-------|
 | 0 | Number-word sayer: rote count to 10 | chant / fingers |
@@ -164,7 +163,7 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 6 | Ordinal & position: first/second, before/after | row of props |
 | 7 | Recognise & extend a simple repeating pattern | bead chain |
 
-### Band 1 — Groep 2 (steps 8–15) · beginning number  ▷ Tide Pools (handelend) · *steps 8–9 soft-rated*
+### Band 1 — Grade 2 (steps 8–15) · beginning number  ▷ Tide Pools (handelend) · *steps 8–9 soft-rated*
 | # | Step | Model |
 |---|------|-------|
 | 8 | Subitise to 6; read numerals 0–10 | dot cards |
@@ -176,7 +175,7 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 14 | Coins to €10; make a total | coin props |
 | 15 | Read a picture/bar graph; tally | pictogram |
 
-### Band 2 — Groep 3 (steps 16–23) · formal +/− to 20  ▷ Tide Pools, Sharing Stump intro
+### Band 2 — Grade 3 (steps 16–23) · formal +/− to 20  ▷ Tide Pools, Sharing Stump intro
 | # | Step | Model |
 |---|------|-------|
 | 16 | Numbers to 100: read, place on line (global) | bead string / line |
@@ -188,7 +187,7 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 22 | Repeated addition → intro × (equal groups) | rows of items |
 | 23 | Fair sharing → intro ÷ (deal into groups) | baskets |
 
-### Band 3 — Groep 4 (steps 24–31) · to 100, tables start  ▷ Tide Pools, Banana Garden, Sharing Stump
+### Band 3 — Grade 4 (steps 24–31) · to 100, tables start  ▷ Tide Pools, Banana Garden, Sharing Stump
 | # | Step | Model |
 |---|------|-------|
 | 24 | Place value to 100 (tens & ones; split) | place-value strips |
@@ -200,19 +199,19 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 30 | ÷ with equal groups; ÷ as missing factor | baskets |
 | 31 | Quarter of a quantity; simple ratio (recipe) | bar / table |
 
-### Band 4 — Groep 5 (steps 32–39) · to 1.000, intro decimals  ▷ all worlds
+### Band 4 — Grade 5 (steps 32–39) · to 1.000, intro decimals  ▷ all worlds
 | # | Step | Model |
 |---|------|-------|
 | 32 | Place value to 1.000; round to hundreds | place-value strips |
 | 33 | Column +/− to 1.000 (cijferen) with regrouping | column layout |
 | 34 | Estimate +/− and judge plausibility | rounding line |
-| 35 | Tables 6–9 added → **all tables to 10 automatic (eind groep 5)** | array / Gem Tree |
+| 35 | Tables 6–9 added → **all tables to 10 automatic (end off grade 5)** | array / Gem Tree |
 | 36 | Decimals in money (2 places): read, +/− | price tags |
 | 37 | ×/÷ informal beyond 20 (chunking) | array / repeated |
 | 38 | Fraction as part of a whole; place 1/2, 1/4 on a line | **Vine Heights** line |
 | 39 | mm/dm/km; herleiden (2 m 40 cm = 240 cm) | ruler / conversion |
 
-### Band 5 — Groep 6 (steps 40–47) · decimals, fractions, fluency  ▷ all worlds · ⭐ je dochter
+### Band 5 — Grade 6 (steps 40–47) · decimals, fractions, fluency  ▷ all worlds · ⭐ je dochter
 | # | Step | Model |
 |---|------|-------|
 | 40 | Numbers to ±100.000; order & round | place-value / line |
@@ -224,7 +223,7 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 46 | Compare fractions (**1/8 vs 1/4 trap**); equivalence intro | Vine Heights / pie |
 | 47 | Fraction of a quantity (2/3 of 300); 1/4 = 25% = 1 op 4 | bar / business |
 
-### Band 6 — Groep 7 (steps 48–55) · refinement, %, scale  ▷ Vine Heights, business
+### Band 6 — Grade 7 (steps 48–55) · refinement, %, scale  ▷ Vine Heights, business
 | # | Step | Model |
 |---|------|-------|
 | 48 | Numbers to ±1 miljoen; decimals to 2 places (precision/rounding) | place-value |
@@ -236,7 +235,7 @@ make-ten → derived facts, etc.) are drawn straight from the fact-fluency resea
 | 54 | Scale notation (1:100 → real length) | scaled drawing |
 | 55 | Area/perimeter reasoning; line graph from a table | grid / graph |
 
-### Band 7 — Groep 8 (steps 56–63) · integration, 1S, VO-ready  ▷ business, all worlds
+### Band 7 — Grade 8 (steps 56–63) · integration, 1S, VO-ready  ▷ business, all worlds
 | # | Step | Model |
 |---|------|-------|
 | 56 | Numbers to millions/billions; decimals to thousandths | place-value |
@@ -269,9 +268,9 @@ underneath.
 
 ```
 Step:  0 ......... 23 .......... 39 ...... 47 .......... 63
-A (groep 3 start)  ▓▓▓▓▓▓▒░·························        entry ~16, climbs slowly
-B (groep 6, jouw dochter) ✓✓✓✓✓✓✓▓▓▓▓▒░··········        entry ~40, gaps below auto-filled
-C (groep 8 start)  ✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓▓▓▓▓▒░               entry ~56, fast-confirm below
+A (grade 3 start)  ▓▓▓▓▓▓▒░·························        entry ~16, climbs slowly
+B (grade 6 start) ✓✓✓✓✓✓✓▓▓▓▓▒░··········        entry ~40, gaps below auto-filled
+C (grade 8 start)  ✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓✓▓▓▓▓▒░               entry ~56, fast-confirm below
 ```
 `▓` active practice · `▒░` stretch/edge · `✓` confirmed-by-compaction · `·` not yet
 
@@ -282,14 +281,14 @@ full practice loops.
 
 ### 4.2 Placement: where does a new child enter?
 
-1. **Age/groep → provisional Target band.** Groep 8 → Target band 7 (steps 56–63).
+1. **Age/grade → provisional Target band.** Grade 8 → Target band 7 (steps 56–63).
    This is the *floor's ceiling*, the level the engine is steering toward.
 2. **Warm-up probes the band below at the confirm target (~85%).** A short
    adaptive probe walks *down* from the Target band, not up from step 0, sampling
    one or two steps per band. As long as the child confirms, the engine marks
    those steps `compacted` and keeps descending only as far as it needs to find
    the **frontier** — the highest step that is *not* yet solid.
-3. **Practice starts at the frontier, not at the Target.** If a groep-8 child sails
+3. **Practice starts at the frontier, not at the Target.** If a grade-8 child sails
    through everything but stumbles on step 45 (fraction notation), the frontier is
    45: that's where ~65% active practice begins, with the Supporting steps below
    it confirmed and the Target steps above it visible as the goal.
@@ -312,15 +311,15 @@ full practice:
 - Compacted steps still resurface later through **Echo Doors / spaced review**, so
   "confirmed in 30 seconds during onboarding" doesn't mean "never seen again."
 
-The effect: a groep-8 starter experiences the **whole narrative** (every world
+The effect: a grade-8 starter experiences the **whole narrative** (every world
 unlocks, the grove is restored from gray) but spends their *real* effort at their
-actual edge. A groep-3 starter experiences the identical narrative at a slower
+actual edge. A grade-3 starter experiences the identical narrative at a slower
 climb. The story is invariant; only the pacing differs — which is precisely the
 "keep the story going whether started in grade 1 or the last grade" you asked for.
 
 ### 4.4 Why not just let the grade-8 child skip to step 56?
 
-Because math is sequentially scaffolded and the *most common* reason a groep-8
+Because math is sequentially scaffolded and the *most common* reason a grade-8
 child finds math stressful (Monkey Grove's stated audience) is unmastered
 *earlier* steps — a shaky 0,4-vs-0,12 (step 44) or 1/8-vs-1/4 (step 46) quietly
 breaks step 60 (unlike-denominator addition). Skipping straight to band 7 hides
@@ -378,8 +377,8 @@ ids as `legacyGroup` so the parent screen's historical coverage still reads.
 
 ## 6. Concrete recommendations
 
-1. **Adopt 64 steps as 8 bands × 8** (`groep = (step >> 3) + 1`). Clean math,
-   `u8`-friendly, ~8 levels-of-thinking per groep matching the fact-fluency
+1. **Adopt 64 steps as 8 bands × 8** (`grade = (step >> 3) + 1`). Clean math,
+   `u8`-friendly, ~8 levels-of-thinking per grade matching the fact-fluency
    staircases in the research.
 2. **Each step is a named level of thinking with its own visual model** — not a
    getal-grootte bucket. Reuse strategies vertically (bridging learned small,
@@ -390,9 +389,9 @@ ids as `legacyGroup` so the parent screen's historical coverage still reads.
 4. **Placement walks *down* from the age-Target band to the frontier**, not up
    from step 0. Practice begins at the frontier.
 5. **Compaction opens below-frontier steps on a single confirm**, demoting to real
-   practice only on a miss. This is what lets a groep-8 starter live the whole
+   practice only on a miss. This is what lets a grade-8 starter live the whole
    story without grinding — and what catches the hidden early gaps that actually
-   cause groep-8 stress.
+   cause grade-8 stress.
 6. **Keep the two misconception traps as first-class step fields:** decimal-length
    (step 44) and denominator-size (step 46). They are the highest-leverage "snap,
    don't memorise" moments and they silently break band-7 fraction work if missed.
@@ -437,6 +436,6 @@ ids as `legacyGroup` so the parent screen's historical coverage still reads.
   versie 2025; referentieniveaus 1F/1S).
 
 *Design synthesis for Monkey Grove `NL_PO`. Peildatum juni 2026. The step contents
-are grounded in the SLO per-groep curriculum; the ladder mechanics are grounded in
+are grounded in the SLO per-grade curriculum; the ladder mechanics are grounded in
 the learning-science sources above. Reconcile step names against the real
 `curriculum/` enum before shipping.*

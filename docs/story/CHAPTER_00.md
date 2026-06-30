@@ -67,7 +67,7 @@ around. It maps to the existing `placement.js` warm-up and the Explorer setup in
 
 - Mimi asks for a few **tiny number-quests** ("grab me two coconuts… now one more… how many?"). These
   are the warm-up probes that set the soft difficulty window (`below` / `on_track` / `ahead`).
-- The child's **age/curriculum floor** (`NL_PO` → Groep) is the lower bound; the warm-up may open the
+- The child's **age/curriculum floor** (`NL_PO` → Grade) is the lower bound; the warm-up may open the
   *upper* side of the window, never push below the floor.
 - **No score, no label sticks to the child.** The probes calibrate the engine, then dissolve into the
   story. (`mathengine.js` cold-start: the first ~8 problems per world ramp fast — "waking the sleepy

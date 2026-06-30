@@ -20,6 +20,12 @@ the seven files interlock into one hexagram. Read this first; then read the chap
 - **[CHAPTER_05 — The Sixty-Four Changes](CHAPTER_05.md)** · *Guà* · Vine Heights · fractions
 - **[CHAPTER_06 — The Four Roots](CHAPTER_06.md)** · *cosmic convergence* · the Festival, balance restored
 
+Beneath these seven narrative chapters runs the **[Tree of Learning](TREE_OF_LEARNING.md)** — the
+skill-progression layer: **10 learning nodes + 22 paths**, folded straight out of the 64 hexagrams
+(10 balanced King Wen pairs + 22 unbalanced) by the engine. It keeps the 7-chapter spine intact while
+carrying the *full* `NL_PO` curriculum, including the decimals / % / scale content the four worlds
+under-serve. The chapters are the journey; the Tree is the map of what was learned.
+
 ---
 
 ## 1. Why the Yijing is secretly a math curriculum

@@ -196,7 +196,7 @@ test('showParents renders translated curriculum coverage without exposing intern
     assert.match(currentHtml, /Country: Netherlands/);
     assert.match(currentHtml, /Learning path: Dutch primary math \(NL_PO\)/);
     assert.match(currentHtml, /Birthday: 2018-06-15/);
-    assert.match(currentHtml, /Stage: Groep 5/);
+    assert.match(currentHtml, /Stage: Grade 5/);
     assert.match(currentHtml, /Operations/);
     assert.match(currentHtml, /Add and subtract to 20 · covered/);
     assert.match(currentHtml, /Tables of 2, 5, and 10 · started/);
