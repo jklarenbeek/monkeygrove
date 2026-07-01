@@ -5,6 +5,7 @@ import { render, backBtn, esc, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { coverageForReport, getPack, listPacks } from '../curriculum/index.js';
 import { money, businessModeLabel } from './business.js';
+import { STAGE_MODES } from '../stage/data.js';
 import { parentWonders } from '../story/wonders.js';
 
 // The deeper "cohesion of nature" reveals (SUPER_PROMPT Phase 7) — a door, not a
@@ -64,11 +65,11 @@ function stageLabel(pack, stageId) {
   return stage ? t(stage.labelKey) : t(pack.fallbackStagePrefixKey || 'curriculum.stage', { n: '?' });
 }
 
-function curriculumCoverageHtml(profile, report, businessReport = null, showControls = false) {
+function curriculumCoverageHtml(profile, report, businessReport = null, stageReport = null, showControls = false) {
   if (!profile?.curriculum || !report) return '';
   const pack = getPack(profile.curriculum.packId);
   const packs = listPacks();
-  const coverage = coverageForReport(pack.id, report, { business: businessReport });
+  const coverage = coverageForReport(pack.id, report, { business: businessReport, stage: stageReport });
   const stage = profile.curriculum.confirmedStage || profile.curriculum.estimatedStage;
   const strictness = profile.curriculum.strictness || 'soft';
   return `
@@ -141,14 +142,34 @@ function parentBusinessHtml(businessReport) {
     </div>`;
 }
 
-export function showParents({ report, profile, businessReport = null, onClose, onCurriculumChange }) {
+// The music stage's per-song practice, mirroring the business panel — song titles with
+// a covered/started/ready pill each, so parents see Kiki's stage feeds real objectives.
+function parentStageHtml(stageReport) {
+  if (!stageReport) return '';
+  const modes = Object.entries(stageReport.modes || {});
+  if (!modes.some(([, mode]) => (mode.attempts || 0) > 0)) return '';
+  return `
+    <div class="card">
+      <h3>${esc(t('parents.stage_practice'))}</h3>
+      <div class="curriculum-objectives">
+        ${modes.map(([id, mode]) => {
+          const coverage = mode?.coverage || 'playable';
+          const label = t(STAGE_MODES[id]?.titleKey || 'stage.songs');
+          return `<span class="curriculum-pill ${esc(coverage)}">${esc(label)} · ${esc(t(`parents.${coverage}`))}</span>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+export function showParents({ report, profile, businessReport = null, stageReport = null, onClose, onCurriculumChange }) {
   const el = render(`
     ${backBtn()}
     <h2>${t('parents.title')}</h2>
     <div class="card"><p style="margin:0;font-size:15px;line-height:1.5">${t('parents.body')}</p></div>
     ${profile && report ? `
-    ${curriculumCoverageHtml(profile, report, businessReport, !!onCurriculumChange)}
+    ${curriculumCoverageHtml(profile, report, businessReport, stageReport, !!onCurriculumChange)}
     ${parentBusinessHtml(businessReport)}
+    ${parentStageHtml(stageReport)}
     <div class="card">
       <h3>${t('parents.skills')} — ${esc(profile.name)}</h3>
       ${Object.entries(report.worlds).map(([w, info]) => info.skills.filter((s) => s.n > 0).map((s) => `

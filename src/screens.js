@@ -14,5 +14,8 @@ export {
   showBusinessStock, showBusinessUpgrades,
 } from './screens/business.js';
 export { showBusinessDaySummary } from './screens/business-summary.js';
+export {
+  showStageSongs, showStageEcho, showStageCount, showStageBeat,
+} from './screens/stage.js';
 export { showParents, showParentProfileSelect } from './screens/parents.js';
 export { showResult } from './screens/result.js';

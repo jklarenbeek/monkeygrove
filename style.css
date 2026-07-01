@@ -703,6 +703,63 @@ html, body {
   gap: 12px;
 }
 
+/* music stage (Kiki's minigame) — reuses the business panel shell + .tile/.menu-row */
+.stage-feedback { background: #eef4ff; }
+
+.stage-pads {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 12px 0;
+}
+.stage-pad {
+  height: 84px;
+  border-radius: 18px;
+  border: 3px solid rgba(0, 0, 0, .12);
+  background: var(--pad);
+  filter: saturate(.85) brightness(.98);
+  transition: transform .1s, filter .1s, box-shadow .12s;
+  cursor: pointer;
+}
+.stage-pad:active { transform: scale(.95); }
+.stage-pad.lit { filter: saturate(1.3) brightness(1.18); box-shadow: 0 0 0 4px #fff, 0 0 18px var(--pad); transform: scale(1.03); }
+
+.stage-beats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.stage-beat {
+  min-width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 3px solid rgba(0, 0, 0, .12);
+  background: #fff;
+  font-weight: 900;
+  font-size: calc(16px * var(--text-scale));
+  cursor: pointer;
+}
+.stage-beat.equipped { border-color: var(--sun-deep); background: #fffbe8; box-shadow: 0 0 0 3px var(--sun); }
+
+.stage-bar {
+  height: 26px;
+  border-radius: 13px;
+  background: #eee;
+  overflow: hidden;
+  border: 2px solid rgba(0, 0, 0, .12);
+  margin: 10px 0 4px;
+}
+.stage-bar-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--leaf), var(--sun)); transition: width .18s; }
+
+.stage-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
 /* egg hatch overlay */
 #hatch-egg { font-size: calc(110px * var(--text-scale)); animation: egg-rock 0.5s ease-in-out infinite; cursor: pointer; }
 @keyframes egg-rock { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }

@@ -95,16 +95,10 @@ export const BALANCE = {
   businessOrdersPerDay: 4,
   businessMaxQueue: 3,
   businessBananaReward: [2, 4],
+  stageBananaReward: [2, 4],        // bananas per solved music-stage round
   bakeMs: 4500,                     // bake time for one oven; extra ovens bake faster
-  businessStartingStock: {
-    dough: 6,
-    sauce: 6,
-    cheese: 6,
-    tomato: 4,
-    flour: 6,
-    berries: 4,
-    milk: 4,
-  },
+  // Per-shop starting stock lives with each shop's (disjoint) ingredient set in
+  // src/business/data.js SHOPS — the bakery and pizzeria are independent economies.
 };
 
 export const RARITY_WEIGHTS = { common: 60, rare: 25, epic: 12, legendary: 3 };

@@ -4,95 +4,97 @@ import { Place } from '../chamber.js';
 import { makeCharacter, makeProp, makeTextSprite } from '../entities.js';
 import { PROPS, getCreature } from '../models.js';
 import { t } from '../i18n.js';
-import { BUSINESS_CUSTOMERS, RECIPES } from './data.js';
+import { BUSINESS_CUSTOMERS, RECIPES, shopById } from './data.js';
 
+// One cozy shop room. The bakery and the pizzeria are separate scenes now (each its
+// own hub build + independent economy), so a BusinessPlace renders exactly ONE shop —
+// whichever the child walked into — instead of the old confusing two-wing room.
 const BUSINESS_ROWS = [
-  '#####################',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#...................#',
-  '#####################',
+  '###############',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '###############',
 ];
 
-const STATION_NAMES = ['counter', 'prep', 'oven', 'pantry', 'coinTray', 'orderBoard'];
+// Station cells are shared by both shops (the room is identical); only the props,
+// storefront dressing, and residents differ per shop — that difference lives in ZONES.
+const STATIONS = {
+  counter: { x: 7, z: 3, prop: 'counter', height: 0.65 },
+  coinTray: { x: 10, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
+  orderBoard: { x: 11, z: 2, prop: 'orderBoard', height: 1.05 },
+  prep: { x: 4, z: 6, prop: 'prepBoard', height: 0.18 },
+  oven: { x: 8, z: 8, prop: 'oven', height: 0.95 },
+  pantry: { x: 3, z: 3, prop: 'shopTable', height: 0.38 },
+};
 
+const QUEUE = [{ x: 7, z: 10 }, { x: 6, z: 10 }, { x: 8, z: 10 }, { x: 5, z: 10 }];
+
+// Per-shop storefront: the sign title, the pantry prop, non-station set-dressing, and
+// the resident pets that make the shop feel lived-in. Bakery reuses dough bowl / basket
+// visuals; pizzeria reuses pizza pan / topping crate visuals.
 const ZONES = {
   bakery: {
     titleKey: 'business.zone.bakery',
-    sign: 'Bakery',
-    signX: 5,
-    signZ: 1,
+    pantryProp: 'shopTable',
     props: ['counter', 'prepBoard', 'doughBowl', 'basket', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
-    stations: {
-      counter: { x: 4, z: 3, prop: 'counter', height: 0.65 },
-      coinTray: { x: 7, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
-      orderBoard: { x: 9, z: 2, prop: 'orderBoard', height: 1.05 },
-      prep: { x: 4, z: 6, prop: 'prepBoard', height: 0.18 },
-      oven: { x: 7, z: 8, prop: 'oven', height: 0.95 },
-      pantry: { x: 2, z: 7, prop: 'shopTable', height: 0.38 },
-    },
-    queue: [{ x: 3, z: 10 }, { x: 4, z: 10 }, { x: 5, z: 10 }, { x: 6, z: 10 }],
-    // Full-size resident pets standing at the storefront — living set-dressing.
-    ambientPets: [{ id: 'piglet', x: 4, z: 11 }, { id: 'duckling', x: 7, z: 11 }],
+    decor: [
+      { key: 'doughBowl', x: 5, z: 5, targetH: 0.24, lift: 0.18 },
+      { key: 'basket', x: 3, z: 5, targetH: 0.34, dx: 0.1 },
+      { key: 'basket', x: 10, z: 5, targetH: 0.34, dx: -0.2 },
+    ],
+    ambientPets: [{ id: 'piglet', x: 6, z: 11 }, { id: 'duckling', x: 9, z: 11 }],
   },
   pizzeria: {
     titleKey: 'business.zone.pizzeria',
-    sign: 'Pizzeria',
-    signX: 15,
-    signZ: 1,
+    pantryProp: 'toppingCrate',
     props: ['counter', 'prepBoard', 'pizzaPan', 'toppingCrate', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
-    stations: {
-      counter: { x: 16, z: 3, prop: 'counter', height: 0.65 },
-      coinTray: { x: 13, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
-      orderBoard: { x: 11, z: 2, prop: 'orderBoard', height: 1.05 },
-      prep: { x: 16, z: 6, prop: 'prepBoard', height: 0.18 },
-      oven: { x: 13, z: 8, prop: 'oven', height: 0.95 },
-      pantry: { x: 18, z: 7, prop: 'toppingCrate', height: 0.46 },
-    },
-    queue: [{ x: 17, z: 10 }, { x: 16, z: 10 }, { x: 15, z: 10 }, { x: 14, z: 10 }],
-    ambientPets: [{ id: 'owl', x: 14, z: 11 }, { id: 'turtle', x: 16, z: 11 }],
+    decor: [
+      { key: 'pizzaPan', x: 5, z: 5, targetH: 0.18, lift: 0.18 },
+      { key: 'toppingCrate', x: 3, z: 5, targetH: 0.34 },
+      { key: 'pizzaPan', x: 10, z: 5, targetH: 0.18, lift: 0.18 },
+    ],
+    ambientPets: [{ id: 'owl', x: 6, z: 11 }, { id: 'turtle', x: 9, z: 11 }],
   },
 };
-
-const DECOR = [
-  { key: 'basket', zone: 'bakery', x: 2, z: 4, targetH: 0.34, dx: 0.1, dz: 0.15 },
-  { key: 'doughBowl', zone: 'bakery', x: 5, z: 6, targetH: 0.24, lift: 0.18 },
-  { key: 'basket', zone: 'bakery', x: 7, z: 4, targetH: 0.34, dx: -0.2 },
-  { key: 'shopTable', zone: 'bakery', x: 5, z: 8, targetH: 0.38 },
-  { key: 'pizzaPan', zone: 'pizzeria', x: 15, z: 6, targetH: 0.18, lift: 0.18 },
-  { key: 'toppingCrate', zone: 'pizzeria', x: 18, z: 5, targetH: 0.34 },
-  { key: 'pizzaPan', zone: 'pizzeria', x: 13, z: 4, targetH: 0.18, lift: 0.38 },
-  { key: 'shopTable', zone: 'pizzeria', x: 15, z: 8, targetH: 0.38 },
-];
 
 function propHeight(key, fallback) {
   return fallback ?? Math.min(0.75, PROPS[key].layers.length * 0.12);
 }
 
+// Deep copy the entered shop's station layout so per-place edits never mutate STATIONS.
+function cloneStations(pantryProp) {
+  const out = {};
+  for (const [name, def] of Object.entries(STATIONS)) {
+    out[name] = { ...def, prop: name === 'pantry' ? pantryProp : def.prop };
+  }
+  return out;
+}
+
 export class BusinessPlace extends Place {
   constructor(world, opts = {}) {
     super(world, 'hub');
+    this.shopId = shopById(opts.shopId).id;
+    this.zone = ZONES[this.shopId] || ZONES.bakery;
     this.buildFrom(BUSINESS_ROWS, { seed: opts.seed ?? 404 });
-    this.stations = {};
+    this.stations = cloneStations(this.zone.pantryProp);
+    this.activeStations = this.stations;
     this.stationMarkers = {};
-    this.miniGameZones = cloneZones();
     this.stationHits = [];
-    this.queueMarkers = this.miniGameZones.bakery.queue.map((spot) => ({ ...spot }));
-    this.activeMiniGame = 'bakery';
-    this.activeStations = this.miniGameZones.bakery.stations;
+    this.queueMarkers = QUEUE.map((spot) => ({ ...spot }));
     this.customers = [];
     this._customerEntities = new Set();
     this._textSprites = [];
-    this._placeZones();
-    this.setActiveRecipe(opts.recipeId || 'flatbread');
+    this._placeShop();
+    this.setActiveRecipe(opts.recipeId || null);
   }
 
   _disposeTextSprite(sprite) {
@@ -112,9 +114,7 @@ export class BusinessPlace extends Place {
 
   refreshLanguage() {
     for (const record of this._textSprites) {
-      const text = record.key.startsWith('zone:')
-        ? t(this.miniGameZones[record.key.slice(5)]?.titleKey)
-        : t(record.key);
+      const text = record.key === 'zone' ? t(this.zone.titleKey) : t(record.key);
       const next = makeTextSprite(text, record.opts);
       next.position.copy(record.position);
       this.group.add(next);
@@ -132,69 +132,46 @@ export class BusinessPlace extends Place {
     }
   }
 
-  _placeZones() {
-    for (const [zoneId, zone] of Object.entries(this.miniGameZones)) {
-      this._placeZone(zoneId, zone);
+  _placeShop() {
+    // shop sign over the counter
+    this._textSprite('zone', t(this.zone.titleKey), { bg: '#fff8ecdd', scale: 0.6, fontSize: 42 }, this.worldPos(7, 1, 1.2));
+    for (const [name, def] of Object.entries(this.stations)) {
+      this.stationHits.push({ name, x: def.x, z: def.z });
+      this.stationMarkers[name] = { ...def };
+      const cell = this.cellAt(def.x, def.z);
+      if (cell) cell.walk = false;
+      this._prop(def.prop, def.x, def.z, { targetH: propHeight(def.prop, def.height), lift: def.lift ?? 0 });
+      this._textSprite('business.station.' + name, t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
     }
-    this._placeSharedDecor();
+    for (const item of this.zone.decor) this._prop(item.key, item.x, item.z, item);
     this._placeAmbientPets();
-    this._activateStations('bakery');
   }
 
-  // Full-size resident pets standing at each storefront — pure set-dressing
-  // that makes the shop feel lived-in. Built once at construction (they persist
-  // across orders) from the full-body creature mesh, with a gentle idle bob.
+  // Full-size resident pets standing at the storefront — pure set-dressing that makes
+  // the shop feel lived-in (the resident who moved in with the build, plus a friend).
   // Their cells are blocked so the player never stands inside a resident.
   _placeAmbientPets() {
     this._ambientPets = [];
-    for (const zone of Object.values(this.miniGameZones)) {
-      for (const def of zone.ambientPets || []) {
-        const cell = this.cellAt(def.x, def.z);
-        if (!cell) continue;
-        const creature = getCreature(def.id);
-        const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
-        const p = this.worldPos(def.x, def.z);
-        mesh.position.copy(p);
-        mesh.rotation.y = Math.PI; // face out toward the counter/player
-        this.group.add(mesh);
-        cell.walk = false;
-        const baseY = p.y;
-        const bob = {
-          t: Math.random() * 4,
-          update: (dtMs) => {
-            bob.t += dtMs / 1000;
-            mesh.position.y = baseY + Math.abs(Math.sin(bob.t * 1.8)) * 0.05;
-          },
-        };
-        this.addEntity(bob);
-        this._ambientPets.push(mesh);
-      }
-    }
-  }
-
-  _placeZone(zoneId, zone) {
-    this._textSprite(`zone:${zoneId}`, t(zone.titleKey) || zone.sign, { bg: '#fff8ecdd', scale: 0.58, fontSize: 40 }, this.worldPos(zone.signX, zone.signZ, 1.2));
-
-    for (const [name, def] of Object.entries(zone.stations)) {
-      const station = { x: def.x, z: def.z };
-      this.stationHits.push({ name, zone: zoneId, ...station });
+    for (const def of this.zone.ambientPets || []) {
       const cell = this.cellAt(def.x, def.z);
-      if (cell) cell.walk = false;
-
-      this._prop(def.prop, def.x, def.z, {
-        targetH: propHeight(def.prop, def.height),
-        lift: def.lift ?? 0,
-      });
-
-      this._textSprite('business.station.' + name, t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
-    }
-  }
-
-  _placeSharedDecor() {
-    for (const item of DECOR) this._prop(item.key, item.x, item.z, item);
-    for (let z = 1; z < this.size.d - 1; z++) {
-      const cell = this.cellAt(10, z);
-      if (cell) this.tintCell(10, z, 0xf7e6b5);
+      if (!cell) continue;
+      const creature = getCreature(def.id);
+      const mesh = makeCharacter(creature.full, 0.62, null, 'creature:' + creature.id + ':f');
+      const p = this.worldPos(def.x, def.z);
+      mesh.position.copy(p);
+      mesh.rotation.y = Math.PI; // face out toward the counter/player
+      this.group.add(mesh);
+      cell.walk = false;
+      const baseY = p.y;
+      const bob = {
+        t: Math.random() * 4,
+        update: (dtMs) => {
+          bob.t += dtMs / 1000;
+          mesh.position.y = baseY + Math.abs(Math.sin(bob.t * 1.8)) * 0.05;
+        },
+      };
+      this.addEntity(bob);
+      this._ambientPets.push(mesh);
     }
   }
 
@@ -214,20 +191,12 @@ export class BusinessPlace extends Place {
     return null;
   }
 
-  _activateStations(kind) {
-    const zone = this.miniGameZones[kind] || this.miniGameZones.bakery;
-    this.activeMiniGame = kind in this.miniGameZones ? kind : 'bakery';
-    this.activeStations = zone.stations;
-    this.queueMarkers = zone.queue.map((spot) => ({ ...spot }));
-    for (const name of STATION_NAMES) {
-      this.stations[name] = { ...zone.stations[name] };
-      this.stationMarkers[name] = { ...zone.stations[name] };
-    }
-  }
-
+  // A bakery only ever bakes bakery recipes (and the pizzeria only pizza), so this just
+  // records the active recipe (for any prop highlight) — kept so the controller's order
+  // flow stays shop-agnostic. It never switches rooms the way the old two-wing scene did.
   setActiveRecipe(recipeId) {
-    const kind = RECIPES[recipeId]?.kind === 'pizza' ? 'pizzeria' : 'bakery';
-    this._activateStations(kind);
+    this.activeRecipe = RECIPES[recipeId] ? recipeId : null;
+    return this.shopId;
   }
 
   spawnCustomer(customerId, queueIndex = 0) {
@@ -289,20 +258,4 @@ export class BusinessPlace extends Place {
     this.entities = this.entities.filter((entity) => !this._customerEntities.has(entity));
     this._customerEntities.clear();
   }
-}
-
-function cloneZones() {
-  return Object.fromEntries(Object.entries(ZONES).map(([id, zone]) => [
-    id,
-    {
-      ...zone,
-      props: [...zone.props],
-      queue: zone.queue.map((spot) => ({ ...spot })),
-      ambientPets: (zone.ambientPets || []).map((spot) => ({ ...spot })),
-      stations: Object.fromEntries(Object.entries(zone.stations).map(([name, station]) => [
-        name,
-        { ...station },
-      ])),
-    },
-  ]));
 }

@@ -11,11 +11,12 @@ import {
 import {
   applyWarmupResult, eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
 } from './curriculum/placement.js';
-// ensureBusinessState is needed eagerly (state.js heals business state on load);
-// dailyBusinessReport feeds the parent dashboard. The heavy bakery/pizzeria sim
-// (BusinessPlace + BusinessController) is lazy-loaded in startBusiness(), so it
-// ships in its own `business-*` chunk the title/hub never download.
-import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
+// ensureShop resolves one shop's healed state eagerly; aggregateBusinessReport merges
+// both shops for the parent dashboard. The heavy bakery/pizzeria sim (BusinessPlace +
+// BusinessController) is lazy-loaded in startBusiness(), so it ships in its own
+// `business-*` chunk the title/hub never download.
+import { aggregateBusinessReport, ensureShop } from './business/engine.js';
+import { stageReport } from './stage/engine.js';
 import { isBuilt } from './island.js';
 import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine } from './story/engine.js';
 import { advanceMimiPhase } from './mimi.js';
@@ -74,7 +75,8 @@ class Game {
     this.talkCooldown = 0; // debounces bump-to-talk while keys are held
     this.hubWelcomed = false; // the hub greeting page shows once per session
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
-    this.business = null; // BusinessController, created when entering the shop
+    this.business = null; // BusinessController, created when entering a shop
+    this.stage = null; // StageController, created when entering the music stage
     this.lastHubEntry = null; // portal/build anchor used when returning from a scene
     this.transitioning = false; // blocks repeated gate/shop entry during transition
     this.avatar = new AvatarRig(this); // player monkey + pet mesh lifecycle (shared by scenes)
@@ -170,7 +172,8 @@ class Game {
     screens.showParents({
       report: p ? masteryReport(p.math, { now: Date.now() }) : null,
       profile: p,
-      businessReport: p?.business ? dailyBusinessReport(p.business) : null,
+      businessReport: p?.business ? aggregateBusinessReport(p) : null,
+      stageReport: p?.stage ? stageReport(p.stage) : null,
       onCurriculumChange: (patch) => {
         if (!p) return;
         const { birthDate, packId, ...rest } = patch;
@@ -367,6 +370,8 @@ class Game {
       this.chamber.refreshLanguage();
     } else if (this.mode === 'business') {
       this.business?.refreshLanguage?.();
+    } else if (this.mode === 'stage') {
+      this.stage?.refreshLanguage?.();
     } else if (this.mode === 'hub') {
       this.place?.refreshLanguage?.();
     }
@@ -489,25 +494,28 @@ class Game {
 
   // ---------- business ----------
 
-  startBusinessFromHub(buildId = 'bakery') {
-    this.lastHubEntry = { type: 'build', id: buildId };
+  startBusinessFromHub(shopId = 'bakery') {
+    this.lastHubEntry = { type: 'build', id: shopId };
+    this.pendingShopId = shopId;
     return this.transitionTo(() => this.startBusiness(), { kind: 'portal' });
   }
 
   async startBusiness() {
-    if (!isBuilt(this.profile, 'bakery')) return false;
+    // Which shop the child walked into (bakery / pizzeria) — set by startBusinessFromHub.
+    const shopId = this.pendingShopId || 'bakery';
+    if (!isBuilt(this.profile, shopId)) return false;
     this.mode = 'business';
     const token = ++this.flowToken;
-    // The bakery sim lives in a lazily-fetched `business-*` chunk. The caller's
+    // The shop sim lives in a lazily-fetched `business-*` chunk. The caller's
     // "Open shop" toast is the loading beat; on a slow connection the kid sees it
     // until the scene + controller arrive. If they navigate away mid-load (a newer
     // flow bumps flowToken), bail before touching any scene state.
     const { BusinessPlace, BusinessController } = await import('./business.js');
     if (token !== this.flowToken) return false;
-    this.business = new BusinessController(this);
+    this.business = new BusinessController(this, shopId);
     screens.closeScreen();
     this.clearPlace();
-    this.place = new BusinessPlace(this.world, { seed: 606 });
+    this.place = new BusinessPlace(this.world, { seed: 606, shopId });
     this.particles = new Particles(this.place.group);
     this.place.fx = this.particles;
     this.avatar.spawnAvatar();
@@ -526,9 +534,49 @@ class Game {
     hud.showHintButton(false);
     this.refreshHudCounts();
     audio.music('island');
-    const business = ensureBusinessState(this.profile);
+    const business = ensureShop(this.profile, shopId);
     if (business.activeOrder?.tasks?.length) this.business.resumeBusinessOrder(business);
     else this.business.startNextBusinessOrder();
+    return true;
+  }
+
+  // ---------- music stage ----------
+
+  startStageFromHub() {
+    this.lastHubEntry = { type: 'build', id: 'stage' };
+    return this.transitionTo(() => this.startStage(), { kind: 'portal' });
+  }
+
+  async startStage() {
+    if (!isBuilt(this.profile, 'stage')) return false;
+    this.mode = 'stage';
+    const token = ++this.flowToken;
+    // The stage sim lives in its own lazily-fetched `stage-*` chunk (like the shop).
+    const { StagePlace, StageController } = await import('./stage.js');
+    if (token !== this.flowToken) return false;
+    this.stage = new StageController(this);
+    screens.closeScreen();
+    this.clearPlace();
+    this.place = new StagePlace(this.world, { seed: 808 });
+    this.particles = new Particles(this.place.group);
+    this.place.fx = this.particles;
+    this.avatar.spawnAvatar();
+    const spawn = { x: 6, z: Math.max(1, this.place.size.d - 2) };
+    this.player.setPlace(this.place, spawn.x, spawn.z);
+    this.avatar.spawnPet(spawn);
+    this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);
+    this.player.onBump = (x, z) => this.stage.stageTap(x, z);
+    this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
+    this.world.defaultZoom = this.input.sceneZoom('hub');
+    this.world.frameBoard(this.place.center(), this.place.size.w, this.place.size.d, this.player.mesh);
+    hud.showHud(true);
+    hud.hideBanner();
+    hud.setAction(null);
+    hud.setVerbPanel(null);
+    hud.showHintButton(false);
+    this.refreshHudCounts();
+    audio.music('island');
+    this.stage.open();
     return true;
   }
 
@@ -557,6 +605,7 @@ class Game {
   inputTapCell(cell) {
     if (this.mode === 'hub' && this.hub.hubTap(cell.x, cell.z)) return;
     if (this.mode === 'business' && this.business?.businessTap(cell.x, cell.z)) return;
+    if (this.mode === 'stage' && this.stage?.stageTap(cell.x, cell.z)) return;
     if (this.helper && cell.x === this.helper.x && cell.z === this.helper.z) {
       this.chamber.helperTap();
       return;

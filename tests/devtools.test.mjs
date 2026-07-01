@@ -64,8 +64,9 @@ test('bakery_built makes the business playable and keeps later builds locked', (
   assert.deepEqual(profile.island.built, ['lanterns', 'fruitstand', 'garden', 'stage', 'bakery']);
   assert.equal(status.find((build) => build.id === 'bakery').state, 'built');
   assert.equal(status.find((build) => build.id === 'bridge').state, 'locked');
-  assert.equal(profile.business.stock.dough > 0, true);
-  assert.equal(profile.business.stock.flour > 0, true);
+  // both shops are independently stocked
+  assert.equal(profile.business.bakery.stock.flour > 0, true);
+  assert.equal(profile.business.pizzeria.stock.dough > 0, true);
 });
 
 test('festival_complete builds everything and reports a useful summary', () => {

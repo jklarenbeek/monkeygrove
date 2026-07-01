@@ -1,6 +1,6 @@
 import { beforeEach, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { BALANCE } from '../src/config.js';
+import { SHOPS } from '../src/business/data.js';
 
 function mockStorage() {
   const data = new Map();
@@ -24,18 +24,24 @@ beforeEach(() => {
   globalThis.localStorage = mockStorage();
 });
 
-test('new profiles include stocked business state', async () => {
+test('new profiles include two stocked, independent shops', async () => {
   const state = await freshStateModule();
 
   const profile = state.createProfile('Ari', { age: 8 });
 
-  assert.equal(profile.business.level, 1);
-  assert.equal(profile.business.shopCoins, 0);
-  assert.deepEqual(profile.business.stock, BALANCE.businessStartingStock);
-  assert.deepEqual(profile.business.progress, {});
+  // The business is now a container of two independent shops.
+  assert.deepEqual(Object.keys(profile.business).sort(), ['bakery', 'pizzeria']);
+  for (const id of ['bakery', 'pizzeria']) {
+    const shop = profile.business[id];
+    assert.equal(shop.id, id);
+    assert.equal(shop.level, 1);
+    assert.equal(shop.shopCoins, 0);
+    assert.deepEqual(shop.stock, SHOPS[id].startingStock);
+    assert.deepEqual(shop.progress, {});
+  }
 });
 
-test('old saves heal business state additively', async () => {
+test('old saves heal both shops additively', async () => {
   localStorage.setItem('monkeygrove.save', JSON.stringify({
     v: 1,
     profiles: [{ id: 'p1', name: 'Old', bananas: 12, created: 1 }],
@@ -48,21 +54,23 @@ test('old saves heal business state additively', async () => {
 
   assert.equal(profile.id, 'p1');
   assert.equal(profile.bananas, 12);
-  assert.equal(profile.business.level, 1);
-  assert.equal(profile.business.shopCoins, 0);
-  assert.deepEqual(profile.business.stock, BALANCE.businessStartingStock);
+  assert.equal(profile.business.bakery.level, 1);
+  assert.equal(profile.business.bakery.shopCoins, 0);
+  assert.deepEqual(profile.business.bakery.stock, SHOPS.bakery.startingStock);
+  assert.deepEqual(profile.business.pizzeria.stock, SHOPS.pizzeria.startingStock);
 });
 
-test('partial business saves preserve values and heal missing stock keys', async () => {
+test('a pre-split flat business migrates into the bakery, seeding a fresh pizzeria', async () => {
+  // v2 and earlier stored one flat shop; the v2->v3 step wraps it as the bakery.
   localStorage.setItem('monkeygrove.save', JSON.stringify({
-    v: 1,
+    v: 2,
     profiles: [{
       id: 'p1',
       name: 'Partial',
       created: 1,
       business: {
         shopCoins: 555,
-        stock: { dough: 2 },
+        stock: { flour: 2 },
         progress: {
           money_make_amounts: { attempts: 4, correct: 3 },
         },
@@ -75,13 +83,17 @@ test('partial business saves preserve values and heal missing stock keys', async
   const state = await freshStateModule();
   const profile = state.activeProfile();
 
-  assert.equal(profile.business.shopCoins, 555);
-  assert.equal(profile.business.stock.dough, 2);
-  assert.equal(profile.business.stock.sauce, BALANCE.businessStartingStock.sauce);
-  assert.equal(profile.business.stock.cheese, BALANCE.businessStartingStock.cheese);
-  assert.deepEqual(profile.business.progress, {
+  // the old flat shop is now the bakery: coins + progress preserved, stock healed
+  assert.equal(profile.business.bakery.shopCoins, 555);
+  assert.equal(profile.business.bakery.stock.flour, 2);
+  assert.equal(profile.business.bakery.stock.berries, SHOPS.bakery.startingStock.berries);
+  assert.equal(profile.business.bakery.stock.milk, SHOPS.bakery.startingStock.milk);
+  assert.deepEqual(profile.business.bakery.progress, {
     money_make_amounts: { attempts: 4, correct: 3 },
   });
-  assert.equal(profile.business.level, 1);
-  assert.equal(profile.business.currentDay, 1);
+  assert.equal(profile.business.bakery.level, 1);
+  assert.equal(profile.business.bakery.currentDay, 1);
+  // and a fresh pizzeria appears beside it
+  assert.deepEqual(profile.business.pizzeria.stock, SHOPS.pizzeria.startingStock);
+  assert.deepEqual(profile.business.pizzeria.progress, {});
 });

@@ -2,8 +2,8 @@ import { createMathState, SKILLS } from './mathengine.js';
 import { BUILDS, freshIsland } from './island.js';
 import { getPack } from './curriculum/index.js';
 import { createCurriculumState } from './curriculum/placement.js';
-import { BALANCE } from './config.js';
 import { ensureBusinessState } from './business/engine.js';
+import { SHOPS } from './business/data.js';
 import { CREATURES, CHARS, HATS, PROPS, AMBIENT } from './models.js';
 import { voxelSvg } from './voxelsvg.js';
 
@@ -250,10 +250,11 @@ function setBuilt(profile, ids) {
 
 function stockBusiness(profile) {
   const business = ensureBusinessState(profile);
-  business.stock = Object.fromEntries(
-    Object.keys(BALANCE.businessStartingStock).map((key) => [key, 20]),
-  );
-  business.stockLimit = Math.max(business.stockLimit || 0, 20);
+  // Fill each shop's own (disjoint) ingredient set to a comfortable level.
+  for (const [id, shop] of Object.entries(business)) {
+    shop.stock = Object.fromEntries(SHOPS[id].ingredientIds.map((key) => [key, 20]));
+    shop.stockLimit = Math.max(shop.stockLimit || 0, 20);
+  }
   return business;
 }
 
@@ -284,8 +285,8 @@ function applyGrade8Business(profile) {
   applyBakeryBuilt(profile);
   ensureBasics(profile, 'grade_8');
   setMastery(profile, { tide: 8, garden: 5, stump: 4, vines: 2 });
-  stockBusiness(profile);
-  profile.business.shopCoins = Math.max(profile.business.shopCoins || 0, 2500);
+  const shops = stockBusiness(profile);
+  for (const shop of Object.values(shops)) shop.shopCoins = Math.max(shop.shopCoins || 0, 2500);
   profile.bananas = Math.max(profile.bananas || 0, 1200);
   return profile;
 }

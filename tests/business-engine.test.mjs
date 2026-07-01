@@ -14,9 +14,9 @@ import {
   bakeDurationMs,
   buyUpgrade,
   completeOrder,
-  createBusinessState,
+  createShopState,
   dailyBusinessReport,
-  ensureBusinessState,
+  ensureShop,
   nextBusinessOrder,
   nextBusinessReview,
   orderIsMakeable,
@@ -34,7 +34,7 @@ test('business data reuses the four helper customers', () => {
 });
 
 test('fresh business state is local, gentle, and stocked for first orders', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   assert.equal(state.level, 1);
   assert.equal(state.shopCoins, 0);
   assert.deepEqual(state.upgrades, []);
@@ -72,7 +72,7 @@ test('classifyBusinessMiss tags forgetting to scale a recipe', () => {
 });
 
 test('a wrong payment surfaces its misconception tag, not just a false total', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const task = {
     id: 'o1:pay:discount', kind: 'payment', mode: 'percentage_discount',
     objectiveId: 'nl_po.grade7.percentages_intro',
@@ -89,7 +89,7 @@ test('a wrong payment surfaces its misconception tag, not just a false total', (
 
 test('order generation chooses stage-appropriate tasks from curriculum', () => {
   const curriculum = createCurriculumState({ age: 8 });
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = nextBusinessOrder(state, curriculum, { rng: new Rng(123) });
 
   assert.ok(CUSTOMER_IDS.includes(order.customerId));
@@ -102,7 +102,7 @@ test('order generation chooses stage-appropriate tasks from curriculum', () => {
 
 test('orders never carry a task the serve flow cannot complete', () => {
   const curriculum = createCurriculumState({ age: 11 }); // grade 8 — the old inert-task case
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   for (let i = 0; i < 12; i++) {
     const order = nextBusinessOrder(state, curriculum, { rng: new Rng(`order-${i}`) });
     for (const task of order.tasks) {
@@ -113,7 +113,7 @@ test('orders never carry a task the serve flow cannot complete', () => {
 });
 
 test('extra ovens bake faster (the extra_oven upgrade has a real effect)', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const oneOven = bakeDurationMs(state);
   assert.ok(oneOven > 0, 'a single oven has a positive bake time');
 
@@ -127,7 +127,7 @@ test('extra ovens bake faster (the extra_oven upgrade has a real effect)', () =>
 
 test('the shop can never soft-lock: a broke, empty shop still gets makeable orders', () => {
   const curriculum = createCurriculumState({ age: 11 }); // grade 8 — biggest quantities
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   for (let i = 0; i < 60; i++) {
     state.stock = {};     // worst case: nothing on the shelves
     state.shopCoins = 0;  // and no coins to restock with
@@ -140,7 +140,7 @@ test('the shop can never soft-lock: a broke, empty shop still gets makeable orde
 
 test('a stocked shop earns its own restocks — no free supply needed', () => {
   const curriculum = createCurriculumState({ age: 8 });
-  const state = createBusinessState(); // starting stock, 0 coins
+  const state = createShopState('pizzeria'); // starting stock, 0 coins
   const order = nextBusinessOrder(state, curriculum, { rng: new Rng('econ-1') });
   assert.equal(order.supplied, false, 'a freshly stocked shop is not handed free crates');
   assert.ok(orderIsMakeable(state, order));
@@ -154,7 +154,7 @@ test('a stocked shop earns its own restocks — no free supply needed', () => {
 
 test('non-order modes surface as a graded end-of-day review (grade 6 and up)', () => {
   const curriculum = createCurriculumState({ age: 11 }); // grade 8 -> all four review modes
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   state.day = {
     ordersServed: 3, revenueCents: 1350, costCents: 420, profitCents: 930, wasteCents: 0,
     demand: { flatbread: 2, margherita: 1 },
@@ -180,10 +180,10 @@ test('non-order modes surface as a graded end-of-day review (grade 6 and up)', (
 
 test('younger graders get no review modes, and summary modes need a played day', () => {
   const young = createCurriculumState({ age: 8 }); // grade 5 -> review modes are grade 6+
-  assert.deepEqual(nextBusinessReview(createBusinessState(), young, { rng: new Rng(1) }), []);
+  assert.deepEqual(nextBusinessReview(createShopState('pizzeria'), young, { rng: new Rng(1) }), []);
 
   const g8 = createCurriculumState({ age: 11 });
-  const modes = nextBusinessReview(createBusinessState(), g8, { rng: new Rng(1) }).map((t) => t.mode);
+  const modes = nextBusinessReview(createShopState('pizzeria'), g8, { rng: new Rng(1) }).map((t) => t.mode);
   assert.ok(modes.includes('unit_conversion_stock'), 'synthetic stock question always available');
   assert.ok(modes.includes('price_compare'), 'synthetic deal question always available');
   assert.ok(!modes.includes('profit_margin'), 'profit needs a played day');
@@ -192,12 +192,8 @@ test('younger graders get no review modes, and summary modes need a played day',
 
 test('order generation filters recipes by the generated quantity stock', () => {
   const curriculum = createCurriculumState({ age: 8 });
-  const state = createBusinessState();
+  const state = createShopState('bakery'); // bakery sells flatbread + berry tart
   state.stock = {
-    dough: 1,
-    sauce: 1,
-    cheese: 1,
-    tomato: 0,
     flour: 4,
     berries: 0,
     milk: 2,
@@ -220,7 +216,7 @@ test('order generation filters recipes by the generated quantity stock', () => {
 });
 
 test('prep actions consume stock only on correct completion', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = {
     id: 'o-test',
     recipeId: 'margherita',
@@ -248,7 +244,7 @@ test('prep actions consume stock only on correct completion', () => {
 });
 
 test('prep actions refuse correct completion when recipe stock is insufficient', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   state.stock.dough = 1;
   state.stock.sauce = 1;
   state.stock.cheese = 1;
@@ -278,7 +274,7 @@ test('prep actions refuse correct completion when recipe stock is insufficient',
 });
 
 test('payment action accepts exact payment and correct change', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = {
     id: 'o-pay',
     recipeId: 'flatbread',
@@ -300,7 +296,7 @@ test('payment action accepts exact payment and correct change', () => {
 });
 
 test('completeOrder records profit, business progress, and no-loss retries', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = {
     id: 'o-done',
     recipeId: 'margherita',
@@ -331,7 +327,7 @@ test('completeOrder records profit, business progress, and no-loss retries', () 
 });
 
 test('completeOrder does not double-count attempts already recorded by actions', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = {
     id: 'o-action-recorded',
     recipeId: 'flatbread',
@@ -356,7 +352,7 @@ test('completeOrder does not double-count attempts already recorded by actions',
 });
 
 test('completeOrder records unevaluated completion attempts once', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   const order = {
     id: 'o-unevaluated',
     recipeId: 'flatbread',
@@ -379,14 +375,14 @@ test('completeOrder records unevaluated completion attempts once', () => {
 });
 
 test('restock and upgrades spend only shop coins and never create debt', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   assert.equal(restockIngredient(state, 'dough', 10).ok, false);
   assert.equal(state.shopCoins, 0);
 
   state.shopCoins = 1000;
   const restocked = restockIngredient(state, 'dough', 5);
   assert.equal(restocked.ok, true);
-  assert.equal(state.stock.dough, createBusinessState().stock.dough + 5);
+  assert.equal(state.stock.dough, createShopState('pizzeria').stock.dough + 5);
 
   const upgraded = buyUpgrade(state, 'extra_oven');
   assert.equal(upgraded.ok, true);
@@ -395,7 +391,7 @@ test('restock and upgrades spend only shop coins and never create debt', () => {
 });
 
 test('restock buys the affordable shelf-room quantity before rejecting', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   state.stockLimit = state.stock.dough + 1;
   state.shopCoins = INGREDIENTS.dough.unitCostCents;
 
@@ -408,16 +404,18 @@ test('restock buys the affordable shelf-room quantity before rejecting', () => {
   assert.equal(state.shopCoins, 0);
 });
 
-test('ensureBusinessState heals partial day fields without losing existing counters', () => {
+test('ensureShop heals partial day fields without losing existing counters', () => {
   const profile = {
     business: {
-      day: {
-        ordersServed: 2,
+      bakery: {
+        day: {
+          ordersServed: 2,
+        },
       },
     },
   };
 
-  const business = ensureBusinessState(profile);
+  const business = ensureShop(profile, 'bakery');
   completeOrder(business, {
     id: 'o-heal',
     recipeId: 'flatbread',
@@ -436,7 +434,7 @@ test('ensureBusinessState heals partial day fields without losing existing count
 });
 
 test('dailyBusinessReport summarizes demand, profit, and modes', () => {
-  const state = createBusinessState();
+  const state = createShopState('pizzeria');
   state.day.ordersServed = 3;
   state.day.revenueCents = 1500;
   state.day.costCents = 600;

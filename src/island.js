@@ -30,6 +30,10 @@ export const BUILDS = [
     npc: { pet: 'piglet', face: '🐷' },
     perk: { kind: 'egg', n: 3 },
   },
+  {
+    id: 'pizzeria', char: 'z', cost: 175, points: 2.7, emoji: '🍕',
+    npc: { pet: 'owl', face: '🦉' },
+  },
   { id: 'bridge', char: 'b', cost: 200, points: 3.0, emoji: '🌉' },
   {
     id: 'plaza', char: 'j', cost: 500, contribution: 250, points: 3.4,

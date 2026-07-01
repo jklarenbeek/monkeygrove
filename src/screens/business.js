@@ -7,7 +7,7 @@ import { render, backBtn, esc } from './core.js';
 import { t } from '../i18n.js';
 import { settings } from '../state.js';
 import { getPack } from '../curriculum/index.js';
-import { BUSINESS_MODES, INGREDIENTS, RECIPES, UPGRADES } from '../business/data.js';
+import { BUSINESS_MODES, INGREDIENTS, RECIPES, UPGRADES, shopById } from '../business/data.js';
 
 export function money(cents) {
   const amount = (Number(cents || 0) / 100).toFixed(2);
@@ -345,14 +345,16 @@ export function showBusinessPayment({ task, onSubmit, onClose }) {
   wireBusinessPanel(el, { task, view, action, doneId: 'business-payment-done', onSubmit, onClose });
 }
 
-export function showBusinessStock({ business, onRestock, onClose }) {
+export function showBusinessStock({ business, shopId, onRestock, onClose }) {
   const limit = Math.max(1, business.stockLimit || 1);
+  // Show only THIS shop's (disjoint) ingredient set — the bakery never lists dough.
+  const ingredients = shopById(shopId || business.id).ingredientIds.map((id) => INGREDIENTS[id]);
   const el = render(`
     ${backBtn()}
     <h2>${t('business.stock')}</h2>
     <div class="chip">${t('business.profit')}: ${money(business.shopCoins)}</div>
     <div class="card">
-      ${Object.values(INGREDIENTS).map((ing) => {
+      ${ingredients.map((ing) => {
         const count = business.stock[ing.id] || 0;
         return `
           <div class="skill-row">

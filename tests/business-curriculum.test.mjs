@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { coverageForReport, getPack, listObjectives } from '../src/curriculum/index.js';
 import { BUSINESS_MODES } from '../src/business/data.js';
-import { createBusinessState, dailyBusinessReport } from '../src/business/engine.js';
+import { createShopState, dailyBusinessReport } from '../src/business/engine.js';
 
 function assertBusinessModesKnown(objectives) {
   const modeIds = new Set(Object.keys(BUSINESS_MODES));
@@ -35,7 +35,7 @@ test('business-covered objectives have businessModes metadata', () => {
 });
 
 test('coverageForReport includes business progress beside math skills', () => {
-  const business = createBusinessState();
+  const business = createShopState('bakery');
   business.progress.money_make_amounts = { attempts: 4, correct: 4 };
   business.progress.recipe_measure_whole = { attempts: 2, correct: 1 };
   const coverage = coverageForReport('NL_PO', { worlds: {} }, {
@@ -51,7 +51,7 @@ test('coverageForReport includes business progress beside math skills', () => {
 });
 
 test('covered math skills stay covered when business progress is partial', () => {
-  const business = createBusinessState();
+  const business = createShopState('bakery');
   business.progress.repeated_addition_orders = { attempts: 1, correct: 0 };
   const coverage = coverageForReport('NL_PO', {
     worlds: {

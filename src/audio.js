@@ -647,6 +647,14 @@ export const audio = {
     if (i >= 4) tone({ freq: hz(ladder[i]) * 4, t: t + 0.04, dur: 0.18, gain: 0.05 });
   },
 
+  // A single music-stage pad note (Echo Song): pads 0..3 map to a warm major triad +
+  // octave (C E G C), so any pattern Kiki plays or the child echoes back sounds nice.
+  pad(i) {
+    if (!ctx || !sfxOn) return;
+    const scale = [60, 64, 67, 72];
+    marimba(hz(scale[((i | 0) % scale.length + scale.length) % scale.length]), ctx.currentTime, 0.4, 0.6);
+  },
+
   music(name) {
     requestedMusic = name;
     if (!ctx || !musicOn) return;

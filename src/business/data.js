@@ -1,3 +1,10 @@
+// The bakery and the pizzeria are two SEPARATE shops now (each its own hub build,
+// scene, and independent economy) — no longer two wings of one confusing room. A
+// shop owns a recipe kind, a disjoint ingredient set, its own starting stock, the
+// resident who runs it, and the storefront visuals. Everything shop-specific lives
+// here so the engine/scene/controller can stay shop-agnostic and just read SHOPS[id].
+export const SHOP_IDS = ['bakery', 'pizzeria'];
+
 export const CUSTOMER_IDS = ['turtle', 'bunny', 'duckling', 'owl'];
 
 export const BUSINESS_CUSTOMERS = {
@@ -174,3 +181,36 @@ export const UPGRADES = {
     objectiveId: 'nl_po.grade8.advanced_data_reasoning',
   },
 };
+
+// The two shops. Ingredient sets are deliberately disjoint so each shop is a real,
+// self-contained economy (its own stock, coins, and upgrades). recipeKind matches
+// RECIPES[*].kind. resident is the friend who moves in with the build (island.js);
+// their `pet` id reuses an existing creature mesh. Storefront props/queue live on
+// the scene ZONES, keyed by the same id.
+export const SHOPS = {
+  bakery: {
+    id: 'bakery',
+    recipeKind: 'bakery',
+    titleKey: 'business.zone.bakery',
+    ingredientIds: ['flour', 'berries', 'milk'],
+    startingStock: { flour: 6, berries: 4, milk: 4 },
+    resident: { pet: 'piglet', face: '🐷', nameKey: 'npc.bakery' },
+  },
+  pizzeria: {
+    id: 'pizzeria',
+    recipeKind: 'pizza',
+    titleKey: 'business.zone.pizzeria',
+    ingredientIds: ['dough', 'sauce', 'cheese', 'tomato'],
+    startingStock: { dough: 6, sauce: 6, cheese: 6, tomato: 4 },
+    resident: { pet: 'owl', face: '🦉', nameKey: 'npc.pizzeria' },
+  },
+};
+
+export const shopById = (id) => SHOPS[id] || SHOPS.bakery;
+
+// Which shop a recipe belongs to (bakery bakes 'bakery' kind, pizzeria bakes 'pizza').
+export const shopForRecipe = (recipeId) => (RECIPES[recipeId]?.kind === 'pizza' ? 'pizzeria' : 'bakery');
+
+// Recipes a given shop sells, in declaration order.
+export const recipesForShop = (shopId) =>
+  Object.values(RECIPES).filter((recipe) => recipe.kind === shopById(shopId).recipeKind);

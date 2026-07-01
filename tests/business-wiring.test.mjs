@@ -172,40 +172,34 @@ test('BusinessPlace builds unwalkable stations and finds stations by nearby grid
   assert.equal(place.stationAt(0, 0), null);
 });
 
-test('BusinessPlace separates bakery and pizzeria into visible mini-game zones', async () => {
+test('each shop renders only its own storefront (bakery vs pizzeria)', async () => {
   const { BusinessPlace } = await import(/* @vite-ignore */ `../src/business/scene.js?zones=${Date.now()}${Math.random()}`);
-  const place = new BusinessPlace(fakeWorld());
+  const bakery = new BusinessPlace(fakeWorld(), { shopId: 'bakery' });
+  const pizzeria = new BusinessPlace(fakeWorld(), { shopId: 'pizzeria' });
 
-  assert.deepEqual(Object.keys(place.miniGameZones).sort(), ['bakery', 'pizzeria']);
-  assert.equal(place.miniGameZones.bakery.titleKey, 'business.zone.bakery');
-  assert.equal(place.miniGameZones.pizzeria.titleKey, 'business.zone.pizzeria');
-  assert.ok(place.miniGameZones.bakery.stations.prep.x < place.miniGameZones.pizzeria.stations.prep.x,
-    'bakery prep is visually in the left wing and pizzeria prep in the right wing');
-  assert.ok(place.miniGameZones.bakery.props.includes('doughBowl'), 'bakery wing reuses dough bowl visuals');
-  assert.ok(place.miniGameZones.bakery.props.includes('basket'), 'bakery wing reuses bread/basket display visuals');
-  assert.ok(place.miniGameZones.pizzeria.props.includes('pizzaPan'), 'pizzeria wing reuses pizza pan visuals');
-  assert.ok(place.miniGameZones.pizzeria.props.includes('toppingCrate'), 'pizzeria wing reuses topping crate visuals');
-  assert.equal(place.stationAt(
-    place.miniGameZones.bakery.stations.prep.x,
-    place.miniGameZones.bakery.stations.prep.z,
-  ), 'prep');
-  assert.equal(place.stationAt(
-    place.miniGameZones.pizzeria.stations.prep.x,
-    place.miniGameZones.pizzeria.stations.prep.z,
-  ), 'prep');
+  assert.equal(bakery.shopId, 'bakery');
+  assert.equal(pizzeria.shopId, 'pizzeria');
+  assert.equal(bakery.zone.titleKey, 'business.zone.bakery');
+  assert.equal(pizzeria.zone.titleKey, 'business.zone.pizzeria');
+  // each shop dresses its storefront with only its own recipe-kind visuals
+  assert.ok(bakery.zone.props.includes('doughBowl'), 'bakery reuses dough bowl visuals');
+  assert.ok(bakery.zone.props.includes('basket'), 'bakery reuses bread/basket display visuals');
+  assert.ok(pizzeria.zone.props.includes('pizzaPan'), 'pizzeria reuses pizza pan visuals');
+  assert.ok(pizzeria.zone.props.includes('toppingCrate'), 'pizzeria reuses topping crate visuals');
+  // both shops share the same cozy room layout, so their station cells resolve in each
+  assert.equal(bakery.stationAt(bakery.stations.prep.x, bakery.stations.prep.z), 'prep');
+  assert.equal(pizzeria.stationAt(pizzeria.stations.oven.x, pizzeria.stations.oven.z), 'oven');
 });
 
-test('BusinessPlace can move the active order focus between bakery and pizzeria wings', async () => {
+test('a shop scene stays its own shop — setActiveRecipe never switches rooms', async () => {
   const { BusinessPlace } = await import(/* @vite-ignore */ `../src/business/scene.js?activeZone=${Date.now()}${Math.random()}`);
-  const place = new BusinessPlace(fakeWorld());
+  const bakery = new BusinessPlace(fakeWorld(), { shopId: 'bakery' });
+  assert.equal(bakery.setActiveRecipe('flatbread'), 'bakery');
+  assert.equal(bakery.shopId, 'bakery', 'the bakery stays the bakery');
 
-  place.setActiveRecipe('flatbread');
-  assert.equal(place.activeMiniGame, 'bakery');
-  assert.deepEqual(place.activeStations.prep, place.miniGameZones.bakery.stations.prep);
-
-  place.setActiveRecipe('margherita');
-  assert.equal(place.activeMiniGame, 'pizzeria');
-  assert.deepEqual(place.activeStations.prep, place.miniGameZones.pizzeria.stations.prep);
+  const pizzeria = new BusinessPlace(fakeWorld(), { shopId: 'pizzeria' });
+  assert.equal(pizzeria.setActiveRecipe('margherita'), 'pizzeria');
+  assert.equal(pizzeria.shopId, 'pizzeria', 'the pizzeria stays the pizzeria');
 });
 
 test('spawnCustomer creates labeled bobbing helper customers in queue order and clearCustomers removes them', async () => {
@@ -250,8 +244,9 @@ test('future main business runtime wiring is declared', () => {
   for (const name of ['startBusiness', 'businessTap', 'endBusinessDay']) {
     assert.ok(source.includes(name), `src/main.js includes ${name}`);
   }
-  assert.ok(source.includes("isBuilt(this.profile, 'bakery')"), 'bakery entry is gated by built island state');
-  assert.ok(source.includes("'business.open'"), 'bakery entry announces the shop opening');
+  assert.ok(source.includes('isBuilt(this.profile, shopId)'), 'shop entry is gated by built island state');
+  assert.ok(source.includes("build.id === 'pizzeria'"), 'the pizzeria is a separate shop entry from the bakery');
+  assert.ok(source.includes("'business.open'"), 'shop entry announces the shop opening');
 });
 
 test('business runtime resumes unfinished active orders before generating a new one', () => {

@@ -7,7 +7,7 @@ import { TEMPLATES, parseLayout, varyLayout, HOST_LIMITS } from '../src/chamber.
 import { SOLID_MARKERS, OCCUPIED_MARKERS } from '../src/config.js';
 import { Rng } from '../src/rng.js';
 
-const KNOWN = new Set('#.,12PAspcDdoBmVMTONtguylfehkbjw'.split(''));
+const KNOWN = new Set('#.,12PAspcDdoBmVMTONtguylfehkbjzw'.split(''));
 
 function eachTemplate(fn) {
   for (const [kind, list] of Object.entries(TEMPLATES)) {

@@ -10,7 +10,8 @@
 //   V  vine-bridge tile (numberline)   M  helper spot (mimi in the hub,
 //   a friendly pet NPC in chambers)
 //   hub only: T gem tree, O shop stand, N egg nest, t/g/u/y world portals,
-//   l/f/e/h/k/b/j island build plots (island.js BUILDS), w bridge-gap water
+//   l/f/e/h/k/z/b/j island build plots (island.js BUILDS; k bakery, z pizzeria),
+//   w bridge-gap water
 //   (becomes 'V' planks once the bridge is built, '#' before — island.js)
 import * as THREE from 'three';
 import { TILE, STEP_H, PALETTE, WORLD_THEME, MARKERS, FLOOR_CHARS } from './config.js';
@@ -66,7 +67,7 @@ export function ensureHostable(problem, math, opts = {}) {
   return p;
 }
 
-const MARKER_CHARS = 'PAspcDdoBmVMTON tguy lfehkbj'.replace(/ /g, '');
+const MARKER_CHARS = 'PAspcDdoBmVMTON tguy lfehkbjz'.replace(/ /g, '');
 const HEIGHTS = { '.': 0, ',': 0, 1: 1, 2: 2 };
 
 // Seeded per-chamber variation so no two boards look alike: random mirror
@@ -551,7 +552,7 @@ export const TEMPLATES = {
       '#......................##......#',
       '#...O.......P......d...###....##',
       '#.................e....#########',
-      '#.d..k..d....,,....d...#########',
+      '#.d..k..d.z..,,....d...#########',
       '##..u...........y....###########',
       '###,....dd.....d..,#############',
       '################################',
@@ -839,6 +840,11 @@ export class HubPlace extends Place {
     } else if (def.id === 'bakery') {
       this._prop('oven', 1.0, x, z);
       this._prop('basket', 0.3, x, z, 0.7, 0.35);
+      block(x, z);
+    } else if (def.id === 'pizzeria') {
+      this._prop('oven', 1.0, x, z);
+      this._prop('pizzaPan', 0.3, x, z, 0.72, 0.35);
+      this._prop('toppingCrate', 0.3, x, z, -0.7, 0.3);
       block(x, z);
     } else if (def.id === 'plaza') {
       this._prop('portal', 1.7, x, z);

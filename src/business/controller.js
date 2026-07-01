@@ -10,7 +10,7 @@ import { audio } from '../audio.js';
 import { persist, persistNow, addBananas } from '../state.js';
 import { Rng } from '../rng.js';
 import { BALANCE } from '../config.js';
-import { BUSINESS_CUSTOMERS } from './data.js';
+import { BUSINESS_CUSTOMERS, shopById } from './data.js';
 import { nextWonderFor } from '../story/wonders.js';
 import {
   applyPaymentAction,
@@ -20,7 +20,7 @@ import {
   buyUpgrade,
   completeOrder,
   dailyBusinessReport,
-  ensureBusinessState,
+  ensureShop,
   ensureOrderMakeable,
   nextBusinessOrder,
   nextBusinessReview,
@@ -28,8 +28,10 @@ import {
 } from './engine.js';
 
 export class BusinessController {
-  constructor(game) {
+  // Each controller drives ONE shop (bakery or pizzeria) — its own independent economy.
+  constructor(game, shopId = 'bakery') {
     this.game = game;
+    this.shopId = shopById(shopId).id;
     this.businessAttempts = [];
     this.businessCustomer = null;
     // Bake step: each order's dish must bake in the oven before it can be served.
@@ -37,6 +39,11 @@ export class BusinessController {
     this.bakeTimer = 0;      // ms remaining
     this.bakeSteam = 0;      // ms until the next steam puff
     this.bakeTicker = null;  // frame-driven entity added to the place
+  }
+
+  // This controller's shop state (its own coins/stock/upgrades/day/progress).
+  shop() {
+    return ensureShop(this.game.profile, this.shopId);
   }
 
   // ---------- oven / bake step ----------
@@ -77,7 +84,7 @@ export class BusinessController {
   }
 
   startBake() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     this.bakeStatus = 'baking';
     this.bakeTimer = bakeDurationMs(business);
     this.bakeSteam = 0;
@@ -95,7 +102,7 @@ export class BusinessController {
 
   // Tapping the oven: start the bake when the food is prepped, or report status.
   tapOven() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     const order = business.activeOrder;
     if (!order) { this.showBusinessOrderPanel(); return; }
     if (this.bakeStatus === 'baking') { hud.toast(t('business.bake.baking')); return; }
@@ -118,7 +125,7 @@ export class BusinessController {
   }
 
   startNextBusinessOrder() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     if (business.activeOrder?.tasks?.length) {
       this.resumeBusinessOrder(business);
       return;
@@ -127,8 +134,8 @@ export class BusinessController {
       this.endBusinessDay();
       return;
     }
-    const rng = new Rng(`business:${this.game.profile.id}:${business.currentDay}:${business.day.ordersServed}`);
-    const order = nextBusinessOrder(business, this.game.profile.curriculum, { rng });
+    const rng = new Rng(`business:${this.game.profile.id}:${this.shopId}:${business.currentDay}:${business.day.ordersServed}`);
+    const order = nextBusinessOrder(business, this.game.profile.curriculum, { rng, shopId: this.shopId });
     business.activeOrder = order;
     business.queue = [order];
     this.businessAttempts = [];
@@ -146,7 +153,7 @@ export class BusinessController {
   }
 
   showBusinessOrderPanel() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     const order = business.activeOrder;
     if (!order) {
       this.startNextBusinessOrder();
@@ -175,7 +182,7 @@ export class BusinessController {
     this.game.place?.refreshLanguage?.();
     const open = document.querySelector('#screens .screen');
     if (!open || open.querySelector('#settings-card')) return;
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     const order = business.activeOrder;
     if (open.classList.contains('business-screen')) this.showBusinessOrderPanel();
     else if (open.querySelector('#business-prep-done')) {
@@ -194,7 +201,7 @@ export class BusinessController {
       task,
       onClose: () => this.showBusinessOrderPanel(),
       onSubmit: (action) => {
-        const business = ensureBusinessState(this.game.profile);
+        const business = this.shop();
         const order = business.activeOrder;
         if (!order || task.kind !== 'prep') return { correct: false, handled: true };
         const result = applyPrepAction(business, order, task, action);
@@ -225,7 +232,7 @@ export class BusinessController {
       task,
       onClose: () => this.showBusinessOrderPanel(),
       onSubmit: (action) => {
-        const business = ensureBusinessState(this.game.profile);
+        const business = this.shop();
         const order = business.activeOrder;
         if (!order || task.kind !== 'payment') return { correct: false, handled: true };
         const result = applyPaymentAction(business, order, task, action);
@@ -245,7 +252,7 @@ export class BusinessController {
   }
 
   serveBusinessOrder() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     const order = business.activeOrder;
     if (!order) return;
     const task = this.nextOpenBusinessTask(order);
@@ -270,28 +277,30 @@ export class BusinessController {
     this.game.refreshHudCounts();
     audio.sfx('coin');
     hud.toast(`+${bananas} 🍌 · ${t('business.profit')}: ${(result.profitCents / 100).toFixed(2)}`);
-    this.maybeBakeryWonder();
+    this.maybeShopWonder();
     if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) this.endBusinessDay();
     else this.startNextBusinessOrder();
   }
 
-  // A gentle one-time reveal that the bakery pie you cut IS a fraction (SUPER_PROMPT
-  // Phase 7). The business flow has no result chest, so the helper shares it in a bubble
+  // A gentle one-time reveal that the pie/pizza you cut IS a fraction (SUPER_PROMPT
+  // Phase 7). Both shops share the 'bakery' wonder trigger — a sliced pizza is the
+  // same fraction as a cut tart. The resident (piglet / owl) delivers it in a bubble
   // the child taps through at their own pace — never on a deadline, never repeated.
-  maybeBakeryWonder() {
+  maybeShopWonder() {
     const p = this.game.profile;
     const card = nextWonderFor('bakery', p.flags?.wondersSeen || []);
     if (!card) return;
     p.flags.wondersSeen = p.flags.wondersSeen || [];
     p.flags.wondersSeen.push(card.id);
     persist();
-    hud.say(`✨ ${t(card.bodyKey)}`, { face: '🐷' });
+    hud.say(`✨ ${t(card.bodyKey)}`, { face: shopById(this.shopId).resident.face });
   }
 
   openBusinessStock() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     screens.showBusinessStock({
       business,
+      shopId: this.shopId,
       onRestock: (ingredientId) => {
         const result = restockIngredient(business, ingredientId, 1);
         audio.sfx(result.ok ? 'coin' : 'boop');
@@ -304,7 +313,7 @@ export class BusinessController {
   }
 
   openBusinessUpgrades() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     screens.showBusinessUpgrades({
       business,
       onBuy: (upgradeId) => {
@@ -319,7 +328,7 @@ export class BusinessController {
   }
 
   leaveBusiness() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     business.queue = business.activeOrder ? [business.activeOrder] : [];
     persistNow();
     this.businessAttempts = [];
@@ -329,7 +338,7 @@ export class BusinessController {
   }
 
   requestEndBusinessDay() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     if (business.activeOrder) {
       audio.sfx('boop');
       hud.toast(t('business.serve'));
@@ -341,7 +350,7 @@ export class BusinessController {
   }
 
   endBusinessDay() {
-    const business = ensureBusinessState(this.game.profile);
+    const business = this.shop();
     if (business.activeOrder) {
       audio.sfx('boop');
       hud.toast(t('business.serve'));
@@ -353,7 +362,7 @@ export class BusinessController {
     business.queue = [];
     this.businessAttempts = [];
     this.game.place?.clearCustomers?.();
-    const reviewRng = new Rng(`business-review:${this.game.profile.id}:${business.currentDay}`);
+    const reviewRng = new Rng(`business-review:${this.game.profile.id}:${this.shopId}:${business.currentDay}`);
     const review = nextBusinessReview(business, this.game.profile.curriculum, { rng: reviewRng });
     screens.showBusinessDaySummary({
       report,

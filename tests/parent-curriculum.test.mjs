@@ -30,15 +30,15 @@ test('task 7 wiring exists for curriculum coverage on the parent screen', () => 
   assert.match(screensSource, /listPacks/);
   assert.match(screensSource, /curriculumCoverageHtml/);
   assert.match(screensSource, /businessReport = null/);
-  assert.match(screensSource, /coverageForReport\(pack\.id, report, \{ business: businessReport \}\)/);
+  assert.match(screensSource, /coverageForReport\(pack\.id, report, \{ business: businessReport, stage: stageReport \}\)/);
 });
 
 test('task 8 parent business reporting is wired and translated', () => {
   assert.match(screensSource, /businessReport/);
   assert.match(screensSource, /parentBusinessHtml/);
   assert.match(screensSource, /parentBusinessHtml\(businessReport\)/);
-  assert.match(mainSource, /dailyBusinessReport/);
-  assert.match(mainSource, /businessReport:\s*p\?\.business\s*\?\s*dailyBusinessReport\(p\.business\)\s*:\s*null/);
+  assert.match(mainSource, /aggregateBusinessReport/);
+  assert.match(mainSource, /businessReport:\s*p\?\.business\s*\?\s*aggregateBusinessReport\(p\)\s*:\s*null/);
 
   for (const key of [
     'parents.business',

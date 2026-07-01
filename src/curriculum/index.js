@@ -33,12 +33,14 @@ function skillMapFromReport(report) {
   return out;
 }
 
-function businessCoverage(obj, businessReport) {
-  const modes = obj.businessModes || [];
-  if (!modes.length || !businessReport?.modes) return null;
-  if (modes.every((id) => businessReport.modes[id]?.coverage === 'covered')) return 'covered';
-  if (modes.some((id) => {
-    const coverage = businessReport.modes[id]?.coverage;
+// Coverage contributed by a minigame (business shops OR the music stage): an objective is
+// 'covered' once every mapped mode is covered, 'partial' once any is tried. Shared shape
+// so the shop and the stage both feed the dashboard the same way.
+function modeCoverage(modeIds, report) {
+  if (!modeIds.length || !report?.modes) return null;
+  if (modeIds.every((id) => report.modes[id]?.coverage === 'covered')) return 'covered';
+  if (modeIds.some((id) => {
+    const coverage = report.modes[id]?.coverage;
     return coverage === 'partial' || coverage === 'covered';
   })) return 'partial';
   return null;
@@ -54,6 +56,7 @@ export function coverageForReport(packId = 'NL_PO', report = null, opts = {}) {
   const pack = getPack(packId);
   const skills = skillMapFromReport(report);
   const businessReport = opts.business || null;
+  const stageReport = opts.stage || null;
   const domains = {};
   const statusCounts = { covered: 0, partial: 0, playable: 0, planned: 0 };
 
@@ -77,9 +80,10 @@ export function coverageForReport(packId = 'NL_PO', report = null, opts = {}) {
     const practiced = skillStates.filter((s) => (s.n || 0) > 0).length;
     const bySkills = mastered && mastered === gameSkills.length ? 'covered'
       : practiced ? 'partial' : null;
-    const byBusiness = businessCoverage(obj, businessReport);
+    const byBusiness = modeCoverage(obj.businessModes || [], businessReport);
+    const byStage = modeCoverage(obj.stageModes || [], stageReport);
     const coverage = obj.status === 'planned' ? 'planned'
-      : mergeCoverage(bySkills, byBusiness);
+      : mergeCoverage(bySkills, byBusiness, byStage);
 
     const entry = { ...obj, coverage };
     const domain = domains[obj.domain];

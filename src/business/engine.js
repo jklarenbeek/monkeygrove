@@ -5,7 +5,10 @@ import {
   CUSTOMER_IDS,
   INGREDIENTS,
   RECIPES,
+  SHOP_IDS,
   UPGRADES,
+  recipesForShop,
+  shopById,
 } from './data.js';
 
 const STAGE_ORDER = {
@@ -23,11 +26,16 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-export function createBusinessState() {
+// One shop's independent economy: coins, stock, upgrades, day, and progress. `id`
+// tells the order/recipe logic which shop this is (which recipes it sells, which
+// ingredients it stocks). Starting stock is that shop's disjoint ingredient set.
+export function createShopState(shopId = 'bakery') {
+  const shop = shopById(shopId);
   return {
+    id: shop.id,
     level: 1,
     shopCoins: 0,
-    stock: { ...BALANCE.businessStartingStock },
+    stock: { ...shop.startingStock },
     stockLimit: 12,
     upgrades: [],
     currentDay: 1,
@@ -37,6 +45,13 @@ export function createBusinessState() {
     day: freshBusinessDay(),
     history: [],
   };
+}
+
+// The whole business is now a container of independent shops, one per SHOP_IDS.
+export function createBusinessState() {
+  const shops = {};
+  for (const id of SHOP_IDS) shops[id] = createShopState(id);
+  return shops;
 }
 
 export function freshBusinessDay() {
@@ -50,29 +65,49 @@ export function freshBusinessDay() {
   };
 }
 
-export function ensureBusinessState(profile) {
-  if (!profile.business || typeof profile.business !== 'object') profile.business = createBusinessState();
-  const ref = createBusinessState();
+// Heal one shop's state additively against a fresh shop of the same id.
+function ensureShopState(shop, shopId) {
+  const ref = createShopState(shopId);
+  if (!shop || typeof shop !== 'object') return ref;
+  shop.id = shopId;
   for (const [key, value] of Object.entries(ref)) {
-    if (profile.business[key] === undefined) profile.business[key] = clone(value);
+    if (shop[key] === undefined) shop[key] = clone(value);
   }
-  if (!profile.business.stock || typeof profile.business.stock !== 'object') profile.business.stock = { ...ref.stock };
+  if (!shop.stock || typeof shop.stock !== 'object') shop.stock = { ...ref.stock };
   for (const [key, value] of Object.entries(ref.stock)) {
-    if (profile.business.stock[key] === undefined) profile.business.stock[key] = value;
+    if (shop.stock[key] === undefined) shop.stock[key] = value;
   }
-  if (!profile.business.day || typeof profile.business.day !== 'object') profile.business.day = freshBusinessDay();
+  if (!shop.day || typeof shop.day !== 'object') shop.day = freshBusinessDay();
   const dayRef = freshBusinessDay();
   for (const [key, value] of Object.entries(dayRef)) {
-    if (profile.business.day[key] === undefined) profile.business.day[key] = clone(value);
+    if (shop.day[key] === undefined) shop.day[key] = clone(value);
   }
-  if (!profile.business.day.demand || typeof profile.business.day.demand !== 'object' || Array.isArray(profile.business.day.demand)) {
-    profile.business.day.demand = {};
+  if (!shop.day.demand || typeof shop.day.demand !== 'object' || Array.isArray(shop.day.demand)) {
+    shop.day.demand = {};
   }
-  if (!profile.business.progress || typeof profile.business.progress !== 'object') profile.business.progress = {};
-  if (!Array.isArray(profile.business.upgrades)) profile.business.upgrades = [];
-  if (!Array.isArray(profile.business.queue)) profile.business.queue = [];
-  if (!Array.isArray(profile.business.history)) profile.business.history = [];
+  if (!shop.progress || typeof shop.progress !== 'object') shop.progress = {};
+  if (!Array.isArray(shop.upgrades)) shop.upgrades = [];
+  if (!Array.isArray(shop.queue)) shop.queue = [];
+  if (!Array.isArray(shop.history)) shop.history = [];
+  return shop;
+}
+
+// Ensure the whole business container exists and both shops are healed. Returns the
+// { bakery, pizzeria } container. A pre-split flat save is wrapped by migrate() (v2->v3)
+// before this runs, so here we only ever see the container shape.
+export function ensureBusinessState(profile) {
+  if (!profile.business || typeof profile.business !== 'object' || Array.isArray(profile.business)) {
+    profile.business = createBusinessState();
+  }
+  for (const id of SHOP_IDS) {
+    profile.business[id] = ensureShopState(profile.business[id], id);
+  }
   return profile.business;
+}
+
+// One shop's healed state by id — the everyday accessor the controller uses.
+export function ensureShop(profile, shopId = 'bakery') {
+  return ensureBusinessState(profile)[shopId] || ensureBusinessState(profile).bakery;
 }
 
 function stageOrder(stageId) {
@@ -85,9 +120,9 @@ function curriculumStage(curriculum) {
   return pack.stages.some((stage) => stage.id === id) ? id : 'grade_4';
 }
 
-function allowedRecipes(curriculum) {
+function allowedRecipes(curriculum, shopId) {
   const order = stageOrder(curriculumStage(curriculum));
-  return Object.values(RECIPES).filter((recipe) => recipe.stages.some((stage) => stageOrder(stage) <= order));
+  return recipesForShop(shopId).filter((recipe) => recipe.stages.some((stage) => stageOrder(stage) <= order));
 }
 
 function allowedModes(curriculum) {
@@ -230,11 +265,15 @@ export function nextBusinessOrder(state, curriculum, opts = {}) {
     pick: (xs) => xs[Math.floor(Math.random() * xs.length)],
     int: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
   };
+  const shopId = opts.shopId || state.id || 'bakery';
   const stage = stageOrder(curriculumStage(curriculum));
   const quantity = stage >= 7 ? rng.pick([1, 2, 3]) : stage >= 5 ? rng.pick([1, 2]) : 1;
-  const allowed = allowedRecipes(curriculum);
-  const stocked = allowed.filter((recipe) => hasStock(state, recipe, quantity));
-  const recipes = stocked.length ? stocked : allowed;
+  const allowed = allowedRecipes(curriculum, shopId);
+  // A shop always has something to sell: if the child's stage predates every recipe
+  // of this kind, fall back to the shop's earliest recipe (gentle, never an empty shop).
+  const pool = allowed.length ? allowed : recipesForShop(shopId);
+  const stocked = pool.filter((recipe) => hasStock(state, recipe, quantity));
+  const recipes = stocked.length ? stocked : pool;
   const recipe = rng.pick(recipes);
   const order = {
     id: `biz-${Date.now().toString(36)}-${Math.floor(Math.random() * 10000).toString(36)}`,
@@ -491,4 +530,33 @@ export function dailyBusinessReport(state) {
     topRecipes,
     modes,
   };
+}
+
+// Parent-facing coverage spans BOTH shops: a money/measurement/fraction objective is
+// practiced wherever the child ran it. Merge each shop's per-mode attempts and recompute
+// coverage on the totals, so the dashboard reads one honest picture across the business.
+export function aggregateBusinessReport(profile) {
+  const shops = ensureBusinessState(profile);
+  const modes = {};
+  for (const mode of Object.keys(BUSINESS_MODES)) modes[mode] = { attempts: 0, correct: 0 };
+  const totals = { ordersServed: 0, revenueCents: 0, costCents: 0, profitCents: 0 };
+  for (const shop of Object.values(shops)) {
+    totals.ordersServed += shop.day?.ordersServed ?? 0;
+    totals.revenueCents += shop.day?.revenueCents ?? 0;
+    totals.costCents += shop.day?.costCents ?? 0;
+    totals.profitCents += shop.day?.profitCents ?? 0;
+    for (const mode of Object.keys(BUSINESS_MODES)) {
+      const stats = shop.progress?.[mode];
+      if (!stats) continue;
+      modes[mode].attempts += stats.attempts || 0;
+      modes[mode].correct += stats.correct || 0;
+    }
+  }
+  for (const mode of Object.keys(modes)) {
+    const stats = modes[mode];
+    stats.rate = stats.attempts ? stats.correct / stats.attempts : 0;
+    stats.coverage = stats.correct >= 3 && stats.rate >= 0.8 ? 'covered'
+      : stats.attempts > 0 ? 'partial' : 'playable';
+  }
+  return { ...totals, modes };
 }

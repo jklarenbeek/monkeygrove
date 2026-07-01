@@ -25,12 +25,12 @@ export const NL_PO = {
   // objective covers — the third pillar's tie to the canonical sequence. Validated in
   // tests/ladder-coherence.test.mjs.
   objectives: [
-    { id: 'nl_po.grade1.counting_and_order', stage: 'grade_1', domain: 'numbers', titleKey: 'curriculum.nl_po.objective.counting_and_order', status: 'playable', gameSkills: ['counting'], steps: [0, 1, 2, 3, 4, 6, 8, 12] },
+    { id: 'nl_po.grade1.counting_and_order', stage: 'grade_1', domain: 'numbers', titleKey: 'curriculum.nl_po.objective.counting_and_order', status: 'playable', gameSkills: ['counting'], stageModes: ['echo'], steps: [0, 1, 2, 3, 4, 6, 8, 12] },
     { id: 'nl_po.grade2.number_bonds_to_10', stage: 'grade_2', domain: 'numbers', titleKey: 'curriculum.nl_po.objective.number_bonds_to_10', status: 'playable', gameSkills: ['number_bonds'], steps: [5, 9] },
     { id: 'nl_po.grade3.add_sub_to_20', stage: 'grade_3', domain: 'operations', titleKey: 'curriculum.nl_po.objective.add_sub_to_20', status: 'playable', gameSkills: ['add_20', 'sub_20'], steps: [10, 11, 17, 18, 19, 20] },
     { id: 'nl_po.grade3.missing_addend_intro', stage: 'grade_3', domain: 'operations', titleKey: 'curriculum.nl_po.objective.missing_addend_intro', status: 'playable', gameSkills: ['missing_addend'] },
     { id: 'nl_po.grade4.add_sub_to_100', stage: 'grade_4', domain: 'operations', titleKey: 'curriculum.nl_po.objective.add_sub_to_100', status: 'playable', gameSkills: ['add_100', 'sub_100'] },
-    { id: 'nl_po.grade4.tables_2_5_10', stage: 'grade_4', domain: 'operations', titleKey: 'curriculum.nl_po.objective.tables_2_5_10', status: 'playable', gameSkills: ['tables_a'], businessModes: ['repeated_addition_orders'] },
+    { id: 'nl_po.grade4.tables_2_5_10', stage: 'grade_4', domain: 'operations', titleKey: 'curriculum.nl_po.objective.tables_2_5_10', status: 'playable', gameSkills: ['tables_a'], businessModes: ['repeated_addition_orders'], stageModes: ['count'] },
     { id: 'nl_po.grade4.fair_sharing_intro', stage: 'grade_4', domain: 'operations', titleKey: 'curriculum.nl_po.objective.fair_sharing_intro', status: 'playable', gameSkills: ['share'], businessModes: ['portion_halves_quarters'] },
     { id: 'nl_po.grade4.money_to_100', stage: 'grade_4', domain: 'measurement_geometry', titleKey: 'curriculum.nl_po.objective.money_to_100', status: 'playable', gameSkills: [], businessModes: ['money_make_amounts'] },
     { id: 'nl_po.grade5.tables_3_4_6', stage: 'grade_5', domain: 'operations', titleKey: 'curriculum.nl_po.objective.tables_3_4_6', status: 'playable', gameSkills: ['tables_b'] },
@@ -41,7 +41,7 @@ export const NL_PO = {
     { id: 'nl_po.grade6.multi_digit_multiplication', stage: 'grade_6', domain: 'operations', titleKey: 'curriculum.nl_po.objective.multi_digit_multiplication', status: 'playable', gameSkills: ['mult_2digit'] },
     { id: 'nl_po.grade6.division_facts_and_inverse', stage: 'grade_6', domain: 'operations', titleKey: 'curriculum.nl_po.objective.division_facts_and_inverse', status: 'playable', gameSkills: ['div_facts', 'missing_factor'] },
     { id: 'nl_po.grade6.division_with_remainders', stage: 'grade_6', domain: 'operations', titleKey: 'curriculum.nl_po.objective.division_with_remainders', status: 'playable', gameSkills: ['div_remainder'] },
-    { id: 'nl_po.grade6.fraction_magnitude', stage: 'grade_6', domain: 'ratios', titleKey: 'curriculum.nl_po.objective.fraction_magnitude', status: 'playable', gameSkills: ['frac_magnitude'] },
+    { id: 'nl_po.grade6.fraction_magnitude', stage: 'grade_6', domain: 'ratios', titleKey: 'curriculum.nl_po.objective.fraction_magnitude', status: 'playable', gameSkills: ['frac_magnitude'], stageModes: ['beat'] },
     { id: 'nl_po.grade6.decimals_compare', stage: 'grade_6', domain: 'numbers', titleKey: 'curriculum.nl_po.objective.decimals_compare', status: 'playable', gameSkills: ['dec_compare'], steps: [44] },
     { id: 'nl_po.grade6.fraction_of_quantity', stage: 'grade_6', domain: 'ratios', titleKey: 'curriculum.nl_po.objective.fraction_of_quantity', status: 'playable', gameSkills: ['frac_of_n'], businessModes: ['fraction_of_quantity_recipe'] },
     { id: 'nl_po.grade6.unit_conversion_context', stage: 'grade_6', domain: 'measurement_geometry', titleKey: 'curriculum.nl_po.objective.unit_conversion_context', status: 'playable', gameSkills: [], businessModes: ['unit_conversion_stock'] },

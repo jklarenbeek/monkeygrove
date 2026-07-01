@@ -394,9 +394,15 @@ export class HubController {
     // build plots: unlocked opens the worktable, finished ones react playfully
     const build = this.buildAt(x, z);
     if (build) {
-      if (build.id === 'bakery' && isBuilt(g.profile, 'bakery')) {
+      // The bakery and the pizzeria are separate shops now — each plot opens its own.
+      if ((build.id === 'bakery' || build.id === 'pizzeria') && isBuilt(g.profile, build.id)) {
         hud.toast(t('business.open'));
-        g.startBusinessFromHub('bakery');
+        g.startBusinessFromHub(build.id);
+        return true;
+      }
+      // The music stage is a minigame: tapping the built stage opens Kiki's songs.
+      if (build.id === 'stage' && isBuilt(g.profile, 'stage')) {
+        g.startStageFromHub();
         return true;
       }
       if (build.state === 'unlocked') { this.openIsland(); return true; }

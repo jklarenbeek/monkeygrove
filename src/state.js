@@ -5,11 +5,12 @@ import { freshStory } from './story/engine.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
 import { createCurriculumState, estimateStageFromAge, refreshCurriculumForDate } from './curriculum/placement.js';
 import { getPack } from './curriculum/index.js';
-import { createBusinessState, ensureBusinessState } from './business/engine.js';
+import { createBusinessState, createShopState, ensureBusinessState } from './business/engine.js';
+import { createStageState, ensureStageState } from './stage/engine.js';
 import { DEFAULT_CREATURE_ID, COMPANION_IDS } from './mesh/creatures.js';
 
 const KEY = 'monkeygrove.save';
-const VERSION = 2;
+const VERSION = 3;
 const SUPPORTED_LANGS = new Set(['en', 'nl']);
 
 let save = null;
@@ -46,6 +47,7 @@ function freshProfile(name, opts = {}) {
       today: opts.today || dayString(),
     }),
     business: createBusinessState(),
+    stage: createStageState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
     flags: opts.placementWarmup ? { needsPlacementWarmup: true } : {},
@@ -158,7 +160,20 @@ function migrate18to64(s) {
   return s;
 }
 
-const STEPS = { 1: migrate18to64 };
+// v2 -> v3: the bakery and pizzeria split into two independent shops. A pre-split save
+// had one flat `business` object (mixed recipes, one wallet). It becomes the BAKERY shop
+// (it already has that shape) and a fresh pizzeria is seeded beside it — no progress lost,
+// and healSave() below normalizes each shop's stock/day/upgrades afterward.
+function migrate2to3(s) {
+  for (const p of s.profiles) {
+    const biz = p.business;
+    if (!isObject(biz) || isObject(biz.bakery) || isObject(biz.pizzeria)) continue;
+    p.business = { bakery: { ...biz, id: 'bakery' }, pizzeria: createShopState('pizzeria') };
+  }
+  return s;
+}
+
+const STEPS = { 1: migrate18to64, 2: migrate2to3 };
 
 // Upgrade a parsed save to the current shape: run version steps, then heal missing
 // fields against a fresh profile (the final, additive step). A step may mutate `s` in
@@ -236,6 +251,7 @@ function healSave(s) {
       if (!isObject(p.math.skills[id])) p.math.skills[id] = structuredClone(ref.math.skills[id]);
     }
     ensureBusinessState(p);
+    ensureStageState(p);
   }
   // heal settings so saves from before comfort/accessibility options get the defaults
   if (!isObject(s.settings)) s.settings = settingsDefaults();
