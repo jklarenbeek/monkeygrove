@@ -491,25 +491,30 @@ The first download has to stay light for kids on slow school Wi-Fi / cheap Andro
 so `npm run build` runs `scripts/check-budget.mjs` after `vite build` and **fails the
 build** if the first load re-bloats (re-run alone with `npm run build:check`). The
 guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
-- **First-load `index` JS ≤ 244 kB gzip — a HARD cap.** Story mode pulls in the
+- **First-load `index` JS ≤ 300 kB gzip — a HARD cap.** Story mode pulls in the
   `@yijingjs/core` engine and per-chapter content (raised 217 → 235 on 2026-06-27); the
   SUPER_PROMPT curriculum build-out added 10 first-load adaptive skills + the 64-step
-  ladder + the Mimi-arc/wonder copy (235 → 242 on 2026-06-30); and the Phase-6 wonder
+  ladder + the Mimi-arc/wonder copy (235 → 242 on 2026-06-30); the Phase-6 wonder
   layer (the shared voxel→SVG renderer for the friend-mesh ceremony + the Gem Tree's 8×8
-  hexagram grid) took it **242 → 244 on 2026-07-01** (today ~242 kB gzip) — raised
-  *deliberately*, not removed: the target is kids on slow school Wi-Fi / cheap Android, so
-  the guardrail stays. When the entry approaches 244 again, **code-split the story
-  screens/prose (and the ladder/wonder metadata) into a lazy chunk** (like the bakery
-  `business-*` and `duel-*` chunks) rather than bumping the number again. The bakery sim
-  and duels stay lazily-fetched.
+  hexagram grid) took it 242 → 244 on 2026-07-01; and the two new minigames — the
+  **bakery/pizzeria split** (two independent shops) and the **music-stage minigame**
+  (Kiki's three grade-gated songs) — took it **244 → 300 on 2026-07-01** (today ~246 kB
+  gzip). Both heavy scenes stay lazy (`business-*` / `stage-*` chunks), but their pure
+  engine/data are eager (`state.js` heals shop + stage state; curriculum/parents read the
+  reports), so first-load grew ~2 kB gzip; the cap was raised generously at the author's
+  request. Raised *deliberately*, not removed: the target is kids on slow school Wi-Fi /
+  cheap Android, so the guardrail stays. When the entry approaches 300, **code-split the
+  story screens/prose (and the ladder/wonder metadata) into a lazy chunk** (like the
+  `business-*`, `stage-*`, and `duel-*` chunks) rather than bumping the number again.
 - **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
-- **PWA precache ≤ 1200 KiB** — today 15 entries / ~1150 KiB (bumped 1150→1200 for the
-  procedural "liveliness" layers — sky/tiers/shadows/scatter/ambient/sway add code, no
-  shipped assets).
-- **The `business-*` chunk stays lazy** — the check fails if it folds back into `index`
-  or the entry static-imports it (Vite would module-preload it into `index.html`).
+- **PWA precache ≤ 1300 KiB** — today 25 entries / ~1251 KiB (1150→1200 for the
+  procedural "liveliness" layers; 1200→1235 for selective bloom + DoF; **1235→1300 on
+  2026-07-01** for the new always-lazy `stage-*` minigame chunk, precached for offline play).
+- **The `business-*` and `stage-*` chunks stay lazy** — the check fails if either folds
+  back into `index` or the entry static-imports it (Vite would module-preload it into
+  `index.html`). The music stage mirrors the bakery sim: heavy scene lazy, pure data eager.
 
 Move a threshold deliberately (here and in `scripts/check-budget.mjs`) when the
 baseline genuinely shifts — not to paper over a regression.

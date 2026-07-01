@@ -47,8 +47,17 @@ import { join } from 'node:path';
 // 2026-07-01: 242 -> 244 for the Phase-6 wonder layer: the shared voxel→SVG renderer
 // (so the line-draw ceremony shows the REAL friend mesh, not an emoji) and the Gem Tree's
 // 8×8 hexagram-reveal grid. ~1.7 kB gzip of real first-load feature; restores jitter room.
-const INDEX_JS_GZIP_BUDGET_KB = 244;   // decimal kB (÷1000), matches Vite's report
-const PRECACHE_BUDGET_KIB = 1235;      // binary KiB (÷1024), matches workbox's report
+// 2026-07-01: 244 -> 300 (first-load) and 1235 -> 1300 (precache) for the two new
+// minigames — the bakery/pizzeria split (each shop its own independent economy) and the
+// music-stage minigame (Kiki's three grade-gated songs). Both heavy scenes stay lazy
+// (business-* / stage-* chunks, guarded below), but their pure engine/data are eager
+// (state.js heals shop + stage state on load; curriculum/parents read their reports), so
+// first-load grew ~2 kB gzip and the offline precache grew by the new stage-* chunk.
+// First-load raised to 300 at the author's request (comfortable headroom for cheap
+// Android / school Wi-Fi); precache raised to clear the new chunk with jitter room.
+// Bumped DELIBERATELY — the caps stay real guardrails.
+const INDEX_JS_GZIP_BUDGET_KB = 300;   // decimal kB (÷1000), matches Vite's report
+const PRECACHE_BUDGET_KIB = 1300;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
 const ASSETS = join(DIST, 'assets');
@@ -143,6 +152,18 @@ if (!businessChunk) {
   checks.push(fail('index.html preloads the business chunk — it is no longer lazy'));
 } else {
   checks.push(pass('bakery business chunk stays lazy'));
+}
+
+// 4b. The music stage stays lazy too: its own `stage-*` chunk (heavy scene + controller),
+//     never folded into `index` nor static-imported from the entry. Its pure engine/data
+//     ARE eager (state.js heals stage state), like the business engine — mirrors guard #4.
+const stageChunk = assets.find((f) => /^stage-.*\.js$/.test(f));
+if (!stageChunk) {
+  checks.push(fail('no stage-*.js chunk — the music-stage sim folded back into index'));
+} else if (indexHtml.includes('stage-')) {
+  checks.push(fail('index.html preloads the stage chunk — it is no longer lazy'));
+} else {
+  checks.push(pass('music stage chunk stays lazy'));
 }
 
 // 5. Selective bloom / DoF post-processing stays lazy: world.js reaches it only via a
