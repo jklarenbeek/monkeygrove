@@ -193,7 +193,11 @@ Duckling, and Olli the Owl. Orders ask the child to prepare recipes, portion
 pizzas, measure ingredients, handle payment and change, watch stock, earn shop
 coins, and buy gentle upgrades. Ingredient sets are disjoint so each shop is a
 real, self-contained economy. The parent dashboard sums both shops for objective
-coverage and also shows a per-shop orders/profit breakdown.
+coverage and also shows a per-shop orders/profit breakdown. On the **hub** each
+shop's plot shows a distinct storefront building (voxel models in `models.js`):
+the bakery a Dutch/German stepped-gable townhouse (warm oven glow in the windows),
+the pizzeria an Italian trattoria with a tiled roof and a wood-fire chimney that
+puffs smoke — not the old shared oven prop.
 
 There is no timer, debt, loss spiral, or shame. Mistakes keep the customer
 waiting kindly and offer another try. The shop is child-facing as orders, ovens,

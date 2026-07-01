@@ -721,6 +721,65 @@ const shopTable = {
   ],
 };
 
+// Hub bakery building — a cozy Dutch/German townhouse bakery with a stepped gable
+// (trapgevel), warm brick walls, a striped awning over the shopfront windows + door,
+// upstairs windows, a cream cornice, and a little gold finial on top. The front facade
+// (+Z, last row of each layer) carries the shopfront; the body is a solid brick block.
+const bakeryBuilding = {
+  palette: {
+    R: '#b5654a', // brick
+    C: '#f3e6c4', // cream trim / gable steps (matches the bakery floor tint)
+    D: '#8a5a3b', // door
+    G: '#bfe3f0', // window glass
+    A: '#e0574c', // awning red
+    a: '#fff0d8', // awning cream stripe
+    Y: '#ffcf5e', // gold finial
+  },
+  layers: [
+    ['RRRRR', 'RRRRR', 'RRRRR', 'RRRRR'], // y0 base
+    ['RRRRR', 'RRRRR', 'RRRRR', 'GGDGG'], // y1 shopfront: windows + door
+    ['RRRRR', 'RRRRR', 'RRRRR', 'AaAaA'], // y2 striped awning
+    ['RRRRR', 'RRRRR', 'RRRRR', 'RGRGR'], // y3 upstairs windows
+    ['RRRRR', 'RRRRR', 'RRRRR', 'RGRGR'], // y4 upstairs windows
+    ['CCCCC', 'CCCCC', 'CCCCC', 'CCCCC'], // y5 cream cornice band
+    ['CRRRC', 'CRRRC', 'CRRRC', 'CRRRC'], // y6 stepped gable (step 1)
+    ['.CRC.', '.CRC.', '.CRC.', '.CRC.'], // y7 stepped gable (step 2)
+    ['..Y..', '..Y..', '..Y..', '..Y..'], // y8 gold finial
+  ],
+};
+
+// Hub pizzeria building — an Italian trattoria: warm ochre plaster, a tricolore
+// (green/white/red) awning over the arched shopfront, upstairs windows, a cornice, a
+// pitched terracotta-tiled roof, and a stone chimney for the wood-fired oven (its smoke
+// puffs in reactive.js). Front facade is the +Z (last) row of each layer.
+const pizzeriaBuilding = {
+  palette: {
+    O: '#e0a860', // ochre plaster
+    o: '#c98f45', // ochre cornice
+    T: '#c0533b', // terracotta roof tile
+    t: '#a5432f', // terracotta ridge (darker)
+    G: '#bfe3f0', // window glass
+    D: '#7a4a2e', // door
+    g: '#4f9d5b', // awning green
+    w: '#fff4e6', // awning white
+    r: '#d64b3f', // awning red
+    S: '#a39d93', // chimney stone
+    s: '#847e74', // chimney cap
+  },
+  layers: [
+    ['OOOOO', 'OOOOO', 'OOOOO', 'OOOOO'], // y0 base
+    ['OOOOO', 'OOOOO', 'OOOOO', 'GGDGG'], // y1 shopfront: windows + door
+    ['OOOOO', 'OOOOO', 'OOOOO', 'ggwrr'], // y2 tricolore awning
+    ['OOOOO', 'OOOOO', 'OOOOO', 'OGOGO'], // y3 upstairs windows
+    ['OOOOO', 'OOOOO', 'OOOOO', 'OGOGO'], // y4 upstairs windows
+    ['ooooo', 'ooooo', 'ooooo', 'ooooo'], // y5 cornice band
+    ['TTTTT', 'TTTTS', 'TTTTT', 'TTTTT'], // y6 roof eaves (+ chimney on the right)
+    ['.....', '.TTTS', '.TTT.', '.....'], // y7 roof slope + chimney
+    ['.....', '.tttS', '.ttt.', '.....'], // y8 roof ridge + chimney
+    ['.....', '....s', '.....', '.....'], // y9 chimney top
+  ],
+};
+
 export const PROPS = {
   palm, palmSmall, bush, flowerPink, flowerYellow, flowerBlue,
   pot, stone, altar, chestBase, chestLid, egg, basket, coconut,
@@ -728,6 +787,7 @@ export const PROPS = {
   sign, rockA, rockB,
   lantern, shell, sprout, berry, stall, oven,
   counter, prepBoard, pizzaPan, doughBowl, toppingCrate, coinTray, orderBoard, shopTable,
+  bakeryBuilding, pizzeriaBuilding,
   grassA, grassB, pebble, mushroom, crystal,
 };
 

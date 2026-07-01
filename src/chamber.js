@@ -551,8 +551,8 @@ export const TEMPLATES = {
       '#..d.........M........bwww..j..#',
       '#......................##......#',
       '#...O.......P......d...###....##',
-      '#.................e....#########',
-      '#.d..k..d.z..,,....d...#########',
+      '#.......k.z.......e....#########',
+      '#.d..........,,....d...#########',
       '##..u...........y....###########',
       '###,....dd.....d..,#############',
       '################################',
@@ -838,13 +838,15 @@ export class HubPlace extends Place {
       this._prop('lantern', 0.5, x, z, -0.85, 0.2);
       block(x, z);
     } else if (def.id === 'bakery') {
-      this._prop('oven', 1.0, x, z);
-      this._prop('basket', 0.3, x, z, 0.7, 0.35);
+      // a cozy Dutch/German stepped-gable bakery townhouse (not a bare oven)
+      this._prop('bakeryBuilding', 2.2, x, z);
+      this._prop('basket', 0.3, x, z, 0.78, 0.5);
       block(x, z);
     } else if (def.id === 'pizzeria') {
-      this._prop('oven', 1.0, x, z);
-      this._prop('pizzaPan', 0.3, x, z, 0.72, 0.35);
-      this._prop('toppingCrate', 0.3, x, z, -0.7, 0.3);
+      // a typical Italian trattoria: ochre walls, tricolore awning, tiled roof + chimney
+      this._prop('pizzeriaBuilding', 2.2, x, z);
+      this._prop('pizzaPan', 0.3, x, z, 0.82, 0.5);
+      this._prop('toppingCrate', 0.3, x, z, -0.72, 0.42);
       block(x, z);
     } else if (def.id === 'plaza') {
       this._prop('portal', 1.7, x, z);

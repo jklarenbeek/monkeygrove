@@ -182,6 +182,24 @@ test('PROPS: business bakery and pizzeria props exist and validate', () => {
   }
 });
 
+test('PROPS: the hub shop buildings validate and read as distinct silhouettes', () => {
+  const bakery = validateModel('props.bakeryBuilding', PROPS.bakeryBuilding, { maxHeight: 20, maxVoxels: 700 });
+  const pizzeria = validateModel('props.pizzeriaBuilding', PROPS.pizzeriaBuilding, { maxHeight: 20, maxVoxels: 700 });
+  // They are proper buildings (taller than the little countertop props), and different.
+  assert.ok(bakery.sizeY >= 8, 'the bakery is a multi-storey building');
+  assert.ok(pizzeria.sizeY >= 8, 'the pizzeria is a multi-storey building');
+  assert.notEqual(bakery.sizeY, pizzeria.sizeY, 'the two buildings are not the same height');
+  // The bakery has a stepped gable — the top layer is narrower than the base.
+  const topWidth = (m) => Math.max(...m.layers[m.layers.length - 1].map((r) => r.replace(/[. ]/g, '').length));
+  const baseWidth = (m) => Math.max(...m.layers[0].map((r) => r.replace(/[. ]/g, '').length));
+  assert.ok(topWidth(PROPS.bakeryBuilding) < baseWidth(PROPS.bakeryBuilding), 'the bakery narrows to a gable/finial on top');
+  // The pizzeria carries a stone chimney (S) and a tricolore awning (g + r).
+  assert.ok(bakery.used.has('A'), 'the bakery has an awning');
+  assert.ok(pizzeria.used.has('S'), 'the pizzeria has a stone chimney');
+  assert.ok(pizzeria.used.has('g') && pizzeria.used.has('r'), 'the pizzeria awning is tricolore (green + red)');
+  assert.ok(pizzeria.used.has('T'), 'the pizzeria has a terracotta tiled roof');
+});
+
 test('berry is the tiny 2-voxel remainder berry', () => {
   assert.equal(stats(PROPS.berry).count, 2);
 });

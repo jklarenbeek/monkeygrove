@@ -109,13 +109,19 @@ export function attachBuildIdle(place, def, spot) {
   if (!GFX.toneMap) return;
   const wp = place.worldPos(spot.x, spot.z);
   if (def.id === 'bakery') {
-    let t = 0; // periodic chimney smoke puff
+    // warm oven light glowing through the shopfront windows (front = +Z)
+    const glow = makeGlowSprite(0xffd9a0, 0.35, 0.3);
+    glow.position.set(wp.x, wp.y + 0.85, wp.z + 0.42);
+    place.group.add(glow);
+    place.addReactor(makePulse(glow, { prop: 'opacity', base: 0.2, amp: 0.12, hz: 0.4 }));
+  } else if (def.id === 'pizzeria') {
+    let t = 0; // wood-fired oven: smoke puffs from the stone chimney (back-left corner)
     place.addEntity({
       update: (dt) => {
         t += dt;
         if (t < 2600) return;
         t = 0;
-        place.fx?.poof(new THREE.Vector3(wp.x, wp.y + 1.1, wp.z), 6, 0xe8e2d4);
+        place.fx?.poof(new THREE.Vector3(wp.x + 0.44, wp.y + 2.05, wp.z - 0.1), 6, 0xd8d2c8);
       },
     });
   } else if (def.id === 'plaza' || def.id === 'stage' || def.id === 'lanterns') {
