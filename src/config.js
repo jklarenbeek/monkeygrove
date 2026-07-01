@@ -97,6 +97,14 @@ export const BALANCE = {
   businessBananaReward: [2, 4],
   stageBananaReward: [2, 4],        // bananas per solved music-stage round
   bakeMs: 4500,                     // bake time for one oven; extra ovens bake faster
+  // "Serve it golden" reward gradient (anti-anxiety: a BONUS, never a penalty). Once a
+  // dish is ready it stays warm for freshWindowMs of free-roam time; serve within it and
+  // the happy customer leaves a freshTipCents tip + sparkle. Miss it and the dish simply
+  // cools — still sells at full base price, no tip, and the shopkeeper gently coaches.
+  // The clock ONLY runs while walking the shop (never while a math panel is open), so a
+  // child solving arithmetic is never racing anything.
+  freshWindowMs: 5000,
+  freshTipCents: 45,
   // Per-shop starting stock lives with each shop's (disjoint) ingredient set in
   // src/business/data.js SHOPS — the bakery and pizzeria are independent economies.
 };

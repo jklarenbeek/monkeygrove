@@ -673,6 +673,7 @@ html, body {
 .business-bake { font-weight: 800; font-size: calc(15px * var(--text-scale)); margin: 2px 0 10px; color: var(--ink-soft); }
 .business-bake-baking { color: var(--sun-deep); }
 .business-bake-ready { color: var(--leaf-deep); }
+.business-bake-cooled { color: var(--ink-soft); }
 
 .business-choice-grid {
   display: grid;
@@ -723,6 +724,14 @@ html, body {
 }
 .stage-pad:active { transform: scale(.95); }
 .stage-pad.lit { filter: saturate(1.3) brightness(1.18); box-shadow: 0 0 0 4px #fff, 0 0 18px var(--pad); transform: scale(1.03); }
+/* Colour-blind safety: every pad carries its number, so identity never depends on hue. */
+.stage-pad-label {
+  font-size: calc(30px * var(--text-scale)); font-weight: 900; color: #fff;
+  text-shadow: 0 1px 0 #0006, 0 0 3px #0008; pointer-events: none;
+}
+/* Reduced motion: the flash still marks which pad lit (brightness + ring) but no scale. */
+.reduce-motion .stage-pad { transition: filter .1s, box-shadow .12s; }
+.reduce-motion .stage-pad.lit { transform: none; box-shadow: 0 0 0 4px #fff, 0 0 8px var(--pad); }
 
 .stage-beats {
   display: flex;
@@ -742,6 +751,9 @@ html, body {
   cursor: pointer;
 }
 .stage-beat.equipped { border-color: var(--sun-deep); background: #fffbe8; box-shadow: 0 0 0 3px var(--sun); }
+/* metronome: the transient beat the counter is currently on (never a persistent answer) */
+.stage-beat.counting { border-color: var(--leaf-deep); background: #eafaef; transform: scale(1.1); }
+.reduce-motion .stage-beat.counting { transform: none; }
 
 .stage-bar {
   height: 26px;
@@ -759,6 +771,8 @@ html, body {
   gap: 10px;
   margin: 10px 0;
 }
+/* drawn fraction-pie note glyph (font-proof; replaces Unicode music symbols) */
+.note-glyph { width: calc(30px * var(--text-scale)); height: calc(30px * var(--text-scale)); display: block; margin: 0 auto; }
 
 /* egg hatch overlay */
 #hatch-egg { font-size: calc(110px * var(--text-scale)); animation: egg-rock 0.5s ease-in-out infinite; cursor: pointer; }

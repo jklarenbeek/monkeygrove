@@ -1309,6 +1309,18 @@ export function recordResult(math, problem, res, { now = 0 } = {}) {
   return { delta, rating: s.r, masteredSkill, newGems };
 }
 
+// A lightweight external mastery signal: reinforce a real skill from a minigame (the
+// music stage) without a full generated problem. It's scored as a fair-difficulty
+// practice (difficulty = the skill's current rating, so expected ≈ 0.5), giving a gentle
+// Elo nudge on a correct round — so the stage and the chambers feed the SAME mastery
+// (a grade-appropriate skip-count on the stage counts toward tables_a, etc.). No-op for
+// an unknown skill. Deterministic from inputs (pass `now` as the log timestamp).
+export function reinforceSkill(math, skillId, correct, { now = 0 } = {}) {
+  const s = math?.skills?.[skillId];
+  if (!s) return null;
+  return recordResult(math, { skillId, difficulty: s.r, answer: null, meta: {} }, { correct: !!correct }, { now });
+}
+
 // Pass `now` for an honest, decay-adjusted snapshot (the Gem Tree and the parent
 // dashboard do, so "mastered" means *recently* mastered). Omit it and the report
 // reflects stored ratings unchanged — which is exactly what the hub passes when

@@ -31,7 +31,11 @@ export const BUILDS = [
     perk: { kind: 'egg', n: 3 },
   },
   {
-    id: 'pizzeria', char: 'z', cost: 175, points: 2.7, emoji: '🍕',
+    // Balance: the pizzeria clusters right after the bakery (points 2.4 -> 2.6) so the
+    // second shop arrives while the child is still engaged with shops, then a longer
+    // climb (2.6 -> 3.0) leads into the bridge/finale arc. Slightly pricier than the
+    // bakery (150) — it's the richer, four-ingredient shop.
+    id: 'pizzeria', char: 'z', cost: 180, points: 2.6, emoji: '🍕',
     npc: { pet: 'owl', face: '🦉' },
   },
   { id: 'bridge', char: 'b', cost: 200, points: 3.0, emoji: '🌉' },

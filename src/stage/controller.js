@@ -9,7 +9,9 @@ import { audio } from '../audio.js';
 import { persist, persistNow, addBananas, addEggPoints } from '../state.js';
 import { Rng } from '../rng.js';
 import { BALANCE } from '../config.js';
+import { reinforceSkill } from '../mathengine.js';
 import { nextWonderFor } from '../story/wonders.js';
+import { STAGE_MODES } from './data.js';
 import {
   ensureStageState,
   gradeStageRound,
@@ -61,7 +63,12 @@ export class StageController {
     if (!this.round) { this.showSongs(); return; }
     const shared = {
       round: this.round,
-      onNote: (i) => audio.pad(i),
+      // each note sounds AND pulses the real 3D stage (gong lights, Kiki hops) —
+      // so Echo playback and every tap are felt on stage, not only on the DOM pads
+      onNote: (i) => { audio.pad(i); this.game.place?.pulseStage?.(); },
+      // the Counting Song metronome: sound each count (rising tone; marimba on multiples)
+      // and pulse the 3D gong on the skip-count beats, so rhythm is embodied not just a grid
+      onCount: (n, isMultiple) => { audio.count(n, isMultiple); if (isMultiple) this.game.place?.pulseStage?.(); },
       onSubmit: (action) => this.grade(action),
       onClose: () => this.showSongs(),
     };
@@ -74,6 +81,11 @@ export class StageController {
     const state = this.state();
     const result = gradeStageRound(this.round, action);
     recordStageAttempt(state, this.songId, result.correct);
+    // P2-7: a correct round also feeds the SAME mastery the chambers use — the Counting
+    // Song's skip-count nudges tables_a, the Beat Bar's fraction sums nudge frac_magnitude
+    // — so the stage and the worlds share one signal instead of a separate stage-only tally.
+    const skill = STAGE_MODES[this.songId]?.reinforceSkill;
+    if (skill && result.correct) reinforceSkill(this.game.profile.math, skill, true, { now: Date.now() });
     persist();
     if (!result.correct) {
       audio.sfx('boop');
@@ -103,7 +115,10 @@ export class StageController {
 
   // A gentle one-time reveal that the music stage IS skip-counting (SUPER_PROMPT Phase 7):
   // the same 3, 6, 9 you ring on the gong are the threes you skip-count in the Garden.
+  // P4-12: fire it *deliberately* from the Counting Song — the song that literally IS
+  // skip-counting (Kiki is the Garden/times-tables friend) — not from any song at random.
   maybeStageWonder() {
+    if (this.songId !== 'count') return;
     const p = this.game.profile;
     const card = nextWonderFor('music', p.flags?.wondersSeen || []);
     if (!card) return;

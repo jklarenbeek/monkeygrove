@@ -59,8 +59,15 @@ added to the home screen like a native app.
     until their packs are defined
 - **Island progression**
   - Mastery unlocks Mimi's blueprints
-  - Bananas fund builds such as lanterns, fruit stand, garden, stage, bakery, bridge, and festival plaza
+  - Bananas fund eight builds: lanterns, fruit stand, garden, music stage, bakery, pizzeria, bridge, and festival plaza
   - Gates and island life bloom as skills improve
+- **Two shops** (each its own scene + economy)
+  - Bakery (Mo the Piglet) — an octagonal cottage baking flatbread and berry tart
+  - Pizzeria (Olli the Owl) — a wider trattoria serving margherita and tomato pizza
+  - Serve a dish while it's golden for a fresh tip (a gentle reward, never a penalty)
+- **Music stage** (Kiki the Kitten's three songs)
+  - Echo Song (sequence memory), Counting Song (skip-counting), Beat Bar (fraction addition)
+  - Correct rounds feed the same skill mastery the chambers do
 - **Retention without pressure**
   - Daily streak gifts and streak freezes
   - Egg meter, hatchable pets, hats, fur colors, and trails
@@ -128,8 +135,8 @@ npm run test:e2e
 ```
 
 It spawns its own Vite dev server, drives the real game through Playwright
-(title -> create profile -> hub -> bakery business scene), asserts there were no
-page errors, then tears everything down. It runs **headless with a software GL
+(title -> create profile -> hub -> bakery -> pizzeria -> music stage), asserts
+there were no page errors, then tears everything down. It runs **headless with a software GL
 backend** (SwiftShader), so it works on machines without a real GPU.
 
 Unlike a typical Playwright project, this harness does **not** download or use

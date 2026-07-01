@@ -182,8 +182,11 @@ export const en = {
   'business.bake.raw': 'Bake it at the oven 🔥',
   'business.bake.baking': 'In the oven… 🍞',
   'business.bake.ready': 'Baked! Serve it 🍞',
+  'business.bake.cooled': 'It cooled down — still tasty! 🍞',
+  'business.bake.cooled_coach': 'Still yummy! Next time serve it while it’s golden for a little tip. 😊',
   'business.bake.prep_first': 'Make the food before baking.',
   'business.bake.first': 'Bake it at the oven first! 🔥',
+  'business.fresh_tip': 'Fresh tip!',
 
   // music stage (Kiki's minigame)
   'stage.songs': 'Choose a song',
@@ -202,6 +205,7 @@ export const en = {
   'stage.song.beat.desc': 'Fill one bar with the right notes.',
   'stage.echo.prompt': 'Watch Kiki play, then tap the same tune back!',
   'stage.count.prompt': 'Count by {step}s — ring the gong on each one!',
+  'stage.count.play': 'Count along',
   'stage.beat.prompt': 'Fill the bar — make exactly one whole!',
   'stage.beat.total': 'So far',
   'stage.beat.whole': '1 whole',

@@ -461,10 +461,14 @@ export function completeOrder(state, order, result = {}) {
     const task = order.tasks.find((item) => item.id === attempt.taskId);
     if (task) recordBusinessAttempt(state, task.mode, !!attempt.correct, { taskId: task.id });
   }
-  const profit = Math.max(0, order.priceCents - order.costCents);
+  // A fresh-serve tip (result.tipCents) is pure upside — extra revenue the customer
+  // leaves for a dish served while golden. It's never negative, so a late serve simply
+  // earns the base profit with no tip (see BusinessController.serveBusinessOrder).
+  const tip = Math.max(0, Math.round(result.tipCents || 0));
+  const profit = Math.max(0, order.priceCents - order.costCents) + tip;
   state.shopCoins += profit;
   state.day.ordersServed += 1;
-  state.day.revenueCents += order.priceCents;
+  state.day.revenueCents += order.priceCents + tip;
   state.day.costCents += order.costCents;
   state.day.profitCents += profit;
   state.day.demand[order.recipeId] = (state.day.demand[order.recipeId] || 0) + order.quantity;
@@ -475,11 +479,12 @@ export function completeOrder(state, order, result = {}) {
     priceCents: order.priceCents,
     costCents: order.costCents,
     profitCents: profit,
+    tipCents: tip,
     t: Date.now(),
   });
   state.history = state.history.slice(-40);
   state.activeOrder = null;
-  return { profitCents: profit, shopCoins: state.shopCoins };
+  return { profitCents: profit, tipCents: tip, shopCoins: state.shopCoins };
 }
 
 export function restockIngredient(state, ingredientId, units) {
@@ -540,7 +545,19 @@ export function aggregateBusinessReport(profile) {
   const modes = {};
   for (const mode of Object.keys(BUSINESS_MODES)) modes[mode] = { attempts: 0, correct: 0 };
   const totals = { ordersServed: 0, revenueCents: 0, costCents: 0, profitCents: 0 };
-  for (const shop of Object.values(shops)) {
+  // Per-shop lines for the parent dashboard: the merged `modes` still drive curriculum
+  // coverage (a money/fraction objective is practiced wherever the child ran it), but
+  // parents also get a bakery-vs-pizzeria breakdown of orders/profit and each shop's day.
+  const perShop = {};
+  for (const [shopId, shop] of Object.entries(shops)) {
+    perShop[shopId] = {
+      ordersServed: shop.day?.ordersServed ?? 0,
+      revenueCents: shop.day?.revenueCents ?? 0,
+      costCents: shop.day?.costCents ?? 0,
+      profitCents: shop.day?.profitCents ?? 0,
+      shopCoins: shop.shopCoins ?? 0,
+      currentDay: shop.currentDay ?? 1,
+    };
     totals.ordersServed += shop.day?.ordersServed ?? 0;
     totals.revenueCents += shop.day?.revenueCents ?? 0;
     totals.costCents += shop.day?.costCents ?? 0;
@@ -558,5 +575,5 @@ export function aggregateBusinessReport(profile) {
     stats.coverage = stats.correct >= 3 && stats.rate >= 0.8 ? 'covered'
       : stats.attempts > 0 ? 'partial' : 'playable';
   }
-  return { ...totals, modes };
+  return { ...totals, modes, shops: perShop };
 }

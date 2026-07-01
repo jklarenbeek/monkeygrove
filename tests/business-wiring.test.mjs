@@ -186,9 +186,27 @@ test('each shop renders only its own storefront (bakery vs pizzeria)', async () 
   assert.ok(bakery.zone.props.includes('basket'), 'bakery reuses bread/basket display visuals');
   assert.ok(pizzeria.zone.props.includes('pizzaPan'), 'pizzeria reuses pizza pan visuals');
   assert.ok(pizzeria.zone.props.includes('toppingCrate'), 'pizzeria reuses topping crate visuals');
-  // both shops share the same cozy room layout, so their station cells resolve in each
+  // the two shops now have genuinely different footprints (not just different props in
+  // one shared box), so a child reads them as distinct places on sight
+  assert.notDeepEqual(
+    { w: bakery.size.w, d: bakery.size.d },
+    { w: pizzeria.size.w, d: pizzeria.size.d },
+    'bakery and pizzeria are different room shapes',
+  );
+  // …and different floor tints + sign colours, so they read distinct on colour too
+  assert.notDeepEqual(bakery.zone.floor, pizzeria.zone.floor, 'shops have different floor tints');
+  assert.notEqual(bakery.zone.signBg, pizzeria.zone.signBg, 'shops have different sign colours');
+  // each shop still resolves its own stations and lands the player on a walkable spawn
   assert.equal(bakery.stationAt(bakery.stations.prep.x, bakery.stations.prep.z), 'prep');
   assert.equal(pizzeria.stationAt(pizzeria.stations.oven.x, pizzeria.stations.oven.z), 'oven');
+  for (const place of [bakery, pizzeria]) {
+    const spawnCell = place.cellAt(place.spawn.x, place.spawn.z);
+    assert.ok(spawnCell && spawnCell.walk !== false, `${place.shopId} spawn is a walkable floor cell`);
+    for (const name of STATION_NAMES) {
+      const s = place.stations[name];
+      assert.ok(place.cellAt(s.x, s.z), `${place.shopId} ${name} station sits on a real cell`);
+    }
+  }
 });
 
 test('a shop scene stays its own shop — setActiveRecipe never switches rooms', async () => {
@@ -447,6 +465,30 @@ test('the oven bake step is wired, gated, and localized', () => {
     'business.bake.prep_first', 'business.bake.first',
   ];
   for (const key of BAKE_KEYS) {
+    assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
+  }
+});
+
+test('the "serve it golden" freshness reward gradient is wired, gentle, and localized', () => {
+  const main = mainSource(); // main.js + business/controller.js + hub.js
+  const i18n = i18nSource();
+
+  // A ready dish cools over a warm window, and the window may ONLY run in free-roam —
+  // never while a panel (i.e. a math answer) is open. This is the anti-anxiety guard.
+  assert.ok(main.includes('freshWindowMs'), 'the warm window duration comes from BALANCE');
+  assert.ok(main.includes('freshMs'), 'the controller tracks the remaining warm window');
+  assert.match(main, /freeRoaming\s*\(\s*\)/, 'freshness only ticks while roaming the shop');
+  assert.match(main, /'#screens \.screen'/, 'the warm window pauses whenever any panel is open');
+  assert.match(main, /coolDown\s*\(\s*\)/, 'the window expiring cools the dish (never ruins it)');
+
+  // Serving a cooled dish is still a full sale — only the tip is missed (pure upside).
+  assert.match(main, /bakeStatus\s*===\s*'ready'/, 'a golden serve is detected for the tip');
+  assert.match(main, /tipCents\s*=\s*fresh\s*\?\s*BALANCE\.freshTipCents\s*:\s*0/, 'the tip is only added on a fresh serve, never subtracted');
+  assert.match(main, /!==\s*'cooled'/, 'a cooled dish can still be served (no lost sale)');
+  assert.ok(main.includes('celebrateFreshServe'), 'a fresh serve gets a small celebration');
+  assert.ok(main.includes('cooled_coach'), 'a cooled serve gets a gentle coach line, not a scold');
+
+  for (const key of ['business.bake.cooled', 'business.bake.cooled_coach', 'business.fresh_tip']) {
     assert.equal(countQuotedKey(i18n, key), 2, `${key} is defined in both en and nl`);
   }
 });

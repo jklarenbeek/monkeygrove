@@ -164,11 +164,12 @@ her worktable.
 - **Choices sequence, never exclude.** Every build stays available forever —
   her choices control order and who moves in next. No missable content, per
   the anti-anxiety guarantees.
-- **Seven plot-based builds** (ACNH bridge-funding model; fixed plots in the
+- **Eight plot-based builds** (ACNH bridge-funding model; fixed plots in the
   hub template): lantern path 30🍌 (0.25pt) → fruit stand 60 (0.7 — Rin the
   Red Panda moves in, saves +8🍌/day) → flower garden 90 (1.2) → music stage
-  120 (1.8 — Kiki the Kitten, tappable gong) → bakery 150 (2.4 — Mo the
-  Piglet, +3 egg/day) → bridge 200 (3.0, opens the festival islet) →
+  120 (1.8 — Kiki the Kitten, three songs) → bakery 150 (2.4 — Mo the
+  Piglet, +3 egg/day) → pizzeria 180 (2.6 — Olli the Owl, a second shop) →
+  bridge 200 (3.0, opens the festival islet) →
   **festival plaza** 500 (3.4 + bridge). At the plaza the Crab King interrupts
   with his apology and pays half from the returned hoard; the festival makes
   the whole island bloom for good and he stays on, sheepish and tappable.
@@ -182,16 +183,57 @@ her worktable.
   `screens.js`, flow in `main.js`.
 
 ## Bakery/Pizzeria business simulation
-After the bakery build is complete, the child can open a cozy shop scene. The
-existing helper animal models become customers: Tuk the Turtle, Pip the Bunny,
-Dot the Duckling, and Olli the Owl. Orders ask the child to prepare recipes,
-portion pizzas, measure ingredients, handle payment and change, watch stock,
-earn shop coins, and buy gentle upgrades.
+The bakery and the pizzeria are **two separate shops** (each its own hub build,
+resident, 3D scene, and independent economy — coins, stock, upgrades, day).
+They are not the same room re-dressed: the **bakery is an octagonal cottage**
+(warm wheat floor, Mo the Piglet 🐷), the **pizzeria a wider trattoria** you
+enter through a street vestibule (terracotta floor, Olli the Owl 🦉). The existing
+helper animal models become customers: Tuk the Turtle, Pip the Bunny, Dot the
+Duckling, and Olli the Owl. Orders ask the child to prepare recipes, portion
+pizzas, measure ingredients, handle payment and change, watch stock, earn shop
+coins, and buy gentle upgrades. Ingredient sets are disjoint so each shop is a
+real, self-contained economy. The parent dashboard sums both shops for objective
+coverage and also shows a per-shop orders/profit breakdown.
 
 There is no timer, debt, loss spiral, or shame. Mistakes keep the customer
 waiting kindly and offer another try. The shop is child-facing as orders, ovens,
 coins, stock, and upgrades; parent-facing progress maps to `NL_PO` objectives
 for money, measurement, fractions, ratios, percentages, profit, and data.
+
+**"Serve it golden" (the one place the world's clock breathes).** A real shop
+can't take forever — food cools, customers want their order. We honour that
+without breaking the bar by making promptness a *reward gradient, never a
+penalty*: once a dish is baked it stays warm for a short window; serve it while
+golden and the happy customer leaves a small **fresh tip** (+coins, a sparkle).
+Miss the window and the dish simply **cools** — it still sells at full base
+price, nothing is burned or lost, and the shopkeeper gives one gentle "next time
+serve it golden" nudge. Crucially the warm-window clock **only runs while the
+child is walking the shop and pauses the instant any panel is open**, so it can
+never race a math answer (the mirror of "crabs freeze while an answer is placed").
+Tuning: `BALANCE.freshWindowMs` / `freshTipCents`; logic in
+`business/controller.js` (`coolDown`, `freeRoaming`, `celebrateFreshServe`) and
+`business/engine.js` (`completeOrder` tip).
+
+## Music stage (Kiki's three songs)
+The `stage` build opens Kiki the Kitten's music stage — a small 3D backdrop
+(raised platform, golden gong, footlight lanterns, Kiki) driven by a song menu
+and one panel per song. Each song is a distinct game that quietly practices real
+arithmetic, gated by grade so difficulty ramps along the journey:
+- **Echo Song** — repeat back Kiki's growing pad pattern (sequence memory/order).
+  Pads carry a permanent number so identity never depends on colour (colour-blind
+  safe); the flash drops its motion under `reducedMotion()`.
+- **Counting Song** — ring the gong on the beats that are multiples of *n*
+  (skip-counting / times tables). A "count along" metronome walks 1..N, sounding
+  each count (rising tones, a marimba accent on multiples) and pulsing the gong —
+  so the rhythm is *embodied*, never a persistent answer key.
+- **Beat Bar** — fill one bar from note values that sum to a whole (fraction
+  addition). Tiles show a drawn fraction-pie glyph (font-proof, reinforces size).
+"Rhythm" is expressed as *which beats*, never *when* — no timing is graded
+(anti-anxiety). Correct rounds feed the SAME mastery the chambers use
+(`reinforceSkill`: the Counting Song → `tables_a`, the Beat Bar → `frac_magnitude`),
+so the stage and the worlds share one signal. The `music_skip_count` "did you
+know" wonder fires deliberately from the Counting Song (Kiki is the Garden /
+skip-counting friend). Files: `src/stage/*` and `src/screens/stage.js`.
 
 ## Hub island
 Walkable (same grid-hop tech as chambers). Your monkey + pets idle and wander;
@@ -247,7 +289,9 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
 - Wrong answers cost nothing and always teach (model + one-line why).
 - Crabs freeze while a stone is carried / an answer is being placed.
 - No countdown timers in core play (optional "Lightning Vine" fluency mode
-  unlocks only after a skill is accurate, per the research).
+  unlocks only after a skill is accurate, per the research). The one soft clock —
+  the shop's "serve it golden" warm window — grades *only* a bonus tip, never a
+  math answer, and pauses whenever a panel is open (see Bakery/Pizzeria above).
 - Progress language celebrates understanding ("You can SEE the sevens now!"),
   never speed or rank.
 

@@ -519,7 +519,9 @@ class Game {
     this.particles = new Particles(this.place.group);
     this.place.fx = this.particles;
     this.avatar.spawnAvatar();
-    const spawn = { x: 2, z: Math.max(1, this.place.size.d - 3) };
+    // Each shop has its own footprint, so it names its own spawn cell; fall back to the
+    // generic bottom-left only if a scene ever omits one.
+    const spawn = this.place.spawn || { x: 2, z: Math.max(1, this.place.size.d - 3) };
     this.player.setPlace(this.place, spawn.x, spawn.z);
     this.avatar.spawnPet(spawn);
     this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);

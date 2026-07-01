@@ -1,5 +1,6 @@
 // End-to-end smoke test: boots the real WebGL game in headless Chrome and drives
-// the flow node/happy-dom can't reach — title -> create profile -> hub -> kitchen.
+// the flow node/happy-dom can't reach — title -> create profile -> hub -> bakery ->
+// pizzeria (its own shop + footprint) -> music stage (grades a song) -> crabs -> leaks.
 // Self-contained: spawns its own Vite dev server on a dedicated port and tears it
 // down. Needs a Chrome/Chromium (skips cleanly if none is found, so CI without a
 // browser won't fail). Run with: npm run test:e2e
@@ -87,23 +88,57 @@ try {
   assert.equal(await evalp(`!${sh('#screens')}.firstElementChild`), true, 'hub: no modal screen open');
   assert.ok(await present('#btn-settings'), 'hub HUD is visible');
 
-  // 6. dev preset: build the bakery, then enter the business scene
+  // 6. dev preset: complete the festival so ALL builds exist (bakery, pizzeria, stage),
+  //    then enter the bakery business scene. festival_complete builds every plot, so we
+  //    can drive both shops and the music stage from one preset.
   await click('#btn-settings');
   await waitSel('#settings-extra-toggle');
   await click('#settings-extra-toggle');
-  await waitSel('[data-settings-preset="bakery_built"]');
-  await click('[data-settings-preset="bakery_built"]');
+  await waitSel('[data-settings-preset="festival_complete"]');
+  await click('[data-settings-preset="festival_complete"]');
   await pause(1500);
   // startBusiness() is async now (it lazy-loads the business-* chunk); await the
   // promise so the assertion is real and this.business exists before we use it.
+  await evalp('(() => { window.__game.pendingShopId = "bakery"; })()');
   assert.equal(await evalp('window.__game.startBusiness()'), true, 'business mode starts (bakery is built)');
   await pause(1200);
 
-  // 7. the order panel works and shows the TODO_06 bake status
+  // 7. the order panel works and shows the bake status; the bakery serves ONLY bakery goods
   await evalp('window.__game.business.showBusinessOrderPanel()');
   await waitSel('#business-serve');
   const panel = await text();
   assert.ok(/oven|🍞|🔥/i.test(panel), `order panel shows a bake status (got: ${panel.slice(0, 80)})`);
+  assert.equal(await evalp('window.__game.business.shopId'), 'bakery', 'the bakery controller is the bakery');
+  assert.equal(await evalp("['flatbread','berry_tart'].includes(window.__game.business.shop().activeOrder.recipeId)"),
+    true, 'the bakery only serves bakery recipes');
+
+  // 7b. the pizzeria is its OWN shop, own footprint, and serves only pizza
+  await evalp('window.__game.startHub()');
+  await pause(500);
+  await evalp('(() => { window.__game.pendingShopId = "pizzeria"; })()');
+  assert.equal(await evalp('window.__game.startBusiness()'), true, 'business mode starts (pizzeria is built)');
+  await pause(1000);
+  assert.equal(await evalp('window.__game.business.shopId'), 'pizzeria', 'the pizzeria controller is the pizzeria');
+  assert.equal(await evalp('window.__game.place.shopId'), 'pizzeria', 'the pizzeria scene is the pizzeria');
+  assert.equal(await evalp("['margherita','tomato_pizza'].includes(window.__game.business.shop().activeOrder.recipeId)"),
+    true, 'the pizzeria only serves pizza recipes');
+  // different footprint from the bakery (the two shops are not the same room)
+  const pizzaRoom = await evalp('({ w: window.__game.place.size.w, d: window.__game.place.size.d })');
+  assert.ok(pizzaRoom.w === 17 && pizzaRoom.d === 11, `pizzeria has its own footprint (got ${JSON.stringify(pizzaRoom)})`);
+
+  // 7c. the music stage plays and grades a song (progress recorded)
+  await evalp('window.__game.startHub()');
+  await pause(500);
+  assert.equal(await evalp('window.__game.startStage()'), true, 'music stage starts (stage is built)');
+  await pause(1000);
+  // play the Echo song and grade its exact sequence — a correct round bumps progress
+  await evalp('window.__game.stage.playSong("echo")');
+  await pause(300);
+  const echoBefore = await evalp('(window.__game.profile.stage.progress.echo?.correct) || 0');
+  await evalp('window.__game.stage.grade({ sequence: window.__game.stage.round.sequence.slice() })');
+  await pause(300);
+  const echoAfter = await evalp('(window.__game.profile.stage.progress.echo?.correct) || 0');
+  assert.ok(echoAfter > echoBefore, `music stage grades a correct Echo round (${echoBefore} -> ${echoAfter})`);
 
   // 8. crabs: drop into a fetch chamber (its template carries crab markers) and
   //    confirm the crabs actually roam — the wandering AI ticks without errors
@@ -137,7 +172,7 @@ try {
   assert.ok(peak <= baseline * 1.5 + 40, `geometry count stays bounded over 10× transitions (samples: ${samples.join(',')})`);
 
   assert.deepEqual(errors, [], `no page errors during the run`);
-  console.log(`e2e: PASSED — boot -> profile -> hub -> kitchen -> crabs roam -> 10× transitions bounded (${samples.join(',')}), no errors.`);
+  console.log(`e2e: PASSED — boot -> profile -> hub -> bakery -> pizzeria -> music stage -> crabs roam -> 10× transitions bounded (${samples.join(',')}), no errors.`);
 } catch (e) {
   console.error('e2e: FAILED —', e.message);
   code = 1;

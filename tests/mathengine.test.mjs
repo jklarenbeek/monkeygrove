@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Rng } from '../src/rng.js';
 import {
   WORLDS, SKILLS, createMathState, nextProblem, recordResult,
-  masteryReport, expectedSuccess,
+  masteryReport, expectedSuccess, reinforceSkill,
 } from '../src/mathengine.js';
 import { portalStage } from '../src/config.js';
 
@@ -279,6 +279,20 @@ test('Elo: update matches formula, hint scores 0.7, K halves after 20 attempts',
   const e4 = expectedSuccess(m4, p);
   const late = recordResult(m4, p, { correct: true, usedHint: false, ms: 900 });
   assert.ok(Math.abs(late.delta - 16 * (1 - e4)) < 1e-9);
+});
+
+test('reinforceSkill: a minigame win nudges the real skill up (fair difficulty), unknown is a no-op', () => {
+  const m = createMathState();
+  const before = m.skills.tables_a.r;
+  const res = reinforceSkill(m, 'tables_a', true, { now: 1 });
+  // scored as a fair fight (difficulty = current rating -> expected 0.5), so +K*0.5
+  assert.ok(res && res.rating > before, 'a correct stage round raises the mapped skill rating');
+  assert.ok(Math.abs(res.delta - 32 * 0.5) < 1e-9, 'fair-difficulty gain is K*(1-0.5)');
+  assert.equal(m.skills.tables_a.n, 1, 'the skill records the attempt');
+  // a wrong minigame round nudges down; an unknown skill changes nothing
+  const wrong = reinforceSkill(createMathState(), 'frac_magnitude', false, { now: 1 });
+  assert.ok(wrong.delta < 0, 'a missed round nudges the skill down');
+  assert.equal(reinforceSkill(m, 'not_a_skill', true), null, 'unknown skill is a no-op');
 });
 
 test('expectedSuccess rises with skill rating', () => {

@@ -655,6 +655,20 @@ export const audio = {
     marimba(hz(scale[((i | 0) % scale.length + scale.length) % scale.length]), ctx.currentTime, 0.4, 0.6);
   },
 
+  // Counting Song metronome tone: beat `n` (1-based) sounds a rising C-pentatonic pitch
+  // so counting up is heard going up; a multiple of the step gets a warm marimba accent
+  // (the skip-count you're practicing), a plain beat gets a soft tick. Reinforces
+  // skip-counting aurally (the "ring the gong on the multiples" rhythm), never graded.
+  count(n, isMultiple) {
+    if (!ctx || !sfxOn) return;
+    const scale = [60, 62, 64, 67, 69]; // C D E G A — C major pentatonic
+    const k = Math.max(1, n | 0) - 1;
+    const midi = scale[k % scale.length] + 12 * Math.floor(k / scale.length);
+    const t = ctx.currentTime;
+    if (isMultiple) marimba(hz(midi), t, 0.32, 0.5);
+    else tone({ freq: hz(midi), type: 'triangle', t, dur: 0.13, gain: 0.12 });
+  },
+
   music(name) {
     requestedMusic = name;
     if (!ctx || !musicOn) return;

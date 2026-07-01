@@ -125,6 +125,16 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
 function parentBusinessHtml(businessReport) {
   if (!businessReport) return '';
   const modes = Object.entries(businessReport.modes || {});
+  const shops = Object.entries(businessReport.shops || {});
+  // Per-shop breakdown: bakery vs pizzeria orders + profit today, so parents see each
+  // shop's activity separately (the objective coverage below still spans both shops).
+  const shopLines = shops.map(([id, s]) => `
+    <div class="skill-row">
+      <div class="s-name">${esc(t('business.zone.' + id))}</div>
+      <div style="font-size:12px;color:var(--ink-soft);min-width:150px;text-align:right">
+        ${esc(t('business.orders_served', { n: s.ordersServed || 0 }))} · ${esc(money(s.profitCents))}
+      </div>
+    </div>`).join('');
   return `
     <div class="card">
       <h3>${esc(t('parents.business'))}</h3>
@@ -132,6 +142,7 @@ function parentBusinessHtml(businessReport) {
         <div class="chip">${esc(t('business.orders_served', { n: businessReport.ordersServed || 0 }))}</div>
         <div class="chip">${esc(t('business.profit'))}: ${esc(money(businessReport.profitCents))}</div>
       </div>
+      ${shopLines}
       <div class="curriculum-objectives">
         ${modes.map(([id, mode]) => {
           const coverage = mode?.coverage || 'partial';

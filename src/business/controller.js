@@ -34,10 +34,11 @@ export class BusinessController {
     this.shopId = shopById(shopId).id;
     this.businessAttempts = [];
     this.businessCustomer = null;
-    // Bake step: each order's dish must bake in the oven before it can be served.
-    this.bakeStatus = 'raw'; // 'raw' -> 'baking' -> 'ready'
-    this.bakeTimer = 0;      // ms remaining
+    // Bake step: each order's dish must bake, then it stays warm for a short window.
+    this.bakeStatus = 'raw'; // 'raw' -> 'baking' -> 'ready' -> 'cooled'
+    this.bakeTimer = 0;      // ms remaining on the bake
     this.bakeSteam = 0;      // ms until the next steam puff
+    this.freshMs = 0;        // ms of warm window left once 'ready' (serve within it for a tip)
     this.bakeTicker = null;  // frame-driven entity added to the place
   }
 
@@ -52,6 +53,16 @@ export class BusinessController {
     this.bakeStatus = 'raw';
     this.bakeTimer = 0;
     this.bakeSteam = 0;
+    this.freshMs = 0;
+  }
+
+  // The freshness window may only run while the child is roaming the 3D shop — never
+  // while ANY panel is open. That guarantees the "serve it golden" timer can never race
+  // a math answer (the arithmetic panels are always open when solving), so this stays
+  // firmly inside the anti-anxiety bar: it nudges promptness, never pressures thinking.
+  freeRoaming() {
+    if (typeof document === 'undefined') return false;
+    return !document.querySelector('#screens .screen');
   }
 
   bakePrepDone(order) {
@@ -65,11 +76,21 @@ export class BusinessController {
     if (this.bakeTicker || !this.game.place?.addEntity) return;
     this.bakeTicker = {
       update: (dtMs) => {
-        if (this.bakeStatus !== 'baking') return;
-        this.bakeTimer -= dtMs;
-        this.bakeSteam -= dtMs;
-        if (this.bakeSteam <= 0) { this.emitSteam(); this.bakeSteam = 260; }
-        if (this.bakeTimer <= 0) this.finishBake();
+        if (this.bakeStatus === 'baking') {
+          this.bakeTimer -= dtMs;
+          this.bakeSteam -= dtMs;
+          if (this.bakeSteam <= 0) { this.emitSteam(); this.bakeSteam = 260; }
+          if (this.bakeTimer <= 0) this.finishBake();
+          return;
+        }
+        // A golden, ready dish stays warm only while the child is walking the shop —
+        // the window pauses the instant any panel opens (math is never on a clock).
+        if (this.bakeStatus === 'ready' && this.freeRoaming()) {
+          this.freshMs -= dtMs;
+          this.bakeSteam -= dtMs;
+          if (this.bakeSteam <= 0) { this.emitSteam(); this.bakeSteam = 700; }
+          if (this.freshMs <= 0) this.coolDown();
+        }
       },
     };
     this.game.place.addEntity(this.bakeTicker);
@@ -81,6 +102,18 @@ export class BusinessController {
     if (!oven || !place.fx || !place.worldPos) return;
     const p = place.worldPos(oven.x, oven.z, 1.1);
     place.fx.emit(p, 6, { colors: [0xffffff, 0xf0f0f0, 0xe2e2e2], speed: 0.45, up: 1.6, life: 1300, spread: 0.4 });
+  }
+
+  // A golden, on-time serve: a little sparkle over the counter and the fresh-tip toast.
+  // This is the whole reward gradient a child sees — a bonus for promptness, never a loss.
+  celebrateFreshServe(tipCents) {
+    const place = this.game.place;
+    const counter = place?.activeStations?.counter;
+    if (counter && place?.fx && place?.worldPos) {
+      const p = place.worldPos(counter.x, counter.z, 1.2);
+      place.fx.emit(p, 10, { colors: [0xfff3a0, 0xffe066, 0xfff8d0], speed: 0.6, up: 1.4, life: 1100, spread: 0.5 });
+    }
+    hud.toast(`✨ ${t('business.fresh_tip')} +${((tipCents || 0) / 100).toFixed(2)}`);
   }
 
   startBake() {
@@ -96,8 +129,18 @@ export class BusinessController {
   finishBake() {
     this.bakeStatus = 'ready';
     this.bakeTimer = 0;
+    this.freshMs = BALANCE.freshWindowMs;
     audio.sfx('coin');
     hud.toast(t('business.bake.ready'));
+  }
+
+  // The warm window ran out while the dish sat waiting. It's NOT ruined — no penalty,
+  // no lost sale — it just cooled: it still sells at full base price, only the fresh
+  // tip is missed, and the shopkeeper gives one gentle "serve it golden next time" nudge.
+  coolDown() {
+    this.bakeStatus = 'cooled';
+    this.freshMs = 0;
+    hud.toast(t('business.bake.cooled'));
   }
 
   // Tapping the oven: start the bake when the food is prepped, or report status.
@@ -107,6 +150,7 @@ export class BusinessController {
     if (!order) { this.showBusinessOrderPanel(); return; }
     if (this.bakeStatus === 'baking') { hud.toast(t('business.bake.baking')); return; }
     if (this.bakeStatus === 'ready') { hud.toast(t('business.bake.ready')); return; }
+    if (this.bakeStatus === 'cooled') { hud.toast(t('business.bake.cooled')); return; }
     if (!this.bakePrepDone(order)) { audio.sfx('boop'); hud.toast(t('business.bake.prep_first')); return; }
     this.startBake();
   }
@@ -260,13 +304,17 @@ export class BusinessController {
       this.showBusinessOrderPanel();
       return;
     }
-    if (this.bakeStatus !== 'ready') {
+    if (this.bakeStatus !== 'ready' && this.bakeStatus !== 'cooled') {
       // math is done, but the dish still has to come out of the oven
       audio.sfx('boop');
       hud.toast(t(this.bakeStatus === 'baking' ? 'business.bake.baking' : 'business.bake.first'));
       return;
     }
-    const result = completeOrder(business, order, { attempts: this.businessAttempts });
+    // Served while still golden? The happy customer leaves a fresh tip (pure upside).
+    // A cooled dish still sells at full base price — it just misses the tip.
+    const fresh = this.bakeStatus === 'ready';
+    const tipCents = fresh ? BALANCE.freshTipCents : 0;
+    const result = completeOrder(business, order, { attempts: this.businessAttempts, tipCents });
     business.queue = [];
     this.businessAttempts = [];
     this.resetBake();
@@ -277,6 +325,8 @@ export class BusinessController {
     this.game.refreshHudCounts();
     audio.sfx('coin');
     hud.toast(`+${bananas} 🍌 · ${t('business.profit')}: ${(result.profitCents / 100).toFixed(2)}`);
+    if (fresh) this.celebrateFreshServe(result.tipCents);
+    else hud.say(t('business.bake.cooled_coach'), { face: shopById(this.shopId).resident.face });
     this.maybeShopWonder();
     if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) this.endBusinessDay();
     else this.startNextBusinessOrder();

@@ -22,6 +22,8 @@ import {
   orderIsMakeable,
   restockIngredient,
   classifyBusinessMiss,
+  aggregateBusinessReport,
+  ensureBusinessState,
 } from '../src/business/engine.js';
 import { createCurriculumState } from '../src/curriculum/placement.js';
 import { Rng } from '../src/rng.js';
@@ -324,6 +326,59 @@ test('completeOrder records profit, business progress, and no-loss retries', () 
   assert.equal(state.progress.portion_halves_quarters.correct, 1);
   assert.equal(state.progress.portion_halves_quarters.attempts, 2);
   assert.equal(state.progress.money_make_amounts.correct, 1);
+});
+
+test('completeOrder adds a fresh-serve tip as pure upside (revenue, profit, coins, history)', () => {
+  const state = createShopState('pizzeria');
+  const order = {
+    id: 'o-tip', recipeId: 'margherita', quantity: 1,
+    priceCents: 450, costCents: 160, customerId: 'turtle', tasks: [],
+  };
+
+  const result = completeOrder(state, order, { tipCents: 45 });
+
+  // base profit is 290 (450 - 160); the tip is added on top, never subtracted
+  assert.equal(result.tipCents, 45);
+  assert.equal(result.profitCents, 335, 'tip is added to profit');
+  assert.equal(state.shopCoins, 335, 'tip is banked as shop coins');
+  assert.equal(state.day.revenueCents, 495, 'tip counts as revenue (450 + 45)');
+  assert.equal(state.day.profitCents, 335);
+  assert.equal(state.history.at(-1).tipCents, 45, 'the tip is recorded in history');
+});
+
+test('completeOrder without a tip earns the base profit only (a cooled/late serve)', () => {
+  const state = createShopState('pizzeria');
+  const order = {
+    id: 'o-notip', recipeId: 'margherita', quantity: 1,
+    priceCents: 450, costCents: 160, customerId: 'turtle', tasks: [],
+  };
+
+  const result = completeOrder(state, order, {}); // no tipCents -> defaults to 0
+
+  assert.equal(result.tipCents, 0);
+  assert.equal(result.profitCents, 290, 'no tip means base profit, never a penalty');
+  assert.equal(state.day.revenueCents, 450, 'base price only, still a full sale');
+});
+
+test('aggregateBusinessReport gives a per-shop breakdown and merges coverage across shops', () => {
+  const profile = {};
+  const shops = ensureBusinessState(profile);
+  // one served order in each shop, with different profits
+  completeOrder(shops.bakery, {
+    id: 'b1', recipeId: 'flatbread', quantity: 1, priceCents: 375, costCents: 125, customerId: 'owl', tasks: [],
+  }, {});
+  completeOrder(shops.pizzeria, {
+    id: 'p1', recipeId: 'margherita', quantity: 1, priceCents: 450, costCents: 160, customerId: 'turtle', tasks: [],
+  }, { tipCents: 45 });
+
+  const report = aggregateBusinessReport(profile);
+  assert.ok(report.shops.bakery && report.shops.pizzeria, 'per-shop breakdown is present');
+  assert.equal(report.shops.bakery.ordersServed, 1);
+  assert.equal(report.shops.pizzeria.ordersServed, 1);
+  assert.equal(report.shops.bakery.profitCents, 250, 'bakery keeps its own profit');
+  assert.equal(report.shops.pizzeria.profitCents, 335, 'pizzeria profit includes its tip');
+  assert.equal(report.ordersServed, 2, 'totals still sum across shops');
+  assert.equal(report.profitCents, 585);
 });
 
 test('completeOrder does not double-count attempts already recorded by actions', () => {

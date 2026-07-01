@@ -2,6 +2,7 @@ import { Place } from '../chamber.js';
 import { makeCharacter, makeProp, makeTextSprite } from '../entities.js';
 import { PROPS, getCreature } from '../models.js';
 import { t } from '../i18n.js';
+import { reducedMotion } from '../a11y.js';
 
 // Kiki the Kitten's music stage: a small raised platform with a golden gong at the back,
 // footlight lanterns, and Kiki herself waiting to play. The whole minigame is screen-driven
@@ -62,7 +63,20 @@ export class StagePlace extends Place {
     const gongCell = this.cellAt(this.gong.x, this.gong.z);
     if (gongCell) gongCell.walk = false;
     this.gongMesh = gongProp;
+    this._gongBase = gongProp.scale.clone();
+    this._gongPulse = 0; // 1 right after a note, eased back to 0 each frame
+    this._kikiPulse = 0;
     this.world.pickables?.push(gongProp);
+    // Ease the gong pulse (and Kiki's extra hop) back down every frame, so pulseStage()
+    // just needs to bump them. The gong scales relative to its authored base scale.
+    this.addEntity({
+      update: (dtMs) => {
+        const dt = dtMs / 1000;
+        this._gongPulse = Math.max(0, this._gongPulse - dt * 2.6);
+        this._kikiPulse = Math.max(0, this._kikiPulse - dt * 2.4);
+        this.gongMesh.scale.copy(this._gongBase).multiplyScalar(1 + this._gongPulse * 0.18);
+      },
+    });
 
     // footlight lanterns at the platform corners
     for (const spot of LANTERNS) {
@@ -89,7 +103,8 @@ export class StagePlace extends Place {
       t: 0,
       update: (dtMs) => {
         bob.t += dtMs / 1000;
-        kiki.position.y = baseY + Math.abs(Math.sin(bob.t * 1.9)) * 0.05;
+        // idle bob + an extra hop on each note (pulseStage bumps _kikiPulse)
+        kiki.position.y = baseY + Math.abs(Math.sin(bob.t * 1.9)) * 0.05 + this._kikiPulse * 0.14;
       },
     };
     this.addEntity(bob);
@@ -107,5 +122,19 @@ export class StagePlace extends Place {
   // World position of the gong, for confetti / steam-style fx.
   gongWorld(lift = 0.9) {
     return this.worldPos(this.gong.x, this.gong.z, lift);
+  }
+
+  // Pulse the real 3D stage on a note: light the gong (scale bump + a little sparkle)
+  // and give Kiki an extra hop, so Echo playback is felt on stage, not only on the DOM
+  // pads. Motion is skipped under reducedMotion(); a faint sparkle still marks the beat.
+  pulseStage() {
+    if (!reducedMotion()) {
+      this._gongPulse = 1;
+      this._kikiPulse = 1;
+    }
+    if (this.fx && this.gongWorld) {
+      this.fx.emit(this.gongWorld(0.9), reducedMotion() ? 2 : 5,
+        { colors: [0xffd166, 0xfff3a0, 0xffe066], speed: 0.5, up: 1.2, life: 520, spread: 0.32 });
+    }
   }
 }

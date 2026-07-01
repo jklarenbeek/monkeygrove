@@ -53,8 +53,37 @@ test('stage strings are defined in both English and Dutch', () => {
     'stage.songs', 'stage.play', 'stage.locked', 'stage.listen', 'stage.correct',
     'stage.song.echo', 'stage.song.count', 'stage.song.beat',
     'stage.echo.prompt', 'stage.count.prompt', 'stage.beat.prompt',
+    'stage.count.play',
     'stage.hint.echo', 'stage.hint.count', 'stage.hint.beat',
   ]) {
     assert.equal(countKey(i18n, key), 2, `${key} is defined in both en and nl`);
   }
+});
+
+test('a correct round feeds the shared mathengine mastery, gated by song', () => {
+  const controller = read('src', 'stage', 'controller.js');
+  assert.ok(controller.includes("import { reinforceSkill } from '../mathengine.js'"), 'controller imports reinforceSkill');
+  assert.match(controller, /STAGE_MODES\[this\.songId\]\?\.reinforceSkill/, 'the song names which skill it reinforces');
+  assert.match(controller, /reinforceSkill\(this\.game\.profile\.math, skill, true/, 'a correct round nudges that skill');
+});
+
+test('the count song reinforces tables, the beat song reinforces fractions, echo neither', () => {
+  const data = read('src', 'stage', 'data.js');
+  assert.match(data, /count:[\s\S]*?reinforceSkill:\s*'tables_a'/, 'the Counting Song feeds tables_a');
+  assert.match(data, /beat:[\s\S]*?reinforceSkill:\s*'frac_magnitude'/, 'the Beat Bar feeds frac_magnitude');
+  assert.match(data, /echo:[\s\S]*?reinforceSkill:\s*null/, 'Echo reinforces no chamber skill');
+});
+
+test('the skip-count wonder fires deliberately from the Counting Song only', () => {
+  const controller = read('src', 'stage', 'controller.js');
+  const fn = controller.slice(controller.indexOf('maybeStageWonder()'));
+  assert.match(fn, /this\.songId !== 'count'[\s\S]*?return/, 'maybeStageWonder is gated to the count song');
+});
+
+test('the 3D stage pulses on each note (gong + Kiki), reduced-motion safe', () => {
+  const scene = read('src', 'stage', 'scene.js');
+  const controller = read('src', 'stage', 'controller.js');
+  assert.match(scene, /pulseStage\s*\(\s*\)/, 'the scene exposes a pulse');
+  assert.ok(scene.includes('reducedMotion'), 'the pulse respects reduced motion');
+  assert.ok(controller.includes('pulseStage'), 'the controller pulses the stage on notes');
 });

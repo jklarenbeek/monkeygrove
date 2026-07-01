@@ -74,7 +74,9 @@ export function showStageEcho({ round, onNote, onSubmit, onClose }) {
     </div>
     <div class="stage-pads">
       ${ECHO_PADS.map((pad) => `
-        <button class="stage-pad" data-pad="${pad.id}" style="--pad:${pad.color}" aria-label="pad ${pad.id + 1}"></button>`).join('')}
+        <button class="stage-pad" data-pad="${pad.id}" style="--pad:${pad.color}" aria-label="pad ${pad.id + 1}">
+          <span class="stage-pad-label">${pad.id + 1}</span>
+        </button>`).join('')}
     </div>
     <div class="tagline"><span id="stage-echo-count">0</span> / ${round.length}</div>
   `);
@@ -106,16 +108,21 @@ export function showStageEcho({ round, onNote, onSubmit, onClose }) {
   wireStagePanel(el, { round, action, submit: () => ({ sequence: [...action.sequence] }), onSubmit, onClose });
 }
 
-// Counting Song: ring the gong on every beat that is a multiple of `step`.
-export function showStageCount({ round, onNote, onSubmit, onClose }) {
+// Counting Song: ring the gong on every beat that is a multiple of `step`. A "Count"
+// metronome walks 1..N so the child can HEAR and SEE the skip-count rhythm (a marimba
+// accent + gong pulse on each multiple) — an opt-in aid that never reveals the answer
+// as a persistent marker, so the exercise itself stays intact (P2-6/P2-8).
+export function showStageCount({ round, onNote, onCount, onSubmit, onClose }) {
   const chosen = new Set();
   const el = panelShell('count', t('stage.count.prompt', { step: round.step }), `
     <div class="stage-beats">
       ${Array.from({ length: round.beats }, (_, k) => k + 1).map((n) => `
         <button class="stage-beat" data-beat="${n}">${n}</button>`).join('')}
     </div>
+    <div class="menu-row"><button class="btn soft" id="stage-count-play">▶ ${t('stage.count.play')}</button></div>
   `);
-  for (const btn of el.querySelectorAll('[data-beat]')) {
+  const beatBtns = [...el.querySelectorAll('[data-beat]')];
+  for (const btn of beatBtns) {
     btn.addEventListener('click', () => {
       const n = Number(btn.dataset.beat);
       if (chosen.has(n)) { chosen.delete(n); btn.classList.remove('equipped'); } else {
@@ -123,7 +130,41 @@ export function showStageCount({ round, onNote, onSubmit, onClose }) {
       }
     });
   }
+  // The metronome: step a transient highlight through the beats, sounding each count.
+  let counting = false;
+  el.querySelector('#stage-count-play').addEventListener('click', () => {
+    if (counting) return;
+    counting = true;
+    let k = 0;
+    const tick = () => {
+      if (k > 0) beatBtns[k - 1]?.classList.remove('counting');
+      if (k >= round.beats || !el.isConnected) { counting = false; return; }
+      k += 1;
+      beatBtns[k - 1]?.classList.add('counting');
+      onCount?.(k, k % round.step === 0);
+      setTimeout(tick, 380);
+    };
+    tick();
+  });
   wireStagePanel(el, { round, action: chosen, submit: () => ({ beats: [...chosen] }), onSubmit, onClose });
+}
+
+// A small drawn note glyph: a pie showing this note's fraction of a whole bar. The old
+// Unicode music symbols (𝅗𝅥 𝅘𝅥𝅮 …) rendered inconsistently across fonts; drawing the
+// fraction magnitude instead is font-proof AND quietly reinforces what a 1/4 note *is*.
+function noteGlyph(num, den) {
+  const r = 11, cx = 13, cy = 13, frac = num / den;
+  if (frac >= 1) {
+    return `<svg class="note-glyph" viewBox="0 0 26 26" aria-hidden="true"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#f6a609" stroke="#00000022"/></svg>`;
+  }
+  const a = frac * 2 * Math.PI;
+  const ex = (cx + r * Math.sin(a)).toFixed(2);
+  const ey = (cy - r * Math.cos(a)).toFixed(2);
+  const large = frac > 0.5 ? 1 : 0;
+  return `<svg class="note-glyph" viewBox="0 0 26 26" aria-hidden="true">`
+    + `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="#00000022"/>`
+    + `<path d="M${cx},${cy} L${cx},${cy - r} A${r},${r} 0 ${large},1 ${ex},${ey} Z" fill="#f6a609"/>`
+    + `</svg>`;
 }
 
 // A running units total (in 24ths) shown as a reduced fraction: 0, 1/2, 3/4, … , 1 (whole).
@@ -143,7 +184,7 @@ export function showStageBeat({ round, onNote, onSubmit, onClose }) {
     <div class="stage-notes">
       ${round.tiles.map((id) => `
         <button class="tile pressable" data-note="${esc(id)}">
-          <div class="t-icon">${esc(NOTE_TILES[id].icon)}</div>
+          <div class="t-icon">${noteGlyph(NOTE_TILES[id].num, NOTE_TILES[id].den)}</div>
           <div class="t-name">${NOTE_TILES[id].num}/${NOTE_TILES[id].den}</div>
         </button>`).join('')}
     </div>

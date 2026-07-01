@@ -18,21 +18,28 @@ export const STAGE_ORDER = {
 // The three songs, in unlock order. minStage gates the song on the child's grade so the
 // stage grows harder as they climb. objectiveId ties each song to an NL_PO objective for
 // parent coverage (the mode reinforces it; see ../curriculum/index.js stageCoverage).
+// reinforceSkill (optional) names a real mathengine skill a correct round of this song
+// nudges, so the stage and the chambers share ONE mastery signal (P2-7): the Counting
+// Song's skip-count feeds the times-tables skill, the Beat Bar's fraction sums feed
+// fraction magnitude. Echo (pure sequence memory) maps to no chamber skill.
 export const STAGE_MODES = {
   echo: {
     id: 'echo', kind: 'sequence', minStage: 'grade_1',
     titleKey: 'stage.song.echo', face: '🎵',
     objectiveId: 'nl_po.grade1.counting_and_order',
+    reinforceSkill: null,
   },
   count: {
     id: 'count', kind: 'skip', minStage: 'grade_3',
     titleKey: 'stage.song.count', face: '🔔',
     objectiveId: 'nl_po.grade4.tables_2_5_10',
+    reinforceSkill: 'tables_a',
   },
   beat: {
     id: 'beat', kind: 'notevalue', minStage: 'grade_5',
     titleKey: 'stage.song.beat', face: '🥁',
     objectiveId: 'nl_po.grade6.fraction_magnitude',
+    reinforceSkill: 'frac_magnitude',
   },
 };
 
@@ -58,15 +65,17 @@ export const COUNT_STEPS = [
 
 // Note-value tiles for the Beat Bar. value is in twenty-fourths of a whole bar (LCM of
 // 1/2, 1/3, 1/4, 1/6, 1/8 = 24), so every sum stays an exact integer — no float drift.
-// A whole bar is WHOLE_BAR units. num/den are the child-facing fraction label.
+// A whole bar is WHOLE_BAR units. num/den are the child-facing fraction label; the tile
+// glyph is drawn from num/den as a fraction pie (screens/stage.js noteGlyph), so it no
+// longer depends on inconsistently-rendered Unicode music symbols.
 export const WHOLE_BAR = 24;
 export const NOTE_TILES = {
-  whole: { id: 'whole', units: 24, num: 1, den: 1, icon: '𝅝' },
-  half: { id: 'half', units: 12, num: 1, den: 2, icon: '𝅗𝅥' },
-  third: { id: 'third', units: 8, num: 1, den: 3, icon: '⅓' },
-  quarter: { id: 'quarter', units: 6, num: 1, den: 4, icon: '𝅘𝅥' },
-  sixth: { id: 'sixth', units: 4, num: 1, den: 6, icon: '⅙' },
-  eighth: { id: 'eighth', units: 3, num: 1, den: 8, icon: '𝅘𝅥𝅮' },
+  whole: { id: 'whole', units: 24, num: 1, den: 1 },
+  half: { id: 'half', units: 12, num: 1, den: 2 },
+  third: { id: 'third', units: 8, num: 1, den: 3 },
+  quarter: { id: 'quarter', units: 6, num: 1, den: 4 },
+  sixth: { id: 'sixth', units: 4, num: 1, den: 6 },
+  eighth: { id: 'eighth', units: 3, num: 1, den: 8 },
 };
 
 // Which note tiles a grade may use — halves & quarters first, then the finer values.

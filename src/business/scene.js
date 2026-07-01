@@ -6,45 +6,79 @@ import { PROPS, getCreature } from '../models.js';
 import { t } from '../i18n.js';
 import { BUSINESS_CUSTOMERS, RECIPES, shopById } from './data.js';
 
-// One cozy shop room. The bakery and the pizzeria are separate scenes now (each its
-// own hub build + independent economy), so a BusinessPlace renders exactly ONE shop —
-// whichever the child walked into — instead of the old confusing two-wing room.
-const BUSINESS_ROWS = [
-  '###############',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '#.............#',
-  '###############',
-];
-
-// Station cells are shared by both shops (the room is identical); only the props,
-// storefront dressing, and residents differ per shop — that difference lives in ZONES.
-const STATIONS = {
-  counter: { x: 7, z: 3, prop: 'counter', height: 0.65 },
-  coinTray: { x: 10, z: 3, prop: 'coinTray', height: 0.24, lift: 0.42 },
-  orderBoard: { x: 11, z: 2, prop: 'orderBoard', height: 1.05 },
-  prep: { x: 4, z: 6, prop: 'prepBoard', height: 0.18 },
-  oven: { x: 8, z: 8, prop: 'oven', height: 0.95 },
-  pantry: { x: 3, z: 3, prop: 'shopTable', height: 0.38 },
+// The bakery and the pizzeria are separate scenes now (each its own hub build +
+// independent economy), so a BusinessPlace renders exactly ONE shop — whichever the
+// child walked into. And they are no longer the SAME room with different props: each
+// shop has its own footprint so it reads as a distinct place the moment you walk in.
+// The bakery is a cozy octagonal cottage (its corners are cut off); the pizzeria is a
+// wider trattoria you enter through a narrow street-side vestibule. Everything that
+// depends on the footprint — layout, station coords, queue, spawn — lives per-shop in
+// ZONES; only the prop + display height of each station is shop-agnostic.
+const STATION_DEFS = {
+  counter: { prop: 'counter', height: 0.65 },
+  coinTray: { prop: 'coinTray', height: 0.24, lift: 0.42 },
+  orderBoard: { prop: 'orderBoard', height: 1.05 },
+  prep: { prop: 'prepBoard', height: 0.18 },
+  oven: { prop: 'oven', height: 0.95 },
+  pantry: { prop: 'shopTable', height: 0.38 },
 };
 
-const QUEUE = [{ x: 7, z: 10 }, { x: 6, z: 10 }, { x: 8, z: 10 }, { x: 5, z: 10 }];
+// Cozy octagonal cottage — the four corners are walled off so the bakery reads round.
+const BAKERY_ROWS = [
+  '####.......####',
+  '##...........##',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '#.............#',
+  '##...........##',
+  '####.......####',
+];
 
-// Per-shop storefront: the sign title, the pantry prop, non-station set-dressing, and
-// the resident pets that make the shop feel lived-in. Bakery reuses dough bowl / basket
-// visuals; pizzeria reuses pizza pan / topping crate visuals.
+// Wider trattoria: a broad dining room you enter through a narrow street vestibule
+// (the stem at the bottom) — a clearly different silhouette from the bakery cottage.
+const PIZZERIA_ROWS = [
+  '#################',
+  '#...............#',
+  '#...............#',
+  '#...............#',
+  '#...............#',
+  '#...............#',
+  '#...............#',
+  '#...............#',
+  '#####.......#####',
+  '#####.......#####',
+  '#####.......#####',
+];
+
+// Per-shop storefront: the footprint (rows), where the sign hangs, the station coords
+// for THIS room, the customer queue + player spawn, the pantry prop, non-station
+// set-dressing, and the resident pets that make the shop feel lived-in. Bakery reuses
+// dough bowl / basket visuals; pizzeria reuses pizza pan / topping crate visuals.
 const ZONES = {
   bakery: {
     titleKey: 'business.zone.bakery',
+    rows: BAKERY_ROWS,
+    // Warm buttery-wheat floor + cream sign — cozy cottage bakery.
+    floor: [0xf5e7bf, 0xecdba6],
+    signBg: '#fff6e0ee',
+    signAt: { x: 7, z: 1 },
     pantryProp: 'shopTable',
+    stations: {
+      counter: { x: 7, z: 3 },
+      coinTray: { x: 10, z: 3 },
+      orderBoard: { x: 11, z: 2 },
+      prep: { x: 4, z: 6 },
+      oven: { x: 8, z: 8 },
+      pantry: { x: 3, z: 3 },
+    },
+    queue: [{ x: 7, z: 10 }, { x: 6, z: 10 }, { x: 8, z: 10 }, { x: 5, z: 10 }],
+    spawn: { x: 2, z: 10 },
     props: ['counter', 'prepBoard', 'doughBowl', 'basket', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
     decor: [
       { key: 'doughBowl', x: 5, z: 5, targetH: 0.24, lift: 0.18 },
@@ -55,14 +89,29 @@ const ZONES = {
   },
   pizzeria: {
     titleKey: 'business.zone.pizzeria',
+    rows: PIZZERIA_ROWS,
+    // Terracotta floor + peachy sign — warm Italian trattoria, clearly not the bakery.
+    floor: [0xe7c5a6, 0xd8b088],
+    signBg: '#ffe9d6ee',
+    signAt: { x: 8, z: 1 },
     pantryProp: 'toppingCrate',
+    stations: {
+      counter: { x: 8, z: 2 },
+      coinTray: { x: 11, z: 2 },
+      orderBoard: { x: 12, z: 1 },
+      prep: { x: 4, z: 5 },
+      oven: { x: 8, z: 6 },
+      pantry: { x: 3, z: 2 },
+    },
+    queue: [{ x: 8, z: 8 }, { x: 7, z: 8 }, { x: 9, z: 8 }, { x: 6, z: 8 }],
+    spawn: { x: 8, z: 10 },
     props: ['counter', 'prepBoard', 'pizzaPan', 'toppingCrate', 'coinTray', 'orderBoard', 'shopTable', 'oven'],
     decor: [
-      { key: 'pizzaPan', x: 5, z: 5, targetH: 0.18, lift: 0.18 },
-      { key: 'toppingCrate', x: 3, z: 5, targetH: 0.34 },
-      { key: 'pizzaPan', x: 10, z: 5, targetH: 0.18, lift: 0.18 },
+      { key: 'pizzaPan', x: 6, z: 4, targetH: 0.18, lift: 0.18 },
+      { key: 'toppingCrate', x: 3, z: 4, targetH: 0.34 },
+      { key: 'pizzaPan', x: 13, z: 4, targetH: 0.18, lift: 0.18 },
     ],
-    ambientPets: [{ id: 'owl', x: 6, z: 11 }, { id: 'turtle', x: 9, z: 11 }],
+    ambientPets: [{ id: 'owl', x: 2, z: 6 }, { id: 'turtle', x: 14, z: 6 }],
   },
 };
 
@@ -70,11 +119,12 @@ function propHeight(key, fallback) {
   return fallback ?? Math.min(0.75, PROPS[key].layers.length * 0.12);
 }
 
-// Deep copy the entered shop's station layout so per-place edits never mutate STATIONS.
-function cloneStations(pantryProp) {
+// Build this shop's station map: shared prop/height from STATION_DEFS merged with the
+// shop's own coordinates. Copied so per-place edits never mutate the ZONES templates.
+function cloneStations(zone) {
   const out = {};
-  for (const [name, def] of Object.entries(STATIONS)) {
-    out[name] = { ...def, prop: name === 'pantry' ? pantryProp : def.prop };
+  for (const [name, def] of Object.entries(STATION_DEFS)) {
+    out[name] = { ...def, ...zone.stations[name], prop: name === 'pantry' ? zone.pantryProp : def.prop };
   }
   return out;
 }
@@ -84,17 +134,29 @@ export class BusinessPlace extends Place {
     super(world, 'hub');
     this.shopId = shopById(opts.shopId).id;
     this.zone = ZONES[this.shopId] || ZONES.bakery;
-    this.buildFrom(BUSINESS_ROWS, { seed: opts.seed ?? 404 });
-    this.stations = cloneStations(this.zone.pantryProp);
+    this.buildFrom(this.zone.rows, { seed: opts.seed ?? 404 });
+    this.stations = cloneStations(this.zone);
     this.activeStations = this.stations;
     this.stationMarkers = {};
     this.stationHits = [];
-    this.queueMarkers = QUEUE.map((spot) => ({ ...spot }));
+    this.queueMarkers = this.zone.queue.map((spot) => ({ ...spot }));
+    // Where the player lands when entering this shop (its footprint differs per shop,
+    // so the generic "bottom-left" fallback in main.js may not be a floor cell here).
+    this.spawn = { ...this.zone.spawn };
     this.customers = [];
     this._customerEntities = new Set();
     this._textSprites = [];
     this._placeShop();
     this.setActiveRecipe(opts.recipeId || null);
+  }
+
+  // Per-shop floor tint so the bakery and pizzeria read as different places at a glance
+  // (the shape already differs; this makes the colour differ too). Falls back to the
+  // hub theme for any raised/alt cells (business rooms are all flat, so the tint wins).
+  _floorColors(cell, x, z, opts) {
+    const tint = this.zone?.floor;
+    if (tint && cell.h === 0 && !cell.alt) return (x + z) % 2 === 0 ? tint[0] : tint[1];
+    return super._floorColors(cell, x, z, opts);
   }
 
   _disposeTextSprite(sprite) {
@@ -133,15 +195,17 @@ export class BusinessPlace extends Place {
   }
 
   _placeShop() {
-    // shop sign over the counter
-    this._textSprite('zone', t(this.zone.titleKey), { bg: '#fff8ecdd', scale: 0.6, fontSize: 42 }, this.worldPos(7, 1, 1.2));
+    // shop sign over the counter (its background tinted to the shop's palette)
+    const sign = this.zone.signAt;
+    const bg = this.zone.signBg || '#fff8ecdd';
+    this._textSprite('zone', t(this.zone.titleKey), { bg, scale: 0.6, fontSize: 42 }, this.worldPos(sign.x, sign.z, 1.2));
     for (const [name, def] of Object.entries(this.stations)) {
       this.stationHits.push({ name, x: def.x, z: def.z });
       this.stationMarkers[name] = { ...def };
       const cell = this.cellAt(def.x, def.z);
       if (cell) cell.walk = false;
       this._prop(def.prop, def.x, def.z, { targetH: propHeight(def.prop, def.height), lift: def.lift ?? 0 });
-      this._textSprite('business.station.' + name, t('business.station.' + name), { bg: '#fff8ecdd', scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
+      this._textSprite('business.station.' + name, t('business.station.' + name), { bg, scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
     }
     for (const item of this.zone.decor) this._prop(item.key, item.x, item.z, item);
     this._placeAmbientPets();
