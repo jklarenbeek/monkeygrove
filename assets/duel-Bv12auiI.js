@@ -1,11 +1,11 @@
-import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q as f,S as L}from"./index-D_rutyCQ.js";const C=d=>document.getElementById(d),m=()=>C("screens"),$=3;function v(d){return m().innerHTML=`<div class="screen opaque">${d}</div>`,m().firstElementChild}function _(d,s,t=$){const o=[];for(let r=0;r<t;r++){const l=q(),e=new x(d*31+r*7+1),n=[];for(let c=0;c<E.problemsPerChamber;c++){const k=c>0?{world:s,rng:e,kind:n[0].kind}:{world:s,rng:e};let h=p(f(l,k),l,{world:s,rng:e});c>0&&h.kind!==n[0].kind&&(h=p(f(l,{world:s,rng:e,kind:"fetch",skill:h.skillId}),l,{world:s,rng:e})),n.push(h),L(l,h,{correct:!0,usedHint:!1,ms:4e3})}o.push(n)}return o}class g{constructor(s,t,o,r,{soloChallenge:l=!1,code:e=null}={}){this.game=s,this.world=o,this.seed=r,this.code=e,this.solo=l,this.players=t.map(n=>({id:n,name:b().find(c=>c.id===n)?.name||"?",score:0})),this.roundsProblems=_(r,o),this.round=0,this.turn=0,this.queue=[],this.rng=new x(r^24301)}start(){this._interstitial()}_interstitial(){const s=this.players[this.turn];v(`
+import{Y as b,t as i,e as c,Z as w,i as u,n as x,_ as S,$ as q,l as E,a0 as p,a1 as f,a2 as _}from"./index-CE1XsoGm.js";const C=d=>document.getElementById(d),m=()=>C("screens"),$=3;function v(d){return m().innerHTML=`<div class="screen opaque">${d}</div>`,m().firstElementChild}function L(d,s,t=$){const o=[];for(let r=0;r<t;r++){const l=q(),e=new x(d*31+r*7+1),n=[];for(let a=0;a<E.problemsPerChamber;a++){const k=a>0?{world:s,rng:e,kind:n[0].kind}:{world:s,rng:e};let h=p(f(l,k),l,{world:s,rng:e});a>0&&h.kind!==n[0].kind&&(h=p(f(l,{world:s,rng:e,kind:"fetch",skill:h.skillId}),l,{world:s,rng:e})),n.push(h),_(l,h,{correct:!0,usedHint:!1,ms:4e3})}o.push(n)}return o}class g{constructor(s,t,o,r,{soloChallenge:l=!1,code:e=null}={}){this.game=s,this.world=o,this.seed=r,this.code=e,this.solo=l,this.players=t.map(n=>({id:n,name:b().find(a=>a.id===n)?.name||"?",score:0})),this.roundsProblems=L(r,o),this.round=0,this.turn=0,this.queue=[],this.rng=new x(r^24301)}start(){this._interstitial()}_interstitial(){const s=this.players[this.turn];v(`
       <div style="flex:1"></div>
       <h2>⚔️ ${i("duel.title")}</h2>
       <div class="card" style="text-align:center">
         <div style="font-size:42px">${this.turn===0?"🐵":"🙈"}</div>
-        <div style="font-size:22px;font-weight:900;margin:8px 0">${i("duel.turn",{name:a(s.name)})}</div>
+        <div style="font-size:22px;font-weight:900;margin:8px 0">${i("duel.turn",{name:c(s.name)})}</div>
         <div style="color:var(--ink-soft);font-weight:700">${i("duel.round",{n:this.round+1,total:this.roundsProblems.length})}</div>
-        <div style="margin-top:8px">${this.players.map(o=>`<span style="margin:0 8px;font-weight:900">${a(o.name)}: 🍌 ${o.score}</span>`).join("")}</div>
+        <div style="margin-top:8px">${this.players.map(o=>`<span style="margin:0 8px;font-weight:900">${c(o.name)}: 🍌 ${o.score}</span>`).join("")}</div>
       </div>
       <button class="btn green" id="duel-go">${i("title.start")}</button>
       <div style="flex:2"></div>
@@ -13,7 +13,7 @@ import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q a
         <div style="flex:1"></div>
         <div class="card" style="text-align:center">
           <div style="font-size:42px">🔄</div>
-          <div style="font-size:22px;font-weight:900">${i("duel.pass",{name:a(t.name)})}</div>
+          <div style="font-size:22px;font-weight:900">${i("duel.pass",{name:c(t.name)})}</div>
         </div>
         <button class="btn green" id="duel-go">${i("ui.ok")}</button>
         <div style="flex:2"></div>
@@ -22,7 +22,7 @@ import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q a
         <h2>🏁 ${i("duel.title")}</h2>
         <div class="card" style="text-align:center">
           <div style="font-size:48px">🍌</div>
-          <div style="font-size:26px;font-weight:900">${a(r.name)}: ${r.score}</div>
+          <div style="font-size:26px;font-weight:900">${c(r.name)}: ${r.score}</div>
           ${this.code?`<div style="margin-top:10px;font-weight:700;color:var(--ink-soft)">${i("duel.code")}: <b>${this.code}</b></div>`:""}
         </div>
         <button class="btn green" id="duel-done">🏝️ ${i("result.home")}</button>
@@ -32,12 +32,12 @@ import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q a
         <div class="card" style="text-align:center">
           <div style="font-size:48px">${e?"🏆":"🤝"}</div>
           <div style="font-size:22px;font-weight:900;margin:8px 0">
-            ${e?i("duel.winner",{name:a(e.name),score:e.score}):i("duel.tie")}
+            ${e?i("duel.winner",{name:c(e.name),score:e.score}):i("duel.tie")}
           </div>
-          <div>${this.players.map(n=>`<span style="margin:0 8px;font-weight:800">${a(n.name)}: 🍌 ${n.score}</span>`).join("")}</div>
+          <div>${this.players.map(n=>`<span style="margin:0 8px;font-weight:800">${c(n.name)}: 🍌 ${n.score}</span>`).join("")}</div>
         </div>
         <button class="btn green" id="duel-done">${i("ui.ok")}</button>
-        <div style="flex:2"></div>`}v(t).querySelector("#duel-done").addEventListener("click",()=>s.showTitle())}}function y(d,s){return`${{tide:"T",garden:"G",stump:"S",vines:"V"}[d]||"G"}${$}-${s.toString(36).toUpperCase()}`}function z(d){const s=String(d).trim().toUpperCase().match(/^([TGSV])(\d)-([0-9A-Z]+)$/);if(!s)return null;const t={T:"tide",G:"garden",S:"stump",V:"vines"}[s[1]],o=parseInt(s[3],36);return!t||!Number.isFinite(o)?null:{world:t,seed:o}}function M(d){const s=b();let t=[],o="garden";const r=()=>{const l=v(`
+        <div style="flex:2"></div>`}v(t).querySelector("#duel-done").addEventListener("click",()=>s.showTitle())}}function y(d,s){return`${{tide:"T",garden:"G",stump:"S",vines:"V"}[d]||"G"}${$}-${s.toString(36).toUpperCase()}`}function z(d){const s=String(d).trim().toUpperCase().match(/^([TGSV])(\d)-([0-9A-Z]+)$/);if(!s)return null;const t={T:"tide",G:"garden",S:"stump",V:"vines"}[s[1]],o=parseInt(s[3],36);return!t||!Number.isFinite(o)?null:{world:t,seed:o}}function T(d){const s=b();let t=[],o="garden";const r=()=>{const l=v(`
       <button class="round-btn screen-close" id="duel-back">✖️</button>
       <h2>⚔️ ${i("duel.title")}</h2>
       <div class="tagline">${i("duel.sub")}</div>
@@ -46,7 +46,7 @@ import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q a
         <div class="tile-grid">
           ${s.map(e=>`
             <div class="tile pressable ${t.includes(e.id)?"equipped":""}" data-pid="${e.id}">
-              <div class="t-icon">🐵</div><div class="t-name">${a(e.name)}</div>
+              <div class="t-icon">🐵</div><div class="t-name">${c(e.name)}</div>
             </div>`).join("")}
         </div>
       </div>
@@ -69,4 +69,4 @@ import{L as b,t as i,e as a,W as w,i as u,n as x,M as S,N as q,l as E,O as p,Q a
         </div>
         <div id="code-out" style="margin-top:10px;font-size:24px;font-weight:900;text-align:center"></div>
       </div>
-    `);l.querySelector("#duel-back").addEventListener("click",()=>d.showTitle());for(const e of l.querySelectorAll("[data-pid]"))e.addEventListener("click",()=>{const n=e.dataset.pid;t=t.includes(n)?t.filter(c=>c!==n):[...t,n].slice(-2),u.sfx("click"),r()});for(const e of l.querySelectorAll("[data-world]"))e.addEventListener("click",()=>{o=e.dataset.world,u.sfx("click"),r()});l.querySelector("#duel-start").addEventListener("click",()=>{const e=Math.random()*1073741824>>>0;new g(d,t,o,e).start()}),l.querySelector("#code-make").addEventListener("click",()=>{const e=Math.random()*1073741824>>>0,n=y(o,e);l.querySelector("#code-out").textContent=n,l.querySelector("#code-in").value=n,u.sfx("sparkle")}),l.querySelector("#code-play").addEventListener("click",()=>{const e=z(l.querySelector("#code-in").value);if(!e){u.sfx("boop");return}const n=t[0]||d.profile?.id||s[0]?.id;n&&new g(d,[n],e.world,e.seed,{soloChallenge:!0,code:y(e.world,e.seed)}).start()})};r()}export{g as Duel,_ as generateDuelProblems,y as makeCode,z as parseCode,M as showDuelSetup};
+    `);l.querySelector("#duel-back").addEventListener("click",()=>d.showTitle());for(const e of l.querySelectorAll("[data-pid]"))e.addEventListener("click",()=>{const n=e.dataset.pid;t=t.includes(n)?t.filter(a=>a!==n):[...t,n].slice(-2),u.sfx("click"),r()});for(const e of l.querySelectorAll("[data-world]"))e.addEventListener("click",()=>{o=e.dataset.world,u.sfx("click"),r()});l.querySelector("#duel-start").addEventListener("click",()=>{const e=Math.random()*1073741824>>>0;new g(d,t,o,e).start()}),l.querySelector("#code-make").addEventListener("click",()=>{const e=Math.random()*1073741824>>>0,n=y(o,e);l.querySelector("#code-out").textContent=n,l.querySelector("#code-in").value=n,u.sfx("sparkle")}),l.querySelector("#code-play").addEventListener("click",()=>{const e=z(l.querySelector("#code-in").value);if(!e){u.sfx("boop");return}const n=t[0]||d.profile?.id||s[0]?.id;n&&new g(d,[n],e.world,e.seed,{soloChallenge:!0,code:y(e.world,e.seed)}).start()})};r()}export{g as Duel,L as generateDuelProblems,y as makeCode,z as parseCode,T as showDuelSetup};
