@@ -6,7 +6,7 @@
 import { test, beforeEach } from 'vitest';
 import assert from 'node:assert/strict';
 import { setLang } from '../src/i18n.js';
-import { showLineCeremony, showStoryBeat, showAltar, showIsland } from '../src/screens.js';
+import { showLineCeremony, showStoryBeat, showAltar, showIsland, showGems, showResult } from '../src/screens.js';
 import { freshStory } from '../src/story/engine.js';
 import { lineCeremonies } from '../src/story/chapters.js';
 
@@ -27,9 +27,23 @@ test('renders an earned ceremony and reaches onDone after its single step', () =
   assert.ok(host().querySelector('#story-hex'), 'hexagram renders');
   assert.ok(host().querySelector('#story-balance').textContent.includes('1 of 6'));
   assert.match(host().querySelector('#story-text').innerHTML, /Tide Pools/);
+  // Phase 6: the returning friend (the Tide line brings the duckling home) renders as
+  // its REAL voxel model — an <svg> in the face slot — not an emoji stand-in.
+  const face = host().querySelector('#story-face');
+  assert.ok(face.querySelector('svg'), 'the friend arrives as a voxel mesh, not an emoji');
+  assert.ok(face.querySelector('.story-friend'), 'friend is wrapped for its walk-home entrance');
 
   host().querySelector('#story-next').click(); // only one event -> done
   assert.equal(done, true);
+});
+
+test('a remembered (no-friend) beat keeps its emoji face, not a mesh', () => {
+  const story = freshStory();
+  story.lines[0] = true;
+  const events = lineCeremonies([0], { tide: 'remembered' });
+  showLineCeremony(events, { story }, () => {});
+  const face = host().querySelector('#story-face');
+  assert.equal(face.querySelector('svg'), null, 'remembered shores show the emoji, no friend mesh');
 });
 
 test('steps through a multi-event batch before finishing', () => {
@@ -81,6 +95,42 @@ test('the worktable shows the persistent bloom chip and opens the Altar', () => 
   assert.ok(altarBtn, 'altar button renders');
   altarBtn.click();
   assert.equal(altarOpened, true);
+});
+
+test('the result screen offers a wonder door after the chest; opening it marks it seen', () => {
+  const wonder = { id: 'twin_gem', titleKey: 'wonder.twin_gem.title', bodyKey: 'wonder.twin_gem.body' };
+  let openedId = null;
+  showResult({ rewards: ['🍌 5'], wonder, onWonderOpen: (id) => { openedId = id; }, onNext: () => {}, onHome: () => {} });
+  // the door stays hidden until the chest is opened (never competes with the reward)
+  assert.ok(host().querySelector('#result-wonder').classList.contains('hidden'));
+  host().querySelector('#result-chest').click();
+  assert.ok(!host().querySelector('#result-wonder').classList.contains('hidden'), 'door appears after the chest');
+  // the card stays hidden until the child chooses to open the door (opt-in)
+  assert.ok(host().querySelector('#wonder-card').classList.contains('hidden'));
+  host().querySelector('#result-wonder').click();
+  assert.ok(!host().querySelector('#wonder-card').classList.contains('hidden'), 'the card reveals on tap');
+  assert.match(host().querySelector('#wonder-card').textContent, /mirror twin/i);
+  assert.equal(openedId, 'twin_gem', 'opening the door marks the wonder discovered');
+});
+
+test('no wonder means no door on the result screen', () => {
+  showResult({ rewards: ['🍌 5'], onNext: () => {}, onHome: () => {} });
+  assert.equal(host().querySelector('#result-wonder'), null);
+});
+
+test('the Gem Tree renders the secret 64 as an 8×8 hexagram grid that fills with gems', () => {
+  const skills = [{ id: 'add_20', nameKey: 'skill.add_20', rating: 700, mastered: false, n: 4 }];
+  const worlds = { tide: { pct: 0.2, skills }, garden: { pct: 0, skills: [] }, stump: { pct: 0, skills: [] }, vines: { pct: 0, skills: [] } };
+  // 32 of 100 facts lit -> ~ round(64 * .32) = 20 hexagrams lit.
+  const lit = [];
+  for (let r = 1; r <= 10 && lit.length < 32; r++) for (let c = 1; c <= 10 && lit.length < 32; c++) lit.push(`${r}x${c}`);
+  showGems({ report: { worlds, gems: { lit, total: 100 } }, onClose: () => {} });
+
+  assert.equal(host().querySelectorAll('.hx').length, 64, 'the full 64 render');
+  assert.equal(host().querySelectorAll('.hx.lit').length, Math.round(64 * 0.32), 'lit hexagrams track the gems');
+  assert.match(host().textContent, /secret 64|I Ching|64/i);
+  // every glyph is a real six-line hexagram
+  assert.equal(host().querySelector('.hx').querySelectorAll('.hx-line').length, 6);
 });
 
 test('the Altar renders the balance reading and closes', () => {

@@ -7,7 +7,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  WONDERS, wonderProof, wondersForTrigger, parentWonders,
+  WONDERS, wonderProof, wondersForTrigger, parentWonders, nextWonderFor, playTrigger,
 } from '../src/story/wonders.js';
 import { FOUNDING_HEXAGRAM } from '../src/story/constants.js';
 
@@ -63,6 +63,24 @@ test('triggers and audiences select the right cards', () => {
   const parents = parentWonders().map((w) => w.id);
   assert.ok(parents.includes('gem_tree_64') && parents.includes('one_line_at_a_time'));
   for (const w of parentWonders()) assert.equal(w.audience, 'parent');
+});
+
+test('playTrigger maps in-play moments to child wonder triggers', () => {
+  assert.equal(playTrigger({ litTwin: true, skillId: 'tables_a', kind: 'fetch' }), 'commutativity');
+  assert.equal(playTrigger({ kind: 'array', skillId: 'tables_b' }), 'array');
+  assert.equal(playTrigger({ skillId: 'div_facts', kind: 'fetch' }), 'division_fact');
+  assert.equal(playTrigger({ skillId: 'div_remainder', kind: 'share' }), 'division_fact');
+  assert.equal(playTrigger({ world: 'business', skillId: 'percent_of' }), 'bakery');
+  assert.equal(playTrigger({ kind: 'fetch', skillId: 'add_20' }), null);
+});
+
+test('nextWonderFor offers an undiscovered child card once, then nothing', () => {
+  assert.equal(nextWonderFor('commutativity', []).id, 'twin_gem');
+  assert.equal(nextWonderFor('commutativity', ['twin_gem']), null); // already discovered — no nag
+  assert.equal(nextWonderFor('array', []).id, 'array_both_ways');
+  assert.equal(nextWonderFor('nope', []), null);
+  // parent-only cards are never offered as in-play child reveals
+  assert.equal(nextWonderFor('gem_tree', []), null);
 });
 
 test('every wonder card has cozy EN and NL copy', () => {

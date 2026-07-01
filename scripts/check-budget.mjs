@@ -44,7 +44,10 @@ import { join } from 'node:path';
 // decimals/%/scale business group) with their generators, the 64-step ladder registry,
 // the Mimi-arc + wonder-card copy, and the matching EN/NL strings — real first-load
 // functionality (~5 kB gzip), not bloat. Raised DELIBERATELY, headroom kept small.
-const INDEX_JS_GZIP_BUDGET_KB = 242;   // decimal kB (÷1000), matches Vite's report
+// 2026-07-01: 242 -> 244 for the Phase-6 wonder layer: the shared voxel→SVG renderer
+// (so the line-draw ceremony shows the REAL friend mesh, not an emoji) and the Gem Tree's
+// 8×8 hexagram-reveal grid. ~1.7 kB gzip of real first-load feature; restores jitter room.
+const INDEX_JS_GZIP_BUDGET_KB = 244;   // decimal kB (÷1000), matches Vite's report
 const PRECACHE_BUDGET_KIB = 1235;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';

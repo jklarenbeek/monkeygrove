@@ -71,3 +71,23 @@ export const wondersForTrigger = (trigger) => WONDERS.filter((w) => w.trigger ==
 
 // The deeper reveals for the parent dashboard and older children.
 export const parentWonders = () => WONDERS.filter((w) => w.audience === 'parent');
+
+// The next child-facing card to gently offer for an in-play moment, or null — the first
+// one for this trigger the child has not already discovered. `seen` is the list of
+// wonder ids already opened (persisted on the profile) so a reveal is a one-time door,
+// never a nag.
+export function nextWonderFor(trigger, seen = []) {
+  const seenSet = new Set(seen);
+  return WONDERS.find((w) => w.audience === 'child' && w.trigger === trigger && !seenSet.has(w.id)) || null;
+}
+
+// Map a just-answered problem to a child wonder trigger, or null. The trigger vocabulary
+// lives with the cards so the play code stays declarative. `litTwin` is true when a fact
+// gem lit together with its commutative twin (the twin-gem wonder's exact moment).
+export function playTrigger({ kind, skillId, world, litTwin } = {}) {
+  if (litTwin) return 'commutativity';
+  if (kind === 'array') return 'array';
+  if (skillId === 'div_facts' || skillId === 'div_remainder') return 'division_fact';
+  if (world === 'business') return 'bakery';
+  return null;
+}

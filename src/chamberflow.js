@@ -13,6 +13,7 @@ import { Particles, Crab, Altar, makeCharacter, makeProp, floatLabel } from './e
 import { VERBS } from './verbs.js';
 import { PROPS, getCreature } from './models.js';
 import { nextProblem, recordResult } from './mathengine.js';
+import { playTrigger, nextWonderFor } from './story/wonders.js';
 import { tween, ease, wobble } from './anim.js';
 import { fxCorrectGlow, fxThemeAmbience } from './verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
@@ -311,6 +312,7 @@ export class ChamberFlow {
     // confetti, banana fountain, egg fill, gem/mastery toasts (egg-just-filled
     // result decides whether completeChamber hatches)
     const eggFull = g.rewards.payCorrect(g.combo, res);
+    this.maybeStashWonder(res); // a gentle "did you know?" for this moment (opt-in, once)
     const tok = g.flowToken;
     delay(1500, () => {
       // a Home press (or any mode switch) during the celebration invalidates
@@ -405,6 +407,25 @@ export class ChamberFlow {
     for (const c of this.game.crabs) c.startle();
   }
 
+  // The cohesion-of-nature reveals (SUPER_PROMPT Phase 7), offered in-play. When a
+  // correct answer IS a wonder (a fact and its twin light together, an array read both
+  // ways, a division fact), stash the first not-yet-discovered card for this session and
+  // give a soft sparkle now — the full "door" waits on the result screen, never blocking
+  // play, never on the clock. One per session, never nagged.
+  maybeStashWonder(res) {
+    const g = this.game;
+    if (g.pendingWonder || !g.problem) return;
+    const litTwin = Array.isArray(res.newGems) && res.newGems.length >= 2;
+    const trigger = playTrigger({
+      kind: g.problem.kind, skillId: g.problem.skillId, world: g.problem.world, litTwin,
+    });
+    if (!trigger) return;
+    const card = nextWonderFor(trigger, g.profile.flags?.wondersSeen || []);
+    if (!card) return;
+    g.pendingWonder = card;
+    hud.toast('✨ ' + t(card.titleKey));
+  }
+
   completeChamber(eggFull) {
     const g = this.game;
     g.profile.stats.chambers++;
@@ -420,9 +441,17 @@ export class ChamberFlow {
 
     if (g.duel) { g.duel.chamberDone(); return; }
 
+    const wonder = g.pendingWonder || null;
+    g.pendingWonder = null;
     hud.showHud(false);
     screens.showResult({
       rewards,
+      wonder,
+      onWonderOpen: (id) => {
+        const f = g.profile.flags;
+        f.wondersSeen = f.wondersSeen || [];
+        if (!f.wondersSeen.includes(id)) { f.wondersSeen.push(id); persist(); }
+      },
       onNext: () => g.afterResult(() => {
         if (g.pendingEcho) { g.pendingEcho = false; g.isEcho = true; }
         this.runChamber();

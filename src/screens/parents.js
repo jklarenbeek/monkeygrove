@@ -5,6 +5,24 @@ import { render, backBtn, esc, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { coverageForReport, getPack, listPacks } from '../curriculum/index.js';
 import { money, businessModeLabel } from './business.js';
+import { parentWonders } from '../story/wonders.js';
+
+// The deeper "cohesion of nature" reveals (SUPER_PROMPT Phase 7) — a door, not a
+// worksheet: gentle "did you know" cards for the parent about the one structure under
+// the whole game (the Gem Tree's 64 = the I Ching = the 64 codons of DNA; change one
+// line at a time). Opt-in reading, never on the clock.
+function wondersHtml() {
+  const cards = parentWonders();
+  if (!cards.length) return '';
+  return `<div class="card">
+    <h3>✨ ${t('parents.wonders')}</h3>
+    ${cards.map((w) => `
+      <div style="margin-bottom:10px">
+        <div style="font-weight:800">${t(w.titleKey)}</div>
+        <div style="font-size:14px;line-height:1.5;color:var(--ink-soft)">${t(w.bodyKey)}</div>
+      </div>`).join('')}
+  </div>`;
+}
 
 export function curriculumPackLabel(pack) {
   const country = pack.countryKey ? t(pack.countryKey) : pack.countryCode || pack.id;
@@ -142,6 +160,7 @@ export function showParents({ report, profile, businessReport = null, onClose, o
           </div>
         </div>`).join('')).join('') || '<p style="font-size:14px;color:var(--ink-soft)">—</p>'}
     </div>` : ''}
+    ${wondersHtml()}
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
   el.querySelector('[data-pack]')?.addEventListener('change', (e) => {

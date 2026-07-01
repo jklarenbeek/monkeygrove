@@ -301,6 +301,7 @@ export const en = {
   'result.mastered': 'You can really SEE {skill} now! 🌟',
   'result.bloomed': '{world} is blooming! 🌸',
   'result.tap_chest': 'Tap the chest!',
+  'result.wonder': 'Did you know?',
 
   // egg & pets
   'egg.progress': 'The egg wiggles…',
@@ -329,6 +330,8 @@ export const en = {
   // gem tree
   'gems.title': 'The Banyan Gem Tree',
   'gems.sub': 'Every table you master becomes a gem. Twins light together!',
+  'gems.hex_title': 'The secret 64',
+  'gems.hex_sub': 'Your gems are the same 64 patterns as the ancient Book of Changes — and the 64 tiny letters that spell every living thing. 💎🧬',
   'gems.count': '{n} of {total} gems shine',
   'gems.skills': 'Your powers',
 
@@ -434,6 +437,7 @@ export const en = {
   // parents
   'parents.title': 'For parents',
   'parents.body': 'Monkey Grove practices arithmetic the way research says children learn it: visual models first (arrays, number lines, fair sharing), no time pressure, no punishment for mistakes — every error shows the model and explains why. An invisible rating system keeps each skill at roughly 65% success: challenging, never crushing.',
+  'parents.wonders': 'Did you know?',
   'parents.choose_child': 'Which explorer?',
   'parents.no_profiles': 'No explorers yet. Start an adventure to add one.',
   'parents.skills': 'Skill overview',

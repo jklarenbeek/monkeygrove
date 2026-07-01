@@ -11,6 +11,7 @@ import { persist, persistNow, addBananas } from '../state.js';
 import { Rng } from '../rng.js';
 import { BALANCE } from '../config.js';
 import { BUSINESS_CUSTOMERS } from './data.js';
+import { nextWonderFor } from '../story/wonders.js';
 import {
   applyPaymentAction,
   applyPrepAction,
@@ -269,8 +270,22 @@ export class BusinessController {
     this.game.refreshHudCounts();
     audio.sfx('coin');
     hud.toast(`+${bananas} 🍌 · ${t('business.profit')}: ${(result.profitCents / 100).toFixed(2)}`);
+    this.maybeBakeryWonder();
     if ((business.day?.ordersServed || 0) >= BALANCE.businessOrdersPerDay) this.endBusinessDay();
     else this.startNextBusinessOrder();
+  }
+
+  // A gentle one-time reveal that the bakery pie you cut IS a fraction (SUPER_PROMPT
+  // Phase 7). The business flow has no result chest, so the helper shares it in a bubble
+  // the child taps through at their own pace — never on a deadline, never repeated.
+  maybeBakeryWonder() {
+    const p = this.game.profile;
+    const card = nextWonderFor('bakery', p.flags?.wondersSeen || []);
+    if (!card) return;
+    p.flags.wondersSeen = p.flags.wondersSeen || [];
+    p.flags.wondersSeen.push(card.id);
+    persist();
+    hud.say(`✨ ${t(card.bodyKey)}`, { face: '🐷' });
   }
 
   openBusinessStock() {

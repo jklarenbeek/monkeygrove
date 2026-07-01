@@ -293,6 +293,7 @@ export const nl = {
   'result.mastered': 'Je ZIET {skill} nu echt! 🌟',
   'result.bloomed': '{world} staat in bloei! 🌸',
   'result.tap_chest': 'Tik op de schatkist!',
+  'result.wonder': 'Wist je dat?',
 
   'egg.progress': 'Het ei wiebelt…',
   'egg.ready': 'Het ei kan uitkomen!',
@@ -319,6 +320,8 @@ export const nl = {
 
   'gems.title': 'De Banyan Edelsteenboom',
   'gems.sub': 'Elke tafelsom die je kent wordt een edelsteen. Tweelingen stralen samen!',
+  'gems.hex_title': 'De geheime 64',
+  'gems.hex_sub': 'Jouw edelstenen zijn dezelfde 64 patronen als het oude Boek der Veranderingen — en de 64 kleine lettertjes die alles wat leeft spellen. 💎🧬',
   'gems.count': '{n} van de {total} edelstenen stralen',
   'gems.skills': 'Jouw krachten',
 
@@ -422,6 +425,7 @@ export const nl = {
 
   'parents.title': 'Voor ouders',
   'parents.body': 'Monkey Grove oefent rekenen zoals onderzoek zegt dat kinderen leren: eerst visuele modellen (rijtjes, getallenlijnen, eerlijk delen), geen tijdsdruk, geen straf voor fouten — elke fout laat het model zien en legt uit waarom. Een onzichtbaar systeem houdt elke vaardigheid op ongeveer 65% succes: uitdagend, nooit ontmoedigend.',
+  'parents.wonders': 'Wist je dat?',
   'parents.choose_child': 'Welke ontdekker?',
   'parents.no_profiles': 'Nog geen ontdekkers. Start een avontuur om er een toe te voegen.',
   'parents.skills': 'Vaardigheden',
