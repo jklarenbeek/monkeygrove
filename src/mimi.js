@@ -10,8 +10,33 @@
 // caller translates (t('build.'+id) / t('world.'+id)) so this stays i18n-free.
 import { progressPoints } from './island.js';
 
+// Mimi's three-phase healing arc (SUPER_PROMPT Phase 4): the anxious, self-blaming Mimi
+// of the gray dock (the Crab King's theft) slowly opens as the friends return, and is
+// whole again at the festival. Her *usefulness* never drops — only her tone shifts.
+//   0 anxious  : the theft is fresh, no world line drawn yet
+//   1 opening  : at least one friend is home (a world line drawn)
+//   2 whole    : the festival / reconciliation has happened
+export function mimiPhaseFor(profile) {
+  const story = profile?.story || {};
+  if (profile?.flags?.festivalDone || story.crabKingReconciled) return 2;
+  const drawn = Array.isArray(story.lines) ? story.lines.filter(Boolean).length : 0;
+  if (drawn >= 1) return 1;
+  return 0;
+}
+
+// Monotonic latch (like flags.portalStages / story.lines): Mimi never relapses, even if
+// a rating later decays. Returns the (possibly advanced) phase.
+export function advanceMimiPhase(profile) {
+  if (!profile?.story) return 0;
+  const next = mimiPhaseFor(profile);
+  if (next > (profile.story.mimiPhase ?? 0)) profile.story.mimiPhase = next;
+  return profile.story.mimiPhase ?? 0;
+}
+
 export function mimiLines(profile, report, status) {
   const lines = [];
+  // Her tone for this visit — the stored monotonic phase, or computed for a pre-arc save.
+  const mimiPhase = Math.max(0, Math.min(2, profile.story?.mimiPhase ?? mimiPhaseFor(profile)));
   if (!profile.flags?.mimiMet) lines.push({ key: 'mimi.meet' });
 
   // The island architect: a funded-up blueprint beats everything else.
@@ -49,6 +74,9 @@ export function mimiLines(profile, report, status) {
   }
   if (profile.flags?.festivalDone) lines.push({ key: 'mimi.festival' });
 
+  // Her self-talk shifts with the arc — anxious, then opening, then whole. This is tone,
+  // not advice: it rides alongside the quest lines above, which never change by phase.
+  lines.push({ key: `mimi.phase${mimiPhase}` });
   lines.push({ key: 'mimi.chat.1' }, { key: 'mimi.chat.2' }, { key: 'mimi.chat.3' });
   return lines;
 }

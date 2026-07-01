@@ -316,7 +316,7 @@ test('parent confirmed stage can override the age lower bound', () => {
 test('age eleven warmup starts with representative grade eight gameplay probes', () => {
   assert.deepEqual(
     eligibleSkillIds(createCurriculumState({ age: 11 })).slice(0, 3),
-    ['mult_2digit', 'div_remainder', 'frac_compare'],
+    ['big_numbers', 'mult_2digit', 'div_remainder'],
   );
 });
 
@@ -333,8 +333,10 @@ test('invalid confirmedStage falls back to estimatedStage for eligibility', () =
 });
 
 test('soft eligibility windows clamp at first and last stages', () => {
+  // grades 1-2 are no longer a curriculum hole: a four-year-old gets the counting and
+  // number-bond foundations (the bottom of the Tree), but nothing from grade 3 up.
   const first = eligibleSkillIds(createCurriculumState({ age: 4 }));
-  assert.deepEqual(first, []);
+  assert.deepEqual(first, ['counting', 'number_bonds']);
   assert.ok(!first.includes('add_20'));
   assert.ok(!first.includes('tables_b'));
   assert.ok(!first.includes('mult_2digit'));

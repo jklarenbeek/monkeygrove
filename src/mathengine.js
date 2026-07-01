@@ -14,17 +14,39 @@
 //   misconception distractors than a pair comparison). Equation shows the
 //   candidates in stone order: '2/5 · 1/2 · 3/4 · 1/8 → ?'.
 
+// The four story worlds — each maps to one line of the founding hexagram (story
+// constants LINE_WORLD), so this list is load-bearing for the cosmology and stays four.
 export const WORLDS = ['tide', 'garden', 'stump', 'vines'];
 
+// The business world is a FIFTH skill group that lives OUTSIDE the six-line hexagram:
+// it holds the upper-grade decimals/%/scale adaptive skills (SUPER_PROMPT Phase 2,
+// the Tree's precision/proportion paths, world: 'business'). It is deliberately not in
+// WORLDS, so the four story worlds' mastery gates, the island progress points, and the
+// six story lines are untouched; masteryReport surfaces it under its own `business`
+// group for the parent dashboard and curriculum coverage.
+export const BUSINESS_WORLD = 'business';
+
 const LADDER = {
-  tide: ['add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100'],
+  // tide grew the bottom (counting, number bonds — grades 1-2) and the top
+  // (big_numbers — grade 8 place value) of the number-sense world, filling the two
+  // ends of the Tree the 64-step ladder names (docs/04; SUPER_PROMPT Phase 1). Order
+  // is the in-world climb; the canonical cross-grade sequence lives in curriculum/ladder.js.
+  tide: ['counting', 'number_bonds', 'add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100', 'big_numbers'],
   garden: ['tables_a', 'tables_b', 'tables_c', 'tables_mix', 'mult_2digit'],
   stump: ['div_facts', 'share', 'div_remainder', 'missing_factor'],
   vines: ['frac_magnitude', 'frac_compare', 'frac_equiv', 'frac_of_n'],
+  // Phase 2: decimals/%/scale as first-class adaptive maths (groep 6-8). These feed the
+  // business-world Tree paths and the parent coverage, not the four story worlds.
+  business: ['dec_compare', 'dec_addsub', 'dec_muldiv', 'frac_dec_pct', 'percent_of', 'percent_adv', 'scale'],
 };
 
+// All worlds that carry skills (the four story worlds + the business group). SKILLS is
+// built from this so the business skills are real, generatable, and rated; only the
+// story-coupled systems read the four-world WORLDS.
+export const ALL_WORLDS = Object.keys(LADDER);
+
 export const SKILLS = {};
-for (const world of WORLDS) {
+for (const world of ALL_WORLDS) {
   LADDER[world].forEach((id, order) => {
     SKILLS[id] = {
       id,
@@ -179,6 +201,27 @@ function buildFracChoices(rng, answer, candidates, fill) {
   for (const c of candidates) push(c.value, c.tag);
   let j = 0;
   while (out.length < 4 && j < 50) push(fill(j++), 'random');
+  return rng.shuffle(out);
+}
+
+// Decimal fetch choices: numeric, NOT integer-rounded (buildChoices is integers only,
+// which is why decimals needed their own infrastructure — SUPER_PROMPT §3). Values are
+// snapped to 3 decimals to kill float dupes; the answer keeps its exact value.
+const round3 = (n) => Math.round(n * 1000) / 1000;
+function buildDecimalChoices(rng, answer, candidates, fill, { count = 5 } = {}) {
+  const out = [{ value: answer, tag: 'correct' }];
+  const vals = [answer];
+  const push = (value, tag) => {
+    if (out.length >= count || value == null || !Number.isFinite(value) || value < 0) return;
+    const v = round3(value);
+    if (vals.some((u) => Math.abs(u - v) < 1e-9)) return;
+    vals.push(v);
+    out.push({ value: v, tag });
+  };
+  for (const c of candidates) push(c.value, c.tag);
+  // `fill` is monotonic-increasing-positive by contract, so count is always reachable.
+  let j = 0;
+  while (out.length < count && j < 80) push(fill(j++), 'random');
   return rng.shuffle(out);
 }
 
@@ -735,9 +778,268 @@ GEN.frac_of_n = (target, rng) => {
   };
 };
 
+// counting (grades 1-2, the foundation of the Tree): "what comes next" in the number
+// sequence. Three tiers grow the magnitude (to 10, to 20, to ~100). The lowest tier is
+// the gentlest in the whole engine — a math-anxious five-year-old's first stones.
+GEN.counting = (target, rng) => {
+  const tier = pickTier([
+    { d: 400, gen: () => rng.int(1, 8) },
+    { d: 520, gen: () => rng.int(9, 18) },
+    { d: 640, gen: () => rng.int(20, 96) },
+  ], target);
+  const a = tier.gen();
+  const answer = a + 2; // the number after a, a+1
+  return {
+    kind: 'fetch',
+    equation: `${a}, ${a + 1}, ⬚`,
+    prompt: { key: 'q.count', vars: { a } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: a + 1, tag: 'near_miss' }, // stayed put instead of stepping on
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ], { min: 0 }),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer } },
+    difficulty: tier.d,
+    meta: { a },
+  };
+};
+
+// number bonds / splits (grade 2): make-ten facts, then to 20 and to 100-by-tens.
+// The strategy the whole +/- staircase is built on (docs/04 step 9).
+GEN.number_bonds = (target, rng) => {
+  const tier = pickTier([
+    { d: 460, gen: () => [10, rng.int(1, 9)] },
+    { d: 580, gen: () => [20, rng.int(2, 18)] },
+    { d: 700, gen: () => [100, rng.int(1, 9) * 10] },
+  ], target);
+  const [c, a] = tier.gen();
+  const answer = c - a;
+  return {
+    kind: 'fetch',
+    equation: `${a} + ? = ${c}`,
+    prompt: { key: 'q.missing', vars: { a, c } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: c + a, tag: 'addsub_confuse' }, // added instead of finding the gap
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ], { min: 0 }),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer } },
+    difficulty: tier.d,
+    meta: { a, c },
+  };
+};
+
+// big numbers (grade 8): +/- in the hundreds, thousands, and ten-thousands — place
+// value reused at scale (docs/04 steps 40/48/56). Reuses the carry-slip distractor
+// shape of add_100; the magnitude is the only thing that grows.
+GEN.big_numbers = (target, rng) => {
+  const tier = pickTier([
+    { d: 820, gen: () => [rng.int(2, 8) * 100 + rng.int(0, 9) * 10, rng.int(1, 8) * 100 + rng.int(0, 9) * 10] },
+    { d: 960, gen: () => [rng.int(11, 89) * 100, rng.int(11, 89) * 100] },
+    { d: 1100, gen: () => [rng.int(12, 90) * 1000, rng.int(1, 9) * 1100 + rng.int(0, 9) * 100] },
+  ], target);
+  const [a, b] = tier.gen();
+  const answer = a + b;
+  return {
+    kind: 'fetch',
+    equation: `${a} + ${b} = ?`,
+    prompt: { key: 'q.fetch', vars: { a, b } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ], { min: 0 }),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { a, b, answer } },
+    difficulty: tier.d,
+    meta: { a, b },
+  };
+};
+
+// ---------- Phase 2: decimals, %, scale (the business world's adaptive maths) ----------
+// All fetch, all groep 6-8. Difficulty tiers are spaced like the four-world skills so
+// the simulated-learner guard holds. Decimals carry numeric (comma-formatted-for-display)
+// values; %, and scale answers are integers, so those reuse buildChoices.
+const decStr = (n) => String(round3(n)).replace('.', ',');
+// Monotonic-increasing positive filler so buildDecimalChoices always reaches `count`.
+const decFill = (answer) => (j) => answer + (j + 1) * Math.max(0.01, Math.abs(answer) * 0.1);
+
+// dec_compare — decimals on the line, "fetch the LARGEST". THE highest-leverage trap
+// in the game: a longer decimal (0,12) looks bigger than a shorter, larger one (0,4).
+// Tagged `decimal_length_bias` so Mimi can name exactly that intuition.
+GEN.dec_compare = (target, rng) => {
+  const tier = pickTier([{ d: 780 }, { d: 900 }, { d: 1020 }], target);
+  const tenth = rng.int(2, 9);
+  const answer = tenth / 10;                                  // e.g. 0,4 — the largest
+  const trap = (10 + rng.int(2, 9)) / 100;                    // 0,1x: longer, looks bigger, is smaller
+  const choices = buildDecimalChoices(rng, answer, [
+    { value: trap, tag: 'decimal_length_bias' },
+    { value: (tenth - 1) / 10, tag: 'near_miss' },
+  ], (j) => Math.max(0.01, (tenth - 1 - j) / 10)); // descending, all < answer
+  return {
+    kind: 'fetch',
+    equation: `${choices.map((c) => decStr(c.value)).join(' · ')} → ?`,
+    prompt: { key: 'q.compare_dec', vars: {} },
+    answer,
+    choices,
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.decimal_length', vars: { answer: decStr(answer) } },
+    difficulty: tier.d,
+    meta: { answer },
+  };
+};
+
+// dec_addsub — column decimals; the `comma_misalign` slip (adding digits as if the
+// comma were not there) is the tagged distractor.
+GEN.dec_addsub = (target, rng) => {
+  const tier = pickTier([{ d: 840, dp: 1 }, { d: 960, dp: 2 }, { d: 1080, dp: 2 }], target);
+  const scale = 10 ** tier.dp;
+  const a = rng.int(11, 89) / scale;
+  const b = rng.int(11, 89) / scale;
+  const answer = round3(a + b);
+  const choices = buildDecimalChoices(rng, answer, [
+    { value: a * scale + b * scale, tag: 'comma_misalign' }, // ignored the comma entirely
+    { value: round3(a + b + 0.1), tag: 'near_miss' },
+  ], decFill(answer));
+  return {
+    kind: 'fetch',
+    equation: `${decStr(a)} + ${decStr(b)} = ?`,
+    prompt: { key: 'q.fetch', vars: { a: decStr(a), b: decStr(b) } },
+    answer,
+    choices,
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.comma_misalign', vars: { answer: decStr(answer) } },
+    difficulty: tier.d,
+    meta: { a, b },
+  };
+};
+
+// dec_muldiv — ×/÷ by 10/100/1000; the `comma_misalign` distractor moves the comma the
+// wrong way.
+GEN.dec_muldiv = (target, rng) => {
+  const tier = pickTier([{ d: 860, pow: 10 }, { d: 980, pow: 100 }, { d: 1100, pow: 1000 }], target);
+  const base = rng.int(11, 99) / 100;
+  const mul = rng.chance(0.5);
+  const answer = round3(mul ? base * tier.pow : base / tier.pow);
+  const wrong = round3(mul ? base / tier.pow : base * tier.pow); // moved the comma the wrong way
+  const choices = buildDecimalChoices(rng, answer, [
+    { value: wrong, tag: 'comma_misalign' },
+  ], decFill(answer));
+  return {
+    kind: 'fetch',
+    equation: `${decStr(base)} ${mul ? '×' : '÷'} ${tier.pow} = ?`,
+    prompt: { key: 'q.fetch', vars: {} },
+    answer,
+    choices,
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.comma_misalign', vars: { answer: decStr(answer) } },
+    difficulty: tier.d,
+    meta: { base, pow: tier.pow },
+  };
+};
+
+// frac_dec_pct — convert between fraction, decimal and percent. The `whole_number_bias`
+// distractor reads the numerator as the answer (1/4 -> 0,1 / "1").
+GEN.frac_dec_pct = (target, rng) => {
+  const tier = pickTier([{ d: 820 }, { d: 940 }, { d: 1060 }], target);
+  const opts = [[1, 2, 0.5], [1, 4, 0.25], [3, 4, 0.75], [1, 5, 0.2], [2, 5, 0.4], [1, 10, 0.1], [3, 10, 0.3]];
+  const [n, d, answer] = rng.pick(opts);
+  const choices = buildDecimalChoices(rng, answer, [
+    { value: n / 100, tag: 'whole_number_bias' },
+    { value: round3(1 - answer), tag: 'near_miss' },
+  ], decFill(answer));
+  return {
+    kind: 'fetch',
+    equation: `${n}/${d} = ⬚`,
+    prompt: { key: 'q.fetch', vars: {} },
+    answer,
+    choices,
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer: decStr(answer) } },
+    difficulty: tier.d,
+    meta: { n, d },
+  };
+};
+
+// percent_of — % of a quantity (groep 7). Integer answers, so buildChoices fits. The
+// `whole_number_bias` distractor returns the whole instead of the part.
+GEN.percent_of = (target, rng) => {
+  const tier = pickTier([
+    { d: 800, pcts: [50, 25, 10], maxMul: 6 },
+    { d: 920, pcts: [25, 20, 75], maxMul: 8 },
+    { d: 1040, pcts: [20, 30, 15], maxMul: 10 },
+  ], target);
+  const pct = rng.pick(tier.pcts);
+  const base = (100 / gcd(pct, 100)) * rng.int(2, tier.maxMul);
+  const answer = base * pct / 100;
+  return {
+    kind: 'fetch',
+    equation: `${pct}% × ${base} = ?`,
+    prompt: { key: 'q.fetch', vars: { pct, base } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: base, tag: 'whole_number_bias' },
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ]),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer } },
+    difficulty: tier.d,
+    meta: { pct, base },
+  };
+};
+
+// percent_adv — percent over 100% (groep 8). The `whole_number_bias` distractor ignores
+// the part above 100% and just returns the base.
+GEN.percent_adv = (target, rng) => {
+  const tier = pickTier([{ d: 980 }, { d: 1100 }, { d: 1220 }], target);
+  const pct = rng.pick([110, 120, 125, 150, 200]);
+  const base = (100 / gcd(pct, 100)) * rng.int(2, 8);
+  const answer = base * pct / 100;
+  return {
+    kind: 'fetch',
+    equation: `${pct}% × ${base} = ?`,
+    prompt: { key: 'q.fetch', vars: { pct, base } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: base, tag: 'whole_number_bias' },
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ]),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer } },
+    difficulty: tier.d,
+    meta: { pct, base },
+  };
+};
+
+// scale — scale notation 1:S, map length -> real length (groep 7-8). Integer answers.
+GEN.scale = (target, rng) => {
+  const tier = pickTier([{ d: 900, scales: [10, 50] }, { d: 1020, scales: [100, 250] }, { d: 1140, scales: [500, 1000] }], target);
+  const s = rng.pick(tier.scales);
+  const map = rng.int(2, 9);
+  const answer = map * s;
+  return {
+    kind: 'fetch',
+    equation: `1 : ${s}, ${map} → ?`,
+    prompt: { key: 'q.fetch', vars: { s, map } },
+    answer,
+    choices: buildChoices(rng, answer, [
+      { value: map + s, tag: 'addsub_confuse' }, // added the scale instead of multiplying
+      { value: reverseDigits(answer), tag: 'reversed' },
+    ]),
+    model: { kind: 'none', params: {} },
+    explain: { key: 'ex.near_miss', vars: { answer } },
+    difficulty: tier.d,
+    meta: { s, map },
+  };
+};
+
 // ---------- kind capability ----------
 
 const NATURAL_KIND = {
+  dec_compare: 'fetch', dec_addsub: 'fetch', dec_muldiv: 'fetch', frac_dec_pct: 'fetch',
+  percent_of: 'fetch', percent_adv: 'fetch', scale: 'fetch',
+  counting: 'fetch', number_bonds: 'fetch', big_numbers: 'fetch',
   add_20: 'fetch', sub_20: 'fetch', missing_addend: 'fetch', add_100: 'fetch', sub_100: 'fetch',
   tables_a: 'fetch', tables_b: 'fetch', tables_c: 'fetch', tables_mix: 'fetch', mult_2digit: 'fetch',
   div_facts: 'fetch', share: 'share', div_remainder: 'share', missing_factor: 'fetch',
@@ -745,6 +1047,9 @@ const NATURAL_KIND = {
 };
 
 const KINDS_SUPPORTED = {
+  dec_compare: ['fetch'], dec_addsub: ['fetch'], dec_muldiv: ['fetch'], frac_dec_pct: ['fetch'],
+  percent_of: ['fetch'], percent_adv: ['fetch'], scale: ['fetch'],
+  counting: ['fetch'], number_bonds: ['fetch'], big_numbers: ['fetch'],
   add_20: ['fetch'], sub_20: ['fetch'], missing_addend: ['fetch'], add_100: ['fetch'], sub_100: ['fetch'],
   tables_a: ['fetch', 'array'], tables_b: ['fetch', 'array'], tables_c: ['fetch', 'array'],
   // mult_2digit arrays (cols 12-99) can never fit the 10×8 soil patch — fetch
@@ -1009,30 +1314,46 @@ export function recordResult(math, problem, res, { now = 0 } = {}) {
 // reflects stored ratings unchanged — which is exactly what the hub passes when
 // it drives the living-gate / island bloom, so a fading rating can never wilt the
 // visible reward (that only ever rises, via flags.portalStages).
+function skillStatesFor(math, world, now) {
+  return LADDER[world].map((id) => {
+    const s = math.skills[id];
+    const rating = effectiveRating(math, id, now);
+    return {
+      id,
+      nameKey: SKILLS[id].nameKey,
+      rating: Math.round(rating),
+      acc10: acc(s.hist),
+      n: s.n,
+      mastered: isMastered(s, rating),
+    };
+  });
+}
+
+function worldPct(skills) {
+  return skills.reduce((sum, sk) => sum + (sk.mastered ? 1
+    : clamp((sk.rating - START_RATING) / (MASTERY_RATING - START_RATING), 0, 1)
+      * Math.min(1, sk.n / MASTERY_MIN_N)), 0) / skills.length;
+}
+
 export function masteryReport(math, { now = 0 } = {}) {
   const worlds = {};
   for (const world of WORLDS) {
-    const skills = LADDER[world].map((id) => {
-      const s = math.skills[id];
-      const rating = effectiveRating(math, id, now);
-      return {
-        id,
-        nameKey: SKILLS[id].nameKey,
-        rating: Math.round(rating),
-        acc10: acc(s.hist),
-        n: s.n,
-        mastered: isMastered(s, rating),
-      };
-    });
-    const pct = skills.reduce((sum, sk) => sum + (sk.mastered ? 1
-      : clamp((sk.rating - START_RATING) / (MASTERY_RATING - START_RATING), 0, 1)
-        * Math.min(1, sk.n / MASTERY_MIN_N)), 0) / skills.length;
-    worlds[world] = { pct, skills };
+    const skills = skillStatesFor(math, world, now);
+    worlds[world] = { pct: worldPct(skills), skills };
   }
+  // The business group rides alongside the four story worlds (not inside `worlds`, so
+  // the six-line cosmology and island progress stay four-world), purely so the parent
+  // dashboard and curriculum coverage can see decimals/%/scale mastery.
+  const businessSkills = skillStatesFor(math, BUSINESS_WORLD, now);
   const lit = Object.keys(math.facts).filter((key) => gemLit(math.facts[key]));
   const weakest = Object.keys(SKILLS)
     .filter((id) => math.skills[id].n > 0)
     .sort((p, q) => effectiveRating(math, p, now) - effectiveRating(math, q, now))
     .slice(0, 3);
-  return { worlds, gems: { lit, total: 100 }, weakest };
+  return {
+    worlds,
+    business: { pct: worldPct(businessSkills), skills: businessSkills },
+    gems: { lit, total: 100 },
+    weakest,
+  };
 }

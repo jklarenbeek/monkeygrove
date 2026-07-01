@@ -3,8 +3,9 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mimiLines } from '../src/mimi.js';
+import { mimiLines, mimiPhaseFor, advanceMimiPhase } from '../src/mimi.js';
 import { islandStatus, buildById, freshIsland, playerCost } from '../src/island.js';
+import { freshStory } from '../src/story/engine.js';
 
 // Fake masteryReport: per-world pct (0..1), like mathengine.masteryReport.
 function report(pcts = {}) {
@@ -93,6 +94,55 @@ test('she always has something to say (cozy chatter closes the list)', () => {
   assert.ok(ls.some((l) => l.key.startsWith('mimi.chat.')));
 });
 
+// ---------------------------------------------------------------------------
+// Mimi's three-phase healing arc (Phase 4): tone shifts anxious -> opening -> whole,
+// while her quest advice never changes by phase.
+
+function storyProfile(mimiPhase, extra = {}) {
+  const story = { ...freshStory(), mimiPhase };
+  return { ...profile(extra), story };
+}
+
+test('phase 0 (anxious): the gray-dock, self-blaming Mimi, advice still intact', () => {
+  const r = report({ tide: 0.3 });
+  const ls = lines(storyProfile(0, { bananas: 999 }), r);
+  const keys = ls.map((l) => l.key);
+  assert.ok(keys.includes('mimi.phase0'));
+  assert.ok(!keys.includes('mimi.phase1') && !keys.includes('mimi.phase2'));
+  assert.equal(ls[0].key, 'mimi.build_ready'); // usefulness never drops — advice leads
+});
+
+test('phase 1 (opening): she begins to trust herself again', () => {
+  const keys = lines(storyProfile(1), report()).map((l) => l.key);
+  assert.ok(keys.includes('mimi.phase1'));
+  assert.ok(!keys.includes('mimi.phase0') && !keys.includes('mimi.phase2'));
+});
+
+test('phase 2 (whole): nerve restored at the festival', () => {
+  const keys = lines(storyProfile(2), report()).map((l) => l.key);
+  assert.ok(keys.includes('mimi.phase2'));
+  assert.ok(!keys.includes('mimi.phase0') && !keys.includes('mimi.phase1'));
+});
+
+test('mimiPhaseFor reads island progress: theft -> a friend home -> festival', () => {
+  assert.equal(mimiPhaseFor({ story: freshStory() }), 0);            // nothing drawn yet
+  const opening = { story: { ...freshStory(), lines: [true, false, false, false, false, false] } };
+  assert.equal(mimiPhaseFor(opening), 1);                            // one friend home
+  assert.equal(mimiPhaseFor({ story: freshStory(), flags: { festivalDone: true } }), 2);
+  assert.equal(mimiPhaseFor({ story: { ...freshStory(), crabKingReconciled: true } }), 2);
+});
+
+test('advanceMimiPhase is monotonic — Mimi never relapses', () => {
+  const p = { story: freshStory(), flags: {} };
+  assert.equal(advanceMimiPhase(p), 0);
+  p.story.lines[0] = true;
+  assert.equal(advanceMimiPhase(p), 1);
+  p.story.lines[0] = false; // a rating decays / line "un-draws" in a bad report
+  assert.equal(advanceMimiPhase(p), 1, 'phase only ever rises');
+  p.flags.festivalDone = true;
+  assert.equal(advanceMimiPhase(p), 2);
+});
+
 test('every line key has EN and NL copy in i18n.js', () => {
   const src = ['en', 'nl']
     .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
@@ -100,6 +150,7 @@ test('every line key has EN and NL copy in i18n.js', () => {
   const keys = [
     'mimi.meet', 'mimi.build_ready', 'mimi.need_bananas', 'mimi.almost_blueprint',
     'mimi.world_hint', 'mimi.egg_soon', 'mimi.streak', 'mimi.festival',
+    'mimi.phase0', 'mimi.phase1', 'mimi.phase2',
     'mimi.chat.1', 'mimi.chat.2', 'mimi.chat.3',
   ];
   for (const k of keys) {

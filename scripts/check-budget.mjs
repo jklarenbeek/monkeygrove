@@ -39,7 +39,12 @@ import { join } from 'node:path';
 // index (dynamic import + the guard below) but ARE precached for offline High-tier
 // play, so the offline total grew. index gzip is unchanged-tier (~234). Bumped
 // deliberately so the ~0.3 KiB margin became real headroom; the cap stays a guardrail.
-const INDEX_JS_GZIP_BUDGET_KB = 235;   // decimal kB (÷1000), matches Vite's report
+// 2026-06-30: 235 -> 242 for the SUPER_PROMPT curriculum build-out (Phases 1-2). The
+// adaptive engine gained 10 first-load skills (counting/number_bonds/big_numbers + the
+// decimals/%/scale business group) with their generators, the 64-step ladder registry,
+// the Mimi-arc + wonder-card copy, and the matching EN/NL strings — real first-load
+// functionality (~5 kB gzip), not bloat. Raised DELIBERATELY, headroom kept small.
+const INDEX_JS_GZIP_BUDGET_KB = 242;   // decimal kB (÷1000), matches Vite's report
 const PRECACHE_BUDGET_KIB = 1235;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';

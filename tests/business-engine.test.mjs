@@ -21,6 +21,7 @@ import {
   nextBusinessReview,
   orderIsMakeable,
   restockIngredient,
+  classifyBusinessMiss,
 } from '../src/business/engine.js';
 import { createCurriculumState } from '../src/curriculum/placement.js';
 import { Rng } from '../src/rng.js';
@@ -40,6 +41,50 @@ test('fresh business state is local, gentle, and stocked for first orders', () =
   assert.equal(state.day.ordersServed, 0);
   assert.ok(state.stock.dough >= 4);
   assert.ok(state.stock.sauce >= 4);
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5: the business world DIAGNOSES, it does not just check totals. A wrong
+// answer is tagged with the same misconception vocabulary the four worlds use.
+
+test('classifyBusinessMiss tags the part-vs-whole percent slip', () => {
+  const expected = { originalCents: 600, percent: 10, finalCents: 540 };
+  // paid the full price (forgot the discount)
+  assert.equal(classifyBusinessMiss('percentage_discount', expected, { finalCents: 600 }), 'whole_number_bias');
+  // returned just the discount amount
+  assert.equal(classifyBusinessMiss('percentage_discount', expected, { finalCents: 60 }), 'whole_number_bias');
+  // a different near miss is not over-claimed as the named trap
+  assert.equal(classifyBusinessMiss('percentage_discount', expected, { finalCents: 545 }), 'near_miss');
+});
+
+test('classifyBusinessMiss tags the comma slip in money change', () => {
+  const expected = { paidCents: 1000, changeCents: 250 };
+  assert.equal(classifyBusinessMiss('decimal_money_change', expected, { changeCents: 2500 }), 'comma_misalign');
+  assert.equal(classifyBusinessMiss('decimal_money_change', expected, { changeCents: 25 }), 'comma_misalign');
+  assert.equal(classifyBusinessMiss('decimal_money_change', expected, { changeCents: 240 }), 'near_miss');
+});
+
+test('classifyBusinessMiss tags forgetting to scale a recipe', () => {
+  const expected = { factor: 3, base: { flour: 2, berries: 1 } };
+  // left every ingredient at the base amount
+  assert.equal(classifyBusinessMiss('scale_recipe', expected, { ingredients: { flour: 2, berries: 1 } }), 'whole_number_bias');
+  assert.equal(classifyBusinessMiss('scale_recipe', expected, { ingredients: { flour: 6, berries: 2 } }), 'near_miss');
+});
+
+test('a wrong payment surfaces its misconception tag, not just a false total', () => {
+  const state = createBusinessState();
+  const task = {
+    id: 'o1:pay:discount', kind: 'payment', mode: 'percentage_discount',
+    objectiveId: 'nl_po.grade7.percentages_intro',
+    expected: { originalCents: 800, percent: 10, finalCents: 720 },
+  };
+  const res = applyPaymentAction(state, { id: 'o1' }, task, { finalCents: 800 });
+  assert.equal(res.correct, false);
+  assert.equal(res.tag, 'whole_number_bias');
+  // a correct answer is tagged 'correct'
+  const ok = applyPaymentAction(state, { id: 'o1' }, task, { finalCents: 720 });
+  assert.equal(ok.correct, true);
+  assert.equal(ok.tag, 'correct');
 });
 
 test('order generation chooses stage-appropriate tasks from curriculum', () => {

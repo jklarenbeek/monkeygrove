@@ -27,3 +27,24 @@ export const stepDistance = (a, b) => yijing_distance(a, b);
 
 // True when b is one gentle line-change from a (the anti-anxiety step size).
 export const isGentleStep = (a, b) => yijing_distance(a, b) === 1;
+
+// The gray-code selector (SUPER_PROMPT Phase 6 / the Book's "one line at a time").
+// Given the current knob-state as a 6-bit hexagram and several candidate next states,
+// pick the GENTLEST gray-code step: never the same state, prefer exactly one line
+// different (a single knob turned), else the closest available. Deterministic ties
+// (lowest hex) so replays are byte-identical. A caller maps a problem's parameters
+// (tier, kind, scaffold, magnitude...) to knob bits; this keeps consecutive problems a
+// single gentle change apart instead of a cliff, the way yijing_neighbors walks the cube.
+export function gentleNextHex(currentHex, optionHexes = []) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const h of optionHexes) {
+    const d = yijing_distance(currentHex, h);
+    if (d === 0) continue; // never serve the exact same knob-state twice in a row
+    if (d < bestDist || (d === bestDist && (best === null || h < best))) {
+      best = h;
+      bestDist = d;
+    }
+  }
+  return best;
+}

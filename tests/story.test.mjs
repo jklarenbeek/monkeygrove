@@ -23,20 +23,23 @@ import {
 import {
   CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS,
 } from '../src/story/chapters.js';
-import { echoShadow, neighborHexes, stepDistance, isGentleStep } from '../src/story/pacing.js';
+import { echoShadow, neighborHexes, stepDistance, isGentleStep, gentleNextHex } from '../src/story/pacing.js';
 
 // A masteryReport skeleton with a chosen set of mastered skill ids.
 function reportWith(mastered = []) {
   const set = new Set(mastered);
   const worlds = {};
   for (const w of WORLDS) worlds[w] = { pct: 0, skills: [] };
+  // Only the four story worlds carry hexagram lines; the business skill group lives
+  // outside the cosmology, so it never appears in a story report.
   for (const id of Object.keys(SKILLS)) {
-    worlds[SKILLS[id].world].skills.push({ id, mastered: set.has(id) });
+    const w = SKILLS[id].world;
+    if (worlds[w]) worlds[w].skills.push({ id, mastered: set.has(id) });
   }
   return { worlds };
 }
 const worldSkills = (w) => Object.keys(SKILLS).filter((id) => SKILLS[id].world === w);
-const allSkills = () => Object.keys(SKILLS);
+const allSkills = () => Object.keys(SKILLS).filter((id) => WORLDS.includes(SKILLS[id].world));
 
 // ---------------------------------------------------------------------------
 // Constants cross-checked against the battle-tested engine.
@@ -342,6 +345,20 @@ test('the gentle ramp is a one-line (gray-code) step', () => {
   }
   assert.equal(isGentleStep(0, 63), false);         // the whole flip is NOT gentle
   assert.equal(stepDistance(0, 63), 6);
+});
+
+test('the gray-code selector prefers a one-knob step and never repeats the state', () => {
+  const cur = FOUNDING_HEXAGRAM;
+  const oneAway = neighborHexes(cur)[0];
+  const twoAway = neighborHexes(oneAway).find((h) => stepDistance(cur, h) === 2);
+  // given a far option and a near option, it takes the gentle (distance-1) one
+  assert.equal(gentleNextHex(cur, [twoAway, oneAway]), oneAway);
+  assert.equal(stepDistance(cur, gentleNextHex(cur, [twoAway, oneAway])), 1);
+  // it never serves the identical state back
+  assert.notEqual(gentleNextHex(cur, [cur, twoAway]), cur);
+  // no candidates -> null (caller falls back to its own pick)
+  assert.equal(gentleNextHex(cur, []), null);
+  assert.equal(gentleNextHex(cur, [cur]), null);
 });
 
 test('ensureStory heals a save that predates story mode', () => {

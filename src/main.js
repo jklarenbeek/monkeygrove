@@ -18,6 +18,7 @@ import {
 import { dailyBusinessReport, ensureBusinessState } from './business/engine.js';
 import { isBuilt } from './island.js';
 import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine } from './story/engine.js';
+import { advanceMimiPhase } from './mimi.js';
 import { lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS } from './story/chapters.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
@@ -429,6 +430,9 @@ class Game {
       let changed = false;
 
       const newly = refreshStoryLines(story, report, eligible);
+      // Mimi's healing arc tracks the returning friends (monotonic; never relapses).
+      // Side-effect latch; it persists with the line-draw that triggered it.
+      advanceMimiPhase(this.profile);
       if (newly.length) {
         changed = true;
         if (withCeremony) {

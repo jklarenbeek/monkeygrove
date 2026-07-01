@@ -320,7 +320,7 @@ function applyWarmupDone(profile) {
 
 function applyBakeryUnlocked(profile) {
   applyWarmupDone(profile);
-  setMastery(profile, { tide: 5, garden: 5, stump: 2, vines: 0 });
+  setMastery(profile, { tide: 8, garden: 5, stump: 2, vines: 0 });
   setBuilt(profile, []);
   profile.bananas = Math.max(profile.bananas || 0, 200);
   profile.flags.festivalDone = false;
@@ -338,7 +338,7 @@ function applyBakeryBuilt(profile) {
 function applyGrade8Business(profile) {
   applyBakeryBuilt(profile);
   ensureBasics(profile, 'grade_8');
-  setMastery(profile, { tide: 5, garden: 5, stump: 4, vines: 2 });
+  setMastery(profile, { tide: 8, garden: 5, stump: 4, vines: 2 });
   stockBusiness(profile);
   profile.business.shopCoins = Math.max(profile.business.shopCoins || 0, 2500);
   profile.bananas = Math.max(profile.bananas || 0, 1200);

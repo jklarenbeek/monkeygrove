@@ -18,7 +18,7 @@ import {
   islandStatus, newBlueprints, markSeen, fund as fundIsland, buildById,
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
-import { mimiLines } from './mimi.js';
+import { mimiLines, advanceMimiPhase } from './mimi.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import {
   ensureStory, drawNarrativeLine, islandBloom,
@@ -601,6 +601,7 @@ export class HubController {
       drawNarrativeLine(story, 1); // the Four-Directions reveal (line 2)
       drawNarrativeLine(story, 5); // the yielding top line (line 6)
       story.crabKingReconciled = true;
+      advanceMimiPhase(g.profile); // the festival makes Mimi whole (phase 2)
       persist();
     }
     // Drop just the new build onto its plot — no teardown/rebuild of the whole

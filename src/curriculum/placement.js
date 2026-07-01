@@ -1,6 +1,15 @@
 import { getPack, listObjectives } from './index.js';
+import { LADDER_STEPS } from './ladder.js';
 
 const DEFAULT_PACK = 'NL_PO';
+
+// Two success targets (docs/04 §2): deliberately-effortful active practice at the
+// frontier (~65%), and affirming confirmation for placement / compaction / spaced
+// review (~85-90%). A confirmation that fails a third of the time reads as punishment.
+export const PRACTICE_TARGET = 0.65;
+export const CONFIRM_TARGET = 0.87;
+
+const BAND_SIZE = 8;
 
 function parseAge(age) {
   if (age == null) return null;
@@ -207,6 +216,86 @@ export function eligibleObjectives(curriculum = null) {
 
 export function eligibleSkillIds(curriculum = null) {
   return [...new Set(eligibleObjectives(curriculum).flatMap((o) => o.gameSkills || []))];
+}
+
+// ---------- placement + compaction over the 64-step ladder (docs/04 §4) ----------
+// One ladder for everyone; placement sets the entry, compaction handles everything
+// below it. A late starter lives the whole story but practises only at their real edge.
+
+// The top ladder step of a stage's band — the age-Target ceiling. grade_N -> band N-1
+// -> steps (N-1)*8 .. N*8-1; the target is the top of that band.
+export function targetStepForStage(packId = DEFAULT_PACK, stageId = null) {
+  const pack = getPack(packId);
+  const order = stageOrder(pack, stageId);
+  if (!order) return LADDER_STEPS.length - 1;
+  return Math.min(LADDER_STEPS.length - 1, order * BAND_SIZE - 1);
+}
+
+function skillStatesFromReport(report) {
+  const out = {};
+  for (const world of Object.values(report?.worlds || {})) {
+    for (const s of world?.skills || []) out[s.id] = s;
+  }
+  for (const s of report?.business?.skills || []) out[s.id] = s;
+  return out;
+}
+
+// A step is "solid" when its engine skill reads mastered (the report is decay-adjusted,
+// so this means *recently* solid). Observational / cold-start steps carry no Elo gate
+// and are solid by definition — they sequence the story, they never block it.
+function stepSolid(step, skills) {
+  if (!step.legacyGroup) return true;
+  return !!skills[step.legacyGroup]?.mastered;
+}
+
+// Walk DOWN from the age-Target step to the frontier — the highest step at/below target
+// that is not yet solid. Below the frontier, solid steps are `compacted` (cleared by a
+// single breeze at the confirm target); genuine gaps stay `active` (real ~65% practice).
+// Steps between the frontier and the target are visible `goal`s; above target is `locked`
+// future. This is the grade-8-starter answer: identical ladder, different entry.
+export function placeOnLadder(report, { targetStep = LADDER_STEPS.length - 1 } = {}) {
+  const skills = skillStatesFromReport(report);
+  const ceiling = Math.max(0, Math.min(targetStep, LADDER_STEPS.length - 1));
+  let frontier = null;
+  for (let id = ceiling; id >= 0; id--) {
+    if (!stepSolid(LADDER_STEPS[id], skills)) { frontier = id; break; }
+  }
+  const perStep = {};
+  for (const step of LADDER_STEPS) {
+    if (step.id > ceiling) perStep[step.id] = 'locked';
+    else if (frontier === null) perStep[step.id] = 'compacted'; // solid all the way to the ceiling
+    else if (step.id > frontier) perStep[step.id] = 'goal';
+    else if (step.id === frontier) perStep[step.id] = 'active';
+    else perStep[step.id] = stepSolid(step, skills) ? 'compacted' : 'active';
+  }
+  return placementLists({ frontier, targetStep: ceiling, perStep });
+}
+
+function placementLists(p) {
+  return {
+    ...p,
+    compacted: LADDER_STEPS.filter((s) => p.perStep[s.id] === 'compacted').map((s) => s.id),
+    practicing: LADDER_STEPS.filter((s) => p.perStep[s.id] === 'active').map((s) => s.id),
+  };
+}
+
+// Place using the child's confirmed (parent override) or estimated age stage.
+export function placeForCurriculum(curriculum = null, report = null) {
+  if (!report) return null;
+  const stage = curriculum?.confirmedStage || curriculum?.estimatedStage;
+  return placeOnLadder(report, {
+    targetStep: targetStepForStage(curriculum?.packId || DEFAULT_PACK, stage),
+  });
+}
+
+// Compaction demotion (docs/04 §4.3): a confirmed step that is then missed becomes real
+// practice and the frontier drops to it — a genuine gap, surfaced cheaply. Access never
+// shrinks; only pace and entry move.
+export function demoteStep(placement, stepId) {
+  if (!placement || !(stepId in placement.perStep)) return placement;
+  const perStep = { ...placement.perStep, [stepId]: 'active' };
+  const frontier = placement.frontier === null ? stepId : Math.min(placement.frontier, stepId);
+  return placementLists({ ...placement, frontier, perStep });
 }
 
 export function applyWarmupResult(curriculum, results, opts = {}) {

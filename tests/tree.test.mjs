@@ -14,8 +14,12 @@ import {
   PAIRS, NODES, NODE_IDS, PATHS, CHAPTER_REGIONS, PLANNED_PATHS,
   nodeById, pathsForSkill,
 } from '../src/story/tree.js';
+import { SLO_DOMAINS } from '../src/curriculum/domains.js';
 
-const FOUR_DOMAINS = new Set(['GETALLEN', 'VERHOUDINGEN', 'METEN_MEETKUNDE', 'VERBANDEN']);
+// The four SLO domains come from the single shared map (src/curriculum/domains.js),
+// not a hand-typed set here, so the Tree and the coherence harness can never disagree
+// about what the four domains are.
+const FOUR_DOMAINS = new Set(SLO_DOMAINS);
 
 // ---------------------------------------------------------------------------
 // The fold: 64 -> 32 King Wen pairs -> 10 balanced (nodes) + 22 unbalanced (paths).
@@ -100,8 +104,9 @@ test('planned paths carry no shipped skill (the decimals/%/scale gap); live path
     if (p.planned) assert.equal(p.skills.length, 0, `planned path ${p.pathNo} should map to no shipped skill yet`);
     else assert.ok(p.skills.length > 0, `live path ${p.pathNo} should map to a shipped skill`);
   }
-  // the gap is real and non-empty: decimals / % / scale / big-numbers / bonds
-  assert.ok(PLANNED_PATHS.length >= 6, 'the upper-grade curriculum gap is represented');
+  // the gap has shrunk to the still-unbuilt upper-grade paths (estimation, fraction
+  // notation); the bottom, top, decimals, %, and scale are now live.
+  assert.ok(PLANNED_PATHS.length >= 1, 'the remaining curriculum gap is represented');
   assert.deepEqual(PATHS.filter((p) => p.planned), PLANNED_PATHS);
 });
 

@@ -258,6 +258,40 @@ export function nextBusinessOrder(state, curriculum, opts = {}) {
   return order;
 }
 
+// Classify a wrong business answer into the same misconception vocabulary the four
+// worlds use (SUPER_PROMPT Phase 5: the business world diagnoses, it doesn't just check
+// totals). The shop is decimals/%/scale you can *touch*; a miss here names the exact
+// intuition that failed, so the helper can explain it like Mimi does in the chambers.
+export function classifyBusinessMiss(mode, expected = {}, action = {}) {
+  const num = (v) => Number(v);
+  if (mode === 'percentage_discount') {
+    // returned the full price (forgot the discount) or just the discount itself —
+    // both are the "part vs whole" confusion.
+    if (num(action.finalCents) === expected.originalCents) return 'whole_number_bias';
+    if (num(action.finalCents) === expected.originalCents - expected.finalCents) return 'whole_number_bias';
+    return 'near_miss';
+  }
+  if (mode === 'decimal_money_change') {
+    const exp = expected.changeCents;
+    const got = num(action.changeCents);
+    // change off by a power of ten — the comma slipped a place.
+    if (got === exp * 10 || got === exp * 100 || got === Math.round(exp / 10)) return 'comma_misalign';
+    return 'near_miss';
+  }
+  if (mode === 'scale_recipe') {
+    const base = expected.base || {};
+    // every ingredient left at the base amount — forgot to multiply by the factor.
+    const leftAtBase = Object.keys(base).length
+      && Object.entries(base).every(([id, n]) => num(action.ingredients?.[id]) === n);
+    return leftAtBase ? 'whole_number_bias' : 'near_miss';
+  }
+  if (mode === 'fraction_of_quantity_recipe') {
+    if (num(action.amount) === expected.of) return 'whole_number_bias'; // used the whole, not the part
+    return 'near_miss';
+  }
+  return 'near_miss';
+}
+
 export function applyPrepAction(state, order, task, action) {
   const recipe = RECIPES[order.recipeId];
   let correct = false;
@@ -282,7 +316,8 @@ export function applyPrepAction(state, order, task, action) {
     consumeStock(state, recipe, order.quantity);
     task.stockConsumed = true;
   }
-  return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id });
+  const tag = correct ? 'correct' : classifyBusinessMiss(task.mode, task.expected, action);
+  return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id, tag });
 }
 
 export function applyPaymentAction(state, order, task, action) {
@@ -294,7 +329,8 @@ export function applyPaymentAction(state, order, task, action) {
   } else if (task.mode === 'percentage_discount') {
     correct = Number(action.finalCents) === task.expected.finalCents;
   }
-  return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id });
+  const tag = correct ? 'correct' : classifyBusinessMiss(task.mode, task.expected, action);
+  return recordBusinessAttempt(state, task.mode, correct, { taskId: task.id, tag });
 }
 
 // ---------------------------------------------------------------------------

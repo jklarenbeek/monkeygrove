@@ -97,10 +97,11 @@ function validateProblem(p) {
 
 test('exports: WORLDS and SKILLS ladder with linear prereqs', () => {
   assert.deepEqual(WORLDS, ['tide', 'garden', 'stump', 'vines']);
-  assert.equal(Object.keys(SKILLS).length, 18);
+  assert.equal(Object.keys(SKILLS).length, 28);
+  const skillWorlds = new Set([...WORLDS, 'business']); // business is a fifth skill group
   for (const [id, sk] of Object.entries(SKILLS)) {
     assert.equal(sk.id, id);
-    assert.ok(WORLDS.includes(sk.world));
+    assert.ok(skillWorlds.has(sk.world));
     assert.equal(sk.nameKey, `skill.${id}`);
     if (sk.order === 0) assert.deepEqual(sk.prereqs, []);
     else assert.equal(SKILLS[sk.prereqs[0]].order, sk.order - 1);
@@ -111,7 +112,7 @@ test('exports: WORLDS and SKILLS ladder with linear prereqs', () => {
 
 test('createMathState shape', () => {
   const m = createMathState();
-  assert.equal(Object.keys(m.skills).length, 18);
+  assert.equal(Object.keys(m.skills).length, 28);
   assert.deepEqual(m.skills.add_20, { r: 600, n: 0, hist: [] });
   assert.deepEqual(m.facts, {});
   assert.deepEqual(m.log, []);
@@ -398,7 +399,7 @@ test('tide and vines problems never touch facts', () => {
 });
 
 test('selection: fresh world focuses on the first skill', () => {
-  for (const [world, first] of [['tide', 'add_20'], ['garden', 'tables_a'], ['stump', 'div_facts'], ['vines', 'frac_magnitude']]) {
+  for (const [world, first] of [['tide', 'counting'], ['garden', 'tables_a'], ['stump', 'div_facts'], ['vines', 'frac_magnitude']]) {
     const m = createMathState();
     const rng = new Rng(`fresh-${world}`);
     for (let i = 0; i < 50; i++) {
@@ -409,14 +410,19 @@ test('selection: fresh world focuses on the first skill', () => {
 
 test('selection: prereqs gate focus; mix is ~70/20/10', () => {
   const m = createMathState();
-  master(m, 'add_20');
+  // master everything up to the focus skill (sub_20) so the foundation steps below
+  // it are cleared — the focus then lands on sub_20 with add_20 as its review.
+  for (const id of ['counting', 'number_bonds', 'add_20']) master(m, id);
   const rng = new Rng('mix');
   const counts = {};
   for (let i = 0; i < 300; i++) {
     const p = nextProblem(m, { world: 'tide', rng });
     counts[p.skillId] = (counts[p.skillId] ?? 0) + 1;
   }
-  assert.deepEqual(new Set(Object.keys(counts)), new Set(['add_20', 'sub_20']));
+  // sub_20 is the focus (~70%), add_20 its immediate review (~20%); the ~10% refresh
+  // branch may also surface the deeper mastered foundation steps, but nothing unmastered.
+  const seen = new Set(Object.keys(counts));
+  for (const id of seen) assert.ok(['counting', 'number_bonds', 'add_20', 'sub_20'].includes(id), `unexpected ${id}`);
   assert.ok(counts.sub_20 > 160, `focus ${counts.sub_20}`);
   assert.ok(counts.add_20 > 40, `review ${counts.add_20}`);
 });
@@ -517,6 +523,24 @@ test('misconception tags appear in distractors over 200 generations', () => {
   collect('frac_of_n', 800, 'fetch', 80000);
   for (const want of ['off_by_table', 'addsub_confuse', 'no_carry', 'borrow', 'reversed',
     'whole_number_bias', 'add_tops_bottoms', 'remainder_ignored', 'near_miss', 'random']) {
+    assert.ok(tags.has(want), `missing tag ${want}`);
+  }
+});
+
+test('decimals/%/scale emit their tagged misconception distractors', () => {
+  const tags = new Set();
+  const collect = (skillId, rating, base) => {
+    const m = stateWithRating(skillId, rating);
+    for (let i = 0; i < 200; i++) {
+      const p = nextProblem(m, { skill: skillId, rng: new Rng(base + i) });
+      if (p.choices) for (const c of p.choices) tags.add(c.tag);
+    }
+  };
+  collect('dec_compare', 900, 110000); // the 0,4 vs 0,12 trap
+  collect('dec_addsub', 960, 120000);
+  collect('dec_muldiv', 980, 130000);
+  collect('percent_of', 920, 140000);
+  for (const want of ['decimal_length_bias', 'comma_misalign', 'whole_number_bias']) {
     assert.ok(tags.has(want), `missing tag ${want}`);
   }
 });
@@ -861,7 +885,7 @@ test('decay: re-practicing recovers a faded skill faster than the decay cost it'
 
 test('decay never wilts the gate/portal bloom (the visible reward only rises)', () => {
   const m = createMathState();
-  for (const id of ['add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100']) masterAt(m, id, BASE);
+  for (const id of ['counting', 'number_bonds', 'add_20', 'sub_20', 'missing_addend', 'add_100', 'sub_100', 'big_numbers']) masterAt(m, id, BASE);
 
   // the hub builds living gates from masteryReport WITHOUT a clock, so the number
   // that feeds the bloom never decays — the gate stays full however stale it gets

@@ -8,7 +8,7 @@
 // PURE DATA + tiny lookups: no DOM, no three.js, no engine import. Like constants.js,
 // the fold here is hand-written but CROSS-CHECKED against the @yijingjs/core engine in
 // tests/tree.test.mjs (the pairs must reproduce from YIJING_KINGWEN_SEQUENCE, every
-// skill id must be a real mathengine skill, the 18 shipped skills must all be covered).
+// skill id must be a real mathengine skill, the 21 shipped skills must all be covered).
 // If the cosmology drifts, a test fails rather than the meaning quietly rotting.
 //
 // PROVENANCE / naming: this is the structure historically called the "Tree of Life"
@@ -62,32 +62,38 @@ export const NODES = NODE_META.map((m, i) => Object.freeze({ ...m, index: i, pai
 // The 22 paths, in SefirotPanel PATHS order. `nodes` are the two NODE indices a
 // path bridges; `pair` is its *unbalanced* King Wen pair. `skills` are the REAL
 // mathengine.js ids the path practises (validated in the test); a `planned` path
-// has none yet — it is curriculum the four shipped worlds do not cover (decimals,
-// %, scale, big numbers, number bonds), with the doc-04 `steps` it will live on.
-// Together the 22 paths cover all 18 shipped skills exactly once.
+// has none yet — it is curriculum the shipped worlds do not cover (decimals, %,
+// scale), with the doc-04 `steps` it will live on. Together the 22 paths cover all
+// 21 shipped skills exactly once.
+//
+// `steps` are the 64-step ladder ids (src/curriculum/ladder.js) this path owns. They
+// form a PARTITION: every Getallen/Verhoudingen ladder step sits on exactly one path,
+// none on two (the Meten/Verbanden steps live off-Tree, in business/measurement
+// objectives). tests/ladder-coherence.test.mjs enforces both the partition and that a
+// step and its path always agree on the SLO domain.
 const PATH_META = [
-  { nodes: [0, 1], cluster: '% advanced (>100%, back-calculate), proportion', world: 'business', grade: '8',   domain: 'VERHOUDINGEN', steps: [62],                 skills: [],                                  planned: true  },
-  { nodes: [0, 2], cluster: 'big numbers (miljoen/miljard), standard form',   world: 'business', grade: '8',   domain: 'GETALLEN',     steps: [40, 48, 56],         skills: [],                                  planned: true  },
-  { nodes: [0, 5], cluster: 'estimation & "does this make sense?" check',     world: null,       grade: '7-8', domain: 'GETALLEN',     steps: [34, 49],             skills: [],                                  planned: true  },
-  { nodes: [1, 2], cluster: 'fraction <-> decimal <-> % conversion',          world: 'business', grade: '7-8', domain: 'VERHOUDINGEN', steps: [50],                 skills: [],                                  planned: true  },
-  { nodes: [1, 3], cluster: 'scale & enlargement (1:100; x2 -> area x4)',     world: 'business', grade: '7-8', domain: 'VERHOUDINGEN', steps: [54, 63],             skills: [],                                  planned: true  },
-  { nodes: [1, 5], cluster: 'percent of a quantity (25% of EUR 80)',          world: 'business', grade: '7',   domain: 'VERHOUDINGEN', steps: [52, 53],             skills: [],                                  planned: true  },
-  { nodes: [2, 4], cluster: 'decimal division, / by 10/100/1000',             world: 'business', grade: '7-8', domain: 'GETALLEN',     steps: [58],                 skills: [],                                  planned: true  },
-  { nodes: [2, 5], cluster: 'decimals on the line, compare (0,4 vs 0,12)',    world: 'business', grade: '6',   domain: 'GETALLEN',     steps: [44],                 skills: [],                                  planned: true  },
-  { nodes: [3, 4], cluster: 'inverse x/ & missing factor (fact families)',    world: 'stump',    grade: '5-6', domain: 'GETALLEN',     steps: [21, 30, 43],         skills: ['missing_factor'],                  planned: false },
-  { nodes: [3, 5], cluster: 'fraction of a quantity (3/4 of 24)',             world: 'vines',    grade: '6-7', domain: 'VERHOUDINGEN', steps: [47],                 skills: ['frac_of_n'],                       planned: false },
-  { nodes: [3, 6], cluster: 'multi-digit x (area model)',                     world: 'garden',   grade: '5-7', domain: 'GETALLEN',     steps: [37, 42],             skills: ['mult_2digit'],                     planned: false },
-  { nodes: [4, 5], cluster: 'division with remainder',                        world: 'stump',    grade: '6',   domain: 'GETALLEN',     steps: [42],                 skills: ['div_remainder'],                   planned: false },
-  { nodes: [4, 7], cluster: 'division facts & fair sharing',                  world: 'stump',    grade: '5-6', domain: 'GETALLEN',     steps: [30],                 skills: ['div_facts', 'share'],              planned: false },
-  { nodes: [5, 6], cluster: 'fraction equivalence (1/2 = 2/4 = 3/6)',         world: 'vines',    grade: '6-7', domain: 'VERHOUDINGEN', steps: [46, 50, 51],         skills: ['frac_equiv'],                      planned: false },
-  { nodes: [5, 7], cluster: 'fraction notation (teller/noemer), on the line', world: 'vines',    grade: '6',   domain: 'VERHOUDINGEN', steps: [45],                 skills: [],                                  planned: true  },
-  { nodes: [5, 8], cluster: 'fraction magnitude & compare (1/8 vs 1/4 trap)', world: 'vines',    grade: '5-6', domain: 'VERHOUDINGEN', steps: [38, 45, 46],         skills: ['frac_magnitude', 'frac_compare'],  planned: false },
-  { nodes: [6, 7], cluster: 'all-tables automaticity (maintenance)',          world: 'garden',   grade: '5',   domain: 'GETALLEN',     steps: [41],                 skills: ['tables_mix'],                      planned: false },
-  { nodes: [6, 8], cluster: 'tables x6-9, skip-count fluency',                world: 'garden',   grade: '4-5', domain: 'GETALLEN',     steps: [35],                 skills: ['tables_c'],                        planned: false },
-  { nodes: [6, 9], cluster: 'tables x2,5,10,3,4 -> intro x',                  world: 'garden',   grade: '4',   domain: 'GETALLEN',     steps: [22, 27, 28, 29],     skills: ['tables_a', 'tables_b'],            planned: false },
-  { nodes: [7, 8], cluster: '+/- to 100 & to 1.000 (column)',                 world: 'tide',     grade: '4-5', domain: 'GETALLEN',     steps: [24, 25, 26, 32, 33, 34], skills: ['add_100', 'sub_100'],          planned: false },
-  { nodes: [7, 9], cluster: '+/- to 20, missing addend, strategy',            world: 'tide',     grade: '3',   domain: 'GETALLEN',     steps: [10, 11, 17, 18, 19, 20], skills: ['add_20', 'sub_20', 'missing_addend'], planned: false },
-  { nodes: [8, 9], cluster: 'counting, splits of 10, the unit',               world: 'tide',     grade: '1-2', domain: 'GETALLEN',     steps: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], skills: [],                          planned: true  },
+  { nodes: [0, 1], cluster: '% advanced (>100%, back-calculate), proportion', world: 'business', grade: '8',   domain: 'VERHOUDINGEN', steps: [62],                     skills: ['percent_adv'],                     planned: false },
+  { nodes: [0, 2], cluster: 'big numbers (miljoen/miljard), standard form',   world: 'tide',     grade: '8',   domain: 'GETALLEN',     steps: [40, 48, 56],             skills: ['big_numbers'],                     planned: false },
+  { nodes: [0, 5], cluster: 'estimation & "does this make sense?" check',     world: null,       grade: '7-8', domain: 'GETALLEN',     steps: [34, 49, 59],             skills: [],                                  planned: true  },
+  { nodes: [1, 2], cluster: 'fraction <-> decimal <-> % conversion',          world: 'business', grade: '7-8', domain: 'VERHOUDINGEN', steps: [50],                     skills: ['frac_dec_pct'],                    planned: false },
+  { nodes: [1, 3], cluster: 'scale & enlargement (1:100; x2 -> area x4)',     world: 'business', grade: '7-8', domain: 'VERHOUDINGEN', steps: [54, 63],                 skills: ['scale'],                           planned: false },
+  { nodes: [1, 5], cluster: 'percent of a quantity (25% of EUR 80)',          world: 'business', grade: '7',   domain: 'VERHOUDINGEN', steps: [52, 53],                 skills: ['percent_of'],                      planned: false },
+  { nodes: [2, 4], cluster: 'decimal +/- and x/ by 10/100/1000',             world: 'business', grade: '7-8', domain: 'GETALLEN',     steps: [57, 58],                 skills: ['dec_addsub', 'dec_muldiv'],        planned: false },
+  { nodes: [2, 5], cluster: 'decimals on the line, compare (0,4 vs 0,12)',    world: 'business', grade: '6',   domain: 'GETALLEN',     steps: [44],                     skills: ['dec_compare'],                     planned: false },
+  { nodes: [3, 4], cluster: 'inverse x/ & missing factor (fact families)',    world: 'stump',    grade: '5-6', domain: 'GETALLEN',     steps: [43],                     skills: ['missing_factor'],                  planned: false },
+  { nodes: [3, 5], cluster: 'fraction of a quantity (3/4 of 24)',             world: 'vines',    grade: '6-7', domain: 'VERHOUDINGEN', steps: [13, 31, 47],             skills: ['frac_of_n'],                       planned: false },
+  { nodes: [3, 6], cluster: 'multi-digit x (area model)',                     world: 'garden',   grade: '5-7', domain: 'GETALLEN',     steps: [37],                     skills: ['mult_2digit'],                     planned: false },
+  { nodes: [4, 5], cluster: 'division with remainder',                        world: 'stump',    grade: '6',   domain: 'GETALLEN',     steps: [42],                     skills: ['div_remainder'],                   planned: false },
+  { nodes: [4, 7], cluster: 'division facts & fair sharing',                  world: 'stump',    grade: '5-6', domain: 'GETALLEN',     steps: [23, 30],                 skills: ['div_facts', 'share'],              planned: false },
+  { nodes: [5, 6], cluster: 'fraction equivalence & +/- x/ (unlike denom)',   world: 'vines',    grade: '6-8', domain: 'VERHOUDINGEN', steps: [51, 60, 61],             skills: ['frac_equiv'],                      planned: false },
+  { nodes: [5, 7], cluster: 'fraction notation (teller/noemer), on the line', world: 'vines',    grade: '6',   domain: 'VERHOUDINGEN', steps: [45],                     skills: [],                                  planned: true  },
+  { nodes: [5, 8], cluster: 'fraction magnitude & compare (1/8 vs 1/4 trap)', world: 'vines',    grade: '5-6', domain: 'VERHOUDINGEN', steps: [38, 46],                 skills: ['frac_magnitude', 'frac_compare'],  planned: false },
+  { nodes: [6, 7], cluster: 'all-tables automaticity (maintenance)',          world: 'garden',   grade: '5',   domain: 'GETALLEN',     steps: [41],                     skills: ['tables_mix'],                      planned: false },
+  { nodes: [6, 8], cluster: 'tables x6-9, skip-count fluency',                world: 'garden',   grade: '4-5', domain: 'GETALLEN',     steps: [35],                     skills: ['tables_c'],                        planned: false },
+  { nodes: [6, 9], cluster: 'tables x2,5,10,3,4 -> intro x',                  world: 'garden',   grade: '4',   domain: 'GETALLEN',     steps: [22, 27, 28, 29],         skills: ['tables_a', 'tables_b'],            planned: false },
+  { nodes: [7, 8], cluster: '+/- to 100 & to 1.000 (column)',                 world: 'tide',     grade: '4-5', domain: 'GETALLEN',     steps: [16, 24, 25, 26, 32, 33], skills: ['add_100', 'sub_100'],              planned: false },
+  { nodes: [7, 9], cluster: '+/- to 20, missing addend, strategy',            world: 'tide',     grade: '3',   domain: 'GETALLEN',     steps: [10, 11, 12, 17, 18, 19, 20, 21], skills: ['add_20', 'sub_20', 'missing_addend'], planned: false },
+  { nodes: [8, 9], cluster: 'counting, splits of 10, the unit',               world: 'tide',     grade: '1-2', domain: 'GETALLEN',     steps: [0, 1, 2, 3, 4, 5, 6, 8, 9], skills: ['counting', 'number_bonds'],     planned: false },
 ];
 
 export const PATHS = PATH_META.map((m, i) => Object.freeze({
@@ -120,6 +126,7 @@ const _pathsBySkill = {};
 for (const p of PATHS) for (const s of p.skills) (_pathsBySkill[s] ||= []).push(p);
 export const pathsForSkill = (id) => _pathsBySkill[id] || [];
 
-// The planned paths are exactly the curriculum the four shipped worlds do not yet
-// cover (decimals, %, scale, big numbers, number bonds) — the gap doc 04 names.
+// The planned paths are exactly the curriculum the shipped worlds do not yet cover
+// (decimals, %, scale, fraction<->decimal) — the upper-grade gap doc 04 names. The
+// bottom (counting/number bonds) and top (big numbers) of the Tree are now live.
 export const PLANNED_PATHS = PATHS.filter((p) => p.planned);

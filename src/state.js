@@ -1,5 +1,5 @@
 // Save/load, profiles, settings, streak, economy. localStorage under monkeygrove.*
-import { createMathState } from './mathengine.js';
+import { createMathState, SKILLS } from './mathengine.js';
 import { freshIsland } from './island.js';
 import { freshStory } from './story/engine.js';
 import { BALANCE, RARITY_WEIGHTS } from './config.js';
@@ -9,7 +9,7 @@ import { createBusinessState, ensureBusinessState } from './business/engine.js';
 import { DEFAULT_CREATURE_ID, COMPANION_IDS } from './mesh/creatures.js';
 
 const KEY = 'monkeygrove.save';
-const VERSION = 1;
+const VERSION = 2;
 const SUPPORTED_LANGS = new Set(['en', 'nl']);
 
 let save = null;
@@ -137,7 +137,28 @@ export function loadSave() {
 //     1: (s) => { for (const p of s.profiles) { p.egg = { points: p.eggPoints ?? 0, goal: BALANCE.eggGoal }; delete p.eggPoints; } return s; },
 //     2: (s) => …,   // v2 -> v3 lives here, and so on
 //   };
-const STEPS = {};
+// docs/04 §5 / SUPER_PROMPT Phase 1: the 18-skill ladder gained three finer skills
+// (counting, number_bonds at the bottom; big_numbers at the top). v1 -> v2 seeds each
+// new skill's Elo from its nearest old parent so a child mid-climb keeps their place —
+// counting/number_bonds are new foundations below the old floor (fresh start);
+// big_numbers extends +/- to 1.000 upward, so it inherits the child's sub_100 rating.
+const SKILL_SEED_PARENT = { counting: null, number_bonds: null, big_numbers: 'sub_100' };
+
+function migrate18to64(s) {
+  const fresh = createMathState();
+  for (const p of s.profiles) {
+    if (!isObject(p.math) || !isObject(p.math.skills)) continue;
+    for (const [id, parent] of Object.entries(SKILL_SEED_PARENT)) {
+      if (isObject(p.math.skills[id])) continue;
+      const seeded = structuredClone(fresh.skills[id]); // { r: START, n: 0, hist: [] }
+      if (parent && isObject(p.math.skills[parent])) seeded.r = p.math.skills[parent].r;
+      p.math.skills[id] = seeded;
+    }
+  }
+  return s;
+}
+
+const STEPS = { 1: migrate18to64 };
 
 // Upgrade a parsed save to the current shape: run version steps, then heal missing
 // fields against a fresh profile (the final, additive step). A step may mutate `s` in
@@ -208,6 +229,12 @@ function healSave(s) {
     if (p.curriculum.warmup.completed === undefined) p.curriculum.warmup.completed = false;
     if (p.curriculum.warmup.results === undefined) p.curriculum.warmup.results = [];
     if (p.curriculum.warmup.skillIds === undefined) p.curriculum.warmup.skillIds = [];
+    // Additively ensure every engine skill has a rating slot (a save predating a new
+    // skill that the version step did not seed still gets a fresh, playable entry).
+    if (!isObject(p.math) || !isObject(p.math.skills)) p.math = createMathState();
+    else for (const id of Object.keys(SKILLS)) {
+      if (!isObject(p.math.skills[id])) p.math.skills[id] = structuredClone(ref.math.skills[id]);
+    }
     ensureBusinessState(p);
   }
   // heal settings so saves from before comfort/accessibility options get the defaults

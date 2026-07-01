@@ -27,6 +27,9 @@ function skillMapFromReport(report) {
     if (!Array.isArray(world?.skills)) continue;
     for (const skill of world.skills) out[skill.id] = skill;
   }
+  // The business group (decimals/%/scale) rides beside the four story worlds in
+  // masteryReport; include it so those objectives can read as covered/partial too.
+  for (const skill of report?.business?.skills || []) out[skill.id] = skill;
   return out;
 }
 

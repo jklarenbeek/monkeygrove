@@ -34,6 +34,7 @@ export function freshStory() {
     phase: 0,                 // furthest chapter reached, 0..6, monotonic
     beats: [],                // story-beat ids already shown (no replay)
     crabKingReconciled: false,
+    mimiPhase: 0,             // Mimi's healing arc: 0 anxious -> 1 opening -> 2 whole (monotonic)
   };
 }
 
@@ -58,6 +59,8 @@ export function ensureStory(profile) {
   s.beats = Array.isArray(s.beats) ? s.beats.filter((b) => typeof b === 'string') : [];
   // crabKingReconciled: a plain boolean flag.
   s.crabKingReconciled = s.crabKingReconciled === true;
+  // mimiPhase: integer clamped to [0, 2], monotonic (healed for pre-arc saves).
+  s.mimiPhase = Number.isFinite(s.mimiPhase) ? Math.max(0, Math.min(2, Math.floor(s.mimiPhase))) : 0;
   return s;
 }
 
