@@ -8,8 +8,8 @@
 <meta name="description" content="A cozy island adventure that brings the numbers home. Een knus eiland-avontuur dat de getallen thuisbrengt.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐵</text></svg>">
 <link rel="apple-touch-icon" href="/monkeygrove/apple-touch-icon.png">
-  <script type="module" crossorigin src="/monkeygrove/assets/index-tpQ89Okm.js"></script>
-  <link rel="stylesheet" crossorigin href="/monkeygrove/assets/index-_hT6ypZ9.css">
+  <script type="module" crossorigin src="/monkeygrove/assets/index-C1dXyLKD.js"></script>
+  <link rel="stylesheet" crossorigin href="/monkeygrove/assets/index-DvPMyQR2.css">
 <link rel="manifest" href="/monkeygrove/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/monkeygrove/registerSW.js"></script></head>
 <body>
 <canvas id="game-canvas"></canvas>
@@ -22,6 +22,7 @@
       <div class="chip" id="chip-streak"><span class="chip-icon">🔥</span><span id="streak-count">0</span></div>
     </div>
     <div id="hud-top-right">
+      <button class="round-btn" id="btn-camera-reset" title="Reset camera">🎯</button>
       <button class="round-btn" id="btn-home" title="Home">🏝️</button>
       <button class="round-btn" id="btn-settings" title="Settings">⚙️</button>
     </div>
@@ -32,6 +33,10 @@
       <button class="round-btn big" id="btn-hint" title="Hint">💡</button>
       <button class="round-btn big hidden" id="btn-action" title="Action">✋</button>
     </div>
+    <div id="joystick" aria-hidden="true">
+      <div id="joystick-base"><div id="joystick-knob"></div></div>
+    </div>
+    <div id="proximity-prompt" class="hidden" aria-hidden="true"></div>
     <div id="combo" class="hidden">x<span id="combo-count">2</span></div>
   </div>
 
