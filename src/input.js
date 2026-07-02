@@ -45,6 +45,12 @@ export function isJoystickZone(x, y, width = window.innerWidth || 1, height = wi
   return x <= Math.min(360, width * 0.46) && y >= height - Math.min(260, height * 0.46);
 }
 
+export function shouldOrbitDrag({ startX, dx, dy, pointerType = 'touch', width = window.innerWidth || 1 } = {}) {
+  const dist = Math.hypot(dx || 0, dy || 0);
+  if (pointerType === 'mouse') return dist > 8;
+  return startX > width * 0.62 && dist > 18;
+}
+
 export function softVibrate(ms = 10) {
   try { navigator.vibrate?.(ms); } catch { /* unsupported or denied: harmless */ }
 }
@@ -59,179 +65,211 @@ export class InputController {
   }
 
   bind() {
-    const game = this.game;
-    window.addEventListener('keydown', (e) => {
-      if (game.mode === 'title' || document.querySelector('#screens .screen')) return;
-      const code = e.code;
-      // an open dialogue eats the confirm key first, Zelda-style
-      if ((code === 'Space' || code === 'Enter') && hud.advanceBubble()) {
-        e.preventDefault();
-        return;
-      }
-      if (game.verb?.onKey?.(code)) { e.preventDefault(); return; }
-      // Screen-relative movement on the iso diamond. The board's rows/columns
-      // run at 45°, so every single-cell hop travels on a screen diagonal —
-      // there is no cell-to-cell move that goes dead-straight up (see
-      // world.GRID_STEP_SCREEN). Rather than fight that, each arrow is assigned
-      // the hop that carries its own label's screen component: Up steps toward
-      // the top of the screen (the up-and-right hop), Down toward the bottom,
-      // Left/Right toward their edges. A deliberate four-key→four-hop bijection
-      // that lines up with the swipe buckets (world.screenDirToGridStep), so
-      // keyboard and touch send the monkey the same way for the same intent.
-      const dirs = {
-        ArrowUp: [0, -1], KeyW: [0, -1],     // top of screen  (up-right hop)
-        ArrowDown: [0, 1], KeyS: [0, 1],     // bottom         (down-left hop)
-        ArrowLeft: [-1, 0], KeyA: [-1, 0],   // left edge       (up-left hop)
-        ArrowRight: [1, 0], KeyD: [1, 0],    // right edge      (down-right hop)
-      };
-      if (dirs[code]) {
-        e.preventDefault();
-        game.player?.tryStep(dirs[code][0], dirs[code][1]);
-      } else if (code === 'Space' || code === 'Enter') {
-        e.preventDefault();
-        game.inputAction();
-      } else if (code === 'KeyE') {
-        game.inputHint();
-      }
-    });
+    this._bindKeyboard();
+    this._bindPointerControls();
+    this._bindWheel();
+  }
 
+  _bindKeyboard() {
+    window.addEventListener('keydown', (e) => this._onKeyDown(e));
+  }
+
+  _onKeyDown(e) {
+    const game = this.game;
+    if (game.mode === 'title' || document.querySelector('#screens .screen')) return;
+    const code = e.code;
+    // an open dialogue eats the confirm key first, Zelda-style
+    if ((code === 'Space' || code === 'Enter') && hud.advanceBubble()) {
+      e.preventDefault();
+      return;
+    }
+    if (game.verb?.onKey?.(code)) { e.preventDefault(); return; }
+    // Screen-relative movement on the iso diamond. The board's rows/columns
+    // run at 45°, so every single-cell hop travels on a screen diagonal.
+    const dirs = {
+      ArrowUp: [0, -1], KeyW: [0, -1],     // top of screen  (up-right hop)
+      ArrowDown: [0, 1], KeyS: [0, 1],     // bottom         (down-left hop)
+      ArrowLeft: [-1, 0], KeyA: [-1, 0],   // left edge       (up-left hop)
+      ArrowRight: [1, 0], KeyD: [1, 0],    // right edge      (down-right hop)
+    };
+    if (dirs[code]) {
+      e.preventDefault();
+      game.player?.tryStep(dirs[code][0], dirs[code][1]);
+    } else if (code === 'Space' || code === 'Enter') {
+      e.preventDefault();
+      game.inputAction();
+    } else if (code === 'KeyE') {
+      game.inputHint();
+    }
+  }
+
+  _bindPointerControls() {
     // One finger drives the game (tap to walk/act, short swipe to step); two
     // fingers drive the camera (pinch to zoom, drag to pan). A two-finger
     // gesture suppresses the one-finger tap that would otherwise fire on lift.
-    const pointers = new Map();        // active pointers: id -> {x, y}
-    let downPos = null, dragging = false, gestured = false;
-    let orbitDrag = null;             // { pointerId, x, y } while one-finger orbiting
-    let pinch = null;                  // { dist, zoom, cx, cy } during 2 fingers
-
-    const centroid = () => {
-      let x = 0, y = 0;
-      for (const p of pointers.values()) { x += p.x; y += p.y; }
-      const n = pointers.size || 1;
-      return { x: x / n, y: y / n };
+    const state = {
+      pointers: new Map(), // active pointers: id -> {x, y}
+      downPos: null,
+      dragging: false,
+      gestured: false,
+      orbitDrag: null,    // { pointerId, x, y } while one-finger orbiting
+      pinch: null,        // { dist, zoom, cx, cy } during 2 fingers
     };
-    const spread = () => {
-      const pts = [...pointers.values()];
-      return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-    };
-
-    this.canvas.addEventListener('pointerdown', (e) => {
-      if (game.mode !== 'title' && e.pointerType !== 'mouse' && isJoystickZone(e.clientX, e.clientY)) {
-        this.joystick = {
-          active: true,
-          pointerId: e.pointerId,
-          origin: { x: e.clientX, y: e.clientY },
-          vector: null,
-        };
-        hud.setJoystickActive(true);
-        hud.setJoystickVector(0, 0);
-        this.canvas.setPointerCapture?.(e.pointerId);
-        e.preventDefault();
-        return;
-      }
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 1) {
-        downPos = { x: e.clientX, y: e.clientY };
-        dragging = false; gestured = false;
-        orbitDrag = null;
-        if (game.mode !== 'title' && !document.querySelector('#screens .screen')) {
-          const cell = this.pickCell(e.clientX, e.clientY);
-          if (cell) game.previewTapCell?.(cell);
-        }
-      } else if (pointers.size === 2) {
-        const c = centroid();
-        pinch = { dist: spread() || 1, zoom: game.world.zoom, cx: c.x, cy: c.y };
-        gestured = true;
-        orbitDrag = null;
-      }
-    });
-
-    this.canvas.addEventListener('pointermove', (e) => {
-      if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
-        const v = joystickVectorFromPointer(this.joystick.origin, { x: e.clientX, y: e.clientY });
-        this.joystick.vector = v;
-        hud.setJoystickVector(v?.x || 0, v?.y || 0);
-        const step = joystickStepFromVector(v);
-        if (step) {
-          const key = `${step[0]},${step[1]}`;
-          if (this.joystick.lastStepKey !== key) softVibrate(12);
-          this.joystick.lastStepKey = key;
-          game.player?.setMoveIntent(step[0], step[1], v.strength);
-        } else {
-          this.joystick.lastStepKey = null;
-          game.player?.clearMoveIntent();
-        }
-        e.preventDefault();
-        return;
-      }
-      if (!pointers.has(e.pointerId)) return;
-      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (game.mode === 'title') return;
-      if (pointers.size >= 2 && pinch) {
-        const d = spread();
-        if (d > 0) game.world.setZoom(pinch.zoom * (d / pinch.dist));
-        const c = centroid();
-        game.world.panByPixels(c.x - pinch.cx, c.y - pinch.cy);
-        pinch.cx = c.x; pinch.cy = c.y;
-        this.userZoom = game.world.zoom; // remember the level they settled on
-      } else if (pointers.size === 1 && downPos) {
-        const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
-        const wantsOrbit = e.pointerType === 'mouse' || downPos.x > (window.innerWidth || 1) * 0.45;
-        if (wantsOrbit && Math.hypot(dx, dy) > 8) {
-          dragging = true;
-          gestured = true;
-          if (!orbitDrag) orbitDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
-          game.world.orbitByPixels(e.clientX - orbitDrag.x);
-          orbitDrag.x = e.clientX;
-          orbitDrag.y = e.clientY;
-        } else if (Math.hypot(dx, dy) > 14) dragging = true;
-      }
-    });
-
-    const endPointer = (e) => {
-      if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
-        this.joystick = { active: false, pointerId: null, origin: null, vector: null };
-        game.player?.clearMoveIntent();
-        hud.setJoystickActive(false);
-        hud.setJoystickVector(0, 0);
-        e.preventDefault();
-        return;
-      }
-      const start = downPos;
-      const had = pointers.delete(e.pointerId);
-      if (pointers.size < 2) pinch = null;
-      if (pointers.size > 0) return;   // wait until every finger is up
-      downPos = null;
-      orbitDrag = null;
-      const wasDrag = dragging, wasGesture = gestured;
-      dragging = false; gestured = false;
-      if (!had || game.mode === 'title' || wasGesture) return;
-      if (!wasDrag) {
-        const cell = this.pickCell(e.clientX, e.clientY);
-        if (!cell) return;
-        game.previewTapCell?.(cell);
-        game.inputTapCell(cell);
-      } else {
-        const dx = e.clientX - (start?.x ?? e.clientX), dy = e.clientY - (start?.y ?? e.clientY);
-        if (Math.hypot(dx, dy) > 30) {
-          // swipe = one step, screen-relative. Hand the swipe direction (screen
-          // y points down, so negate it for "up+") to the same iso resolver the
-          // camera basis drives: it buckets the angle into the four grid hops
-          // 1:1 — a swipe up-left steps up-left — instead of the old octant
-          // round() that double-mapped left and could drop diagonals sideways.
-          const d = screenDirToGridStep(dx, -dy);
-          if (d) game.player?.tryStep(d[0], d[1]);
-        }
-      }
-    };
+    this.canvas.addEventListener('pointerdown', (e) => this._onPointerDown(e, state));
+    this.canvas.addEventListener('pointermove', (e) => this._onPointerMove(e, state));
+    const endPointer = (e) => this._onPointerEnd(e, state);
     this.canvas.addEventListener('pointerup', endPointer);
     this.canvas.addEventListener('pointercancel', endPointer);
+  }
 
-    // desktop: mouse wheel / trackpad pinch zooms toward the current framing
+  _pointerCentroid(state) {
+    let x = 0, y = 0;
+    for (const p of state.pointers.values()) { x += p.x; y += p.y; }
+    const n = state.pointers.size || 1;
+    return { x: x / n, y: y / n };
+  }
+
+  _pointerSpread(state) {
+    const pts = [...state.pointers.values()];
+    return pts.length < 2 ? 0 : Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  _startJoystick(e) {
+    this.joystick = {
+      active: true,
+      pointerId: e.pointerId,
+      origin: { x: e.clientX, y: e.clientY },
+      vector: null,
+    };
+    hud.setJoystickActive(true);
+    hud.setJoystickVector(0, 0);
+    try { this.canvas.setPointerCapture?.(e.pointerId); } catch { /* synthetic/ended pointer: ignore */ }
+    e.preventDefault();
+  }
+
+  _moveJoystick(e) {
+    const v = joystickVectorFromPointer(this.joystick.origin, { x: e.clientX, y: e.clientY });
+    this.joystick.vector = v;
+    hud.setJoystickVector(v?.x || 0, v?.y || 0);
+    const step = joystickStepFromVector(v);
+    if (step) {
+      const key = `${step[0]},${step[1]}`;
+      if (this.joystick.lastStepKey !== key) softVibrate(12);
+      this.joystick.lastStepKey = key;
+      this.game.player?.setMoveIntent(step[0], step[1], v.strength);
+    } else {
+      this.joystick.lastStepKey = null;
+      this.game.player?.clearMoveIntent();
+    }
+    e.preventDefault();
+  }
+
+  _endJoystick(e) {
+    this.joystick = { active: false, pointerId: null, origin: null, vector: null };
+    this.game.player?.clearMoveIntent();
+    hud.setJoystickActive(false);
+    hud.setJoystickVector(0, 0);
+    e.preventDefault();
+  }
+
+  _onPointerDown(e, state) {
+    const game = this.game;
+    if (game.mode !== 'title' && e.pointerType !== 'mouse' && isJoystickZone(e.clientX, e.clientY)) {
+      this._startJoystick(e);
+      return;
+    }
+    state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (state.pointers.size === 1) {
+      state.downPos = { x: e.clientX, y: e.clientY };
+      state.dragging = false; state.gestured = false;
+      state.orbitDrag = null;
+      if (game.mode !== 'title' && !document.querySelector('#screens .screen')) {
+        const cell = this.pickCell(e.clientX, e.clientY);
+        if (cell) game.previewTapCell?.(cell);
+      }
+    } else if (state.pointers.size === 2) {
+      const c = this._pointerCentroid(state);
+      state.pinch = { dist: this._pointerSpread(state) || 1, zoom: game.world.zoom, cx: c.x, cy: c.y };
+      state.gestured = true;
+      state.orbitDrag = null;
+    }
+  }
+
+  _onPointerMove(e, state) {
+    if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
+      this._moveJoystick(e);
+      return;
+    }
+    if (!state.pointers.has(e.pointerId)) return;
+    state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.game.mode === 'title') return;
+    if (state.pointers.size >= 2 && state.pinch) {
+      this._movePinchCamera(state);
+    } else if (state.pointers.size === 1 && state.downPos) {
+      this._moveSinglePointerCamera(e, state);
+    }
+  }
+
+  _movePinchCamera(state) {
+    const d = this._pointerSpread(state);
+    if (d > 0) this.game.world.setZoom(state.pinch.zoom * (d / state.pinch.dist));
+    const c = this._pointerCentroid(state);
+    this.game.world.panByPixels(c.x - state.pinch.cx, c.y - state.pinch.cy);
+    state.pinch.cx = c.x; state.pinch.cy = c.y;
+    this.userZoom = this.game.world.zoom; // remember the level they settled on
+  }
+
+  _moveSinglePointerCamera(e, state) {
+    const dx = e.clientX - state.downPos.x, dy = e.clientY - state.downPos.y;
+    if (shouldOrbitDrag({ startX: state.downPos.x, dx, dy, pointerType: e.pointerType, width: window.innerWidth || 1 })) {
+      state.dragging = true;
+      state.gestured = true;
+      if (!state.orbitDrag) state.orbitDrag = { pointerId: e.pointerId, x: state.downPos.x, y: state.downPos.y };
+      this.game.world.orbitByPixels(e.clientX - state.orbitDrag.x);
+      state.orbitDrag.x = e.clientX;
+      state.orbitDrag.y = e.clientY;
+    } else if (Math.hypot(dx, dy) > 14) state.dragging = true;
+  }
+
+  _onPointerEnd(e, state) {
+    if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
+      this._endJoystick(e);
+      return;
+    }
+    const start = state.downPos;
+    const had = state.pointers.delete(e.pointerId);
+    if (state.pointers.size < 2) state.pinch = null;
+    if (state.pointers.size > 0) return;   // wait until every finger is up
+    state.downPos = null;
+    state.orbitDrag = null;
+    const wasDrag = state.dragging, wasGesture = state.gestured;
+    state.dragging = false; state.gestured = false;
+    if (!had || this.game.mode === 'title' || wasGesture) return;
+    if (!wasDrag) {
+      const cell = this.pickCell(e.clientX, e.clientY);
+      if (!cell) return;
+      this.game.previewTapCell?.(cell);
+      this.game.inputTapCell(cell);
+    } else {
+      this._finishSwipe(e, start);
+    }
+  }
+
+  _finishSwipe(e, start) {
+    const dx = e.clientX - (start?.x ?? e.clientX), dy = e.clientY - (start?.y ?? e.clientY);
+    if (Math.hypot(dx, dy) <= 30) return;
+    // Swipe = one step, screen-relative, using the same iso resolver as the
+    // joystick so touch movement feels like one language.
+    const d = screenDirToGridStep(dx, -dy);
+    if (d) this.game.player?.tryStep(d[0], d[1]);
+  }
+
+  _bindWheel() {
     this.canvas.addEventListener('wheel', (e) => {
-      if (game.mode === 'title') return;
+      if (this.game.mode === 'title') return;
       e.preventDefault();
-      game.world.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
-      this.userZoom = game.world.zoom; // remember the level they settled on
+      this.game.world.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
+      this.userZoom = this.game.world.zoom; // remember the level they settled on
     }, { passive: false });
   }
 

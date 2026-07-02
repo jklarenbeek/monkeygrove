@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { Player } from '../src/player.js';
+import { Player, moveIntentHopTuning } from '../src/player.js';
 
 function fakeMesh() {
   return {
@@ -93,4 +93,13 @@ test('reachableCells returns nearby legal cells without including blocked tiles'
   const cells = p.reachableCells(2).map((c) => `${c.x},${c.z}`).sort();
 
   assert.deepEqual(cells, ['0,1', '0,2', '1,1'].sort());
+});
+
+test('moveIntentHopTuning makes strong joystick movement look quicker and livelier', () => {
+  const weak = moveIntentHopTuning(0.2);
+  const strong = moveIntentHopTuning(1);
+
+  assert.ok(strong.ms < weak.ms, `strong move ms ${strong.ms} should be lower than weak ${weak.ms}`);
+  assert.ok(strong.arc > weak.arc, `strong move arc ${strong.arc} should be higher than weak ${weak.arc}`);
+  assert.ok(strong.ms >= 145, 'hop animation keeps enough time to read as a hop');
 });

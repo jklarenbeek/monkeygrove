@@ -10,6 +10,14 @@ import { joystickRepeatMs } from './input.js';
 
 const NO_SQUASH = { sy: 1, sxz: 1 };
 
+export function moveIntentHopTuning(strength = 0) {
+  const s = Math.max(0, Math.min(1, strength || 0));
+  return {
+    ms: Math.max(145, Math.round(HOP_MS - s * 34)),
+    arc: HOP_ARC * (1 + s * 0.12),
+  };
+}
+
 // A ground-pinned contact shadow that tracks a hopping character on the X/Z plane
 // but never inherits its hop arc or squash (it stays flat on the floor). Lives as a
 // sibling in the place group, not a child of the bouncing mesh. Shared singleton
@@ -136,13 +144,14 @@ export class Player {
     const m = this.mesh;
     const start = m.position.clone();
     const end = this.place.worldPos(nx, nz);
+    const hop = moveIntentHopTuning(this.moveIntent?.strength || 0);
     if (this.sfx) audio.sfx('hop');
     tween({
-      ms: HOP_MS, ease: ease.linear,
+      ms: hop.ms, ease: ease.linear,
       onUpdate: (v, k) => {
         m.position.x = start.x + (end.x - start.x) * k;
         m.position.z = start.z + (end.z - start.z) * k;
-        m.position.y = start.y + (end.y - start.y) * k + Math.sin(k * Math.PI) * HOP_ARC;
+        m.position.y = start.y + (end.y - start.y) * k + Math.sin(k * Math.PI) * hop.arc;
         const s = reducedMotion() ? NO_SQUASH : squash(k);
         m.scale.set(this.baseScale * s.sxz, this.baseScale * s.sy, this.baseScale * s.sxz);
         m.rotation.y += (this.facing - m.rotation.y) * 0.35;

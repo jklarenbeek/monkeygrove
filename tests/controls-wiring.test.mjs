@@ -24,6 +24,8 @@ test('control CSS exposes touch joystick and proximity prompt without stealing p
   assert.match(html, /id="joystick"/, 'joystick DOM exists');
   assert.match(html, /id="proximity-prompt"/, 'proximity prompt DOM exists');
   assert.match(css, /#joystick[\s\S]*pointer-events:\s*none/, 'joystick overlay does not block taps');
+  assert.match(css, /joystick-idle-pulse/, 'idle joystick has a visible discovery pulse');
+  assert.match(css, /#btn-action\.ready[\s\S]*0 0 0 10px/, 'ready action button gets a stronger contextual glow');
   assert.match(css, /@media \(hover:\s*none\), \(pointer:\s*coarse\)[\s\S]*#joystick\s*\{\s*display:\s*flex/, 'joystick shows on coarse pointers');
   assert.match(css, /@media \(max-width:\s*760px\)[\s\S]*#joystick\s*\{\s*display:\s*flex/, 'joystick also shows in narrow mobile-sized viewports');
 });

@@ -68,7 +68,7 @@ html, body {
 .round-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
 #btn-action.ready {
   background: #fffdf4;
-  box-shadow: 0 4px 0 var(--sun-deep), 0 0 0 6px rgba(255, 217, 102, .32);
+  box-shadow: 0 4px 0 var(--sun-deep), 0 0 0 10px rgba(255, 217, 102, .34), 0 0 22px rgba(255, 217, 102, .48);
   animation: action-ready .85s ease-in-out infinite;
 }
 #btn-action.idle {
@@ -131,6 +131,15 @@ html, body {
 #joystick.active #joystick-base {
   background: rgba(255,253,244,.68);
   box-shadow: 0 8px 18px rgba(74,63,53,.28), 0 0 0 7px rgba(255,217,102,.28);
+}
+#joystick:not(.active) #joystick-base {
+  animation: joystick-idle-pulse 2.1s ease-in-out infinite;
+}
+@keyframes joystick-idle-pulse {
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 8px 18px rgba(74,63,53,.26), 0 0 0 8px rgba(255,255,255,.24), 0 0 0 15px rgba(255,217,102,.18);
+  }
 }
 #proximity-prompt {
   position: absolute;

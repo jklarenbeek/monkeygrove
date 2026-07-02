@@ -5,7 +5,12 @@
 // buckets, the way the old `Math.round(ang / (PI/2))` octant table did.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { joystickRepeatMs, joystickStepFromVector, joystickVectorFromPointer } from '../src/input.js';
+import {
+  joystickRepeatMs,
+  joystickStepFromVector,
+  joystickVectorFromPointer,
+  shouldOrbitDrag,
+} from '../src/input.js';
 import { screenDirToGridStep } from '../src/world.js';
 
 const key = (s) => (s ? `${s[0]},${s[1]}` : 'null');
@@ -102,4 +107,11 @@ test('joystick repeat timing gets faster as the thumbstick is pushed farther', (
   assert.ok(slow > fast, `expected weak stick repeat ${slow}ms to be slower than ${fast}ms`);
   assert.ok(fast >= 145 && fast <= 190, `full-strength repeat stays near hop timing, got ${fast}ms`);
   assert.ok(slow <= 280, `weak repeat remains responsive, got ${slow}ms`);
+});
+
+test('touch camera orbit requires a deliberate right-side drag', () => {
+  assert.equal(shouldOrbitDrag({ startX: 190, dx: 20, dy: 0, pointerType: 'touch', width: 390 }), false);
+  assert.equal(shouldOrbitDrag({ startX: 250, dx: 10, dy: 0, pointerType: 'touch', width: 390 }), false);
+  assert.equal(shouldOrbitDrag({ startX: 292, dx: 22, dy: 0, pointerType: 'touch', width: 390 }), true);
+  assert.equal(shouldOrbitDrag({ startX: 40, dx: 9, dy: 0, pointerType: 'mouse', width: 390 }), true);
 });
