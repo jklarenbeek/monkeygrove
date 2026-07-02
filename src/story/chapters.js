@@ -29,13 +29,20 @@ for (const c of CHAPTERS) if (c.lineIndex != null) CHAPTER_BY_LINE[c.lineIndex] 
 
 export const chapterForLine = (lineIndex) => CHAPTER_BY_LINE[lineIndex] || null;
 
-// The two narrative lines (not earned by mastery) and how they are shown. Their
-// prose pages live in i18n under story.beat.<id>.* (child-safe). `reveal` (line 2,
-// the Four Directions) fires once the first shore is home; `finale` (line 6, the
-// yielding top line) is drawn by the Crab King festival flow, not auto-triggered.
+// The story-beat cards and how they are shown. Their prose pages live in i18n
+// under story.beat.<id>.* (child-safe). Beats WITH a lineIndex draw a narrative
+// line: `reveal` (line 2, the Four Directions) fires once the first shore is
+// home; `finale` (line 6, the yielding top line) is drawn by the Crab King
+// festival flow, not auto-triggered. Beats with lineIndex null draw nothing —
+// they are the mid-game mystery drip: `sighting` (the Crab King watching from
+// the gray shore, once the Eight are home) and `echo` (the Gray Echo Realm
+// intro, played once before the first Echo Door; shadow:true renders the
+// island's INVERSION — echoShadow — instead of the founding hexagram).
 export const NARRATIVE_BEATS = {
-  reveal: { lineIndex: 1, pages: ['story.beat.reveal.1', 'story.beat.reveal.2'], faces: ['🧭', '✨'] },
-  finale: { lineIndex: 5, pages: ['finale.1', 'finale.2', 'finale.3', 'finale.4'], faces: ['🦀', '🦀', '🦀', '🐵'] },
+  reveal:   { lineIndex: 1, pages: ['story.beat.reveal.1', 'story.beat.reveal.2'], faces: ['🧭', '✨'] },
+  sighting: { lineIndex: null, pages: ['story.beat.sighting.1', 'story.beat.sighting.2'], faces: ['🦀', '🌫️'] },
+  echo:     { lineIndex: null, shadow: true, pages: ['story.beat.echo.1', 'story.beat.echo.2'], faces: ['🌫️', '✨'] },
+  finale:   { lineIndex: 5, pages: ['finale.1', 'finale.2', 'finale.3', 'finale.4'], faces: ['🦀', '🦀', '🦀', '🐵'] },
 };
 
 // Which narrative beat is due to play now, or null. Only `reveal` auto-fires
@@ -44,6 +51,14 @@ export const NARRATIVE_BEATS = {
 export function dueNarrativeBeat(story) {
   if (story.lines[0] && !story.lines[1]) return 'reveal';
   return null;
+}
+
+// The Crab King sighting is due once the garden line (Ch03, the Eight Friends)
+// is home and the beat has not played — the mid-game glimpse that keeps the
+// mystery alive between the theft and the confession. The caller marks the
+// beat when it actually shows (so a silent bootstrap never consumes it).
+export function dueSightingBeat(story) {
+  return story.lines[2] && !story.beats.includes('crab_sighting');
 }
 
 // Plan the ceremony for a batch of newly-drawn line indices.

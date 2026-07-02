@@ -78,6 +78,15 @@ export const nl = {
   // narratieve momenten (lijnen die je niet met rekenen verdient). reveal = de Vier Richtingen.
   'story.beat.reveal.1': 'Wacht… er waren hier vroeger <b>vier</b> van alles. Vier kusten, vier winden, vier kleine altaren. 🧭',
   'story.beat.reveal.2': 'Een tweede lijn keert terug, en de <b>Vier Richtingen</b> worden wakker — het hele eiland opent zich om je heen. ✨',
+  // de Krabbenkoning-waarneming — het mysterie halverwege (zodra de Acht thuis zijn)
+  'story.beat.sighting.1': 'Ver weg op de grijze kust… glinsteren twee <b>grote scharen</b> in de mist. Iemand kijkt toe hoe het eiland opbloeit. 👀',
+  'story.beat.sighting.2': 'Mimi fluistert: “Hij staat er nu elke avond. Hij komt nooit dichterbij… ik vraag me af waar hij op wacht.”',
+  // het Grijze Echorijk — één keer, vóór de eerste Echodeur
+  'story.beat.echo.1': 'Achter elke lijn die je tekent woont een stille <b>grijze echo</b> — een heel spiegeleiland, slapend in de mist. 🌫️',
+  'story.beat.echo.2': 'Lijnen die je bezoekt blijven <b>warm en goud</b>. Stap zo nu en dan door een Echodeur, en niets wat je leerde vervaagt ooit. ✨',
+  // de Krabbenkoning-cameo — hij kijkt naar ÉÉN deelkamer en vertrekt met niets
+  'story.cameo.watch': 'Psst… iemand met <b>grote scharen</b> kijkt toe vanuit de hoek. Hij jat niets. Hij kijkt alleen… hoe jij deelt.',
+  'story.cameo.gone': '🦀💨 Hij scharrelde weg — en nam helemaal niets mee…',
 
   // de Balansschijf (het Balansaltaar) — de diepe meting. Kindvriendelijk: het bos
   // is "gelijk"/"in balans", nooit "helemaal vol". In balans is beter dan volgepropt.
@@ -350,9 +359,29 @@ export const nl = {
   'gems.title': 'De Banyan Edelsteenboom',
   'gems.sub': 'Elke tafelsom die je kent wordt een edelsteen. Tweelingen stralen samen!',
   'gems.hex_title': 'De geheime 64',
-  'gems.hex_sub': 'Jouw edelstenen zijn dezelfde 64 patronen als het oude Boek der Veranderingen — en de 64 kleine lettertjes die alles wat leeft spellen. 💎🧬',
+  'gems.hex_sub': 'Jouw edelstenen laten deze oeroude patronen één voor één oplichten — precies dezelfde 64. Maar dat is nog maar het begin van het geheim… ✨',
   'gems.count': '{n} van de {total} edelstenen stralen',
   'gems.skills': 'Jouw krachten',
+  // de Boom van het Leren (story/tree.js live getekend) — 10 lichtjes + 22 paadjes.
+  // Alleen kindvriendelijke namen; de historische woorden blijven in de auteursdocs.
+  'tree.title': 'De Boom van het Leren',
+  'tree.sub': 'Tien kleine lichtjes, tweeëntwintig paadjes ertussen — de kaart van alles wat jij aan het groeien bent.',
+  'tree.node.whole': 'Het Geheel',
+  'tree.node.foundation': 'Fundament',
+  'tree.node.procedure': 'Stappen',
+  'tree.node.fluency': 'Ritme',
+  'tree.node.sharing': 'Delen',
+  'tree.node.growth': 'Groei',
+  'tree.node.balance': 'Balans',
+  'tree.node.precision': 'Precisie',
+  'tree.node.proportion': 'Verhouding',
+  'tree.node.integration': 'Het Weefsel',
+  'tree.count': '{gold} van 22 paadjes goud geweven · {lit} van 10 lichtjes aan',
+  'tree.legend.gold': 'een pad dat je goud hebt geweven',
+  'tree.legend.growing': 'een pad dat je nu bewandelt',
+  'tree.legend.sleep': 'een pad dat nog slaapt',
+  'tree.legend.dream': 'een pad dat nog droomt — het opent later',
+  'tree.moral': 'Een boom heeft nooit haast. Hij groeit wortels en takken tegelijk — en jij ook. Onderweg zijn op een pad is precies waar je hoort te zijn. 🌳',
 
   'shop.title': 'De winkel van Coco',
   'shop.hats': 'Hoedjes',
@@ -390,6 +419,12 @@ export const nl = {
   'wonder.music_skip_count.body': 'Dat deuntje is sprongen tellen! 2, 4, 6, 8 — tellen en muziek zijn dezelfde hartslag. 🎵',
   'wonder.bakery_pie.title': 'Een breuk die je kunt opeten',
   'wonder.bakery_pie.body': 'Snijd de taart in 4 en pak er 1 — dat stuk ÍS een kwart. Breuken zijn gewoon iets lekkers eerlijk delen. 🥧',
+  'wonder.bee_hexagons.title': 'Het lievelingstrucje van de bijen',
+  'wonder.bee_hexagons.body': 'Bijen bouwen hun honingkamertjes ook in nette rijen — zeshoekige, want zo vullen ze elk gaatje met de minste was. Jouw nette rijen zijn dezelfde truc die de natuur gebruikt. 🐝',
+  'wonder.tide_returns.title': 'Het getij dat teruggeeft',
+  'wonder.tide_returns.body': 'Pak 3 schelpen van het strand, leg er 3 terug — het strand is weer heel. Eraf halen maakt erbij doen ongedaan, zoals het getij weggaat en altijd terugkomt. De zee rekent al eeuwen. 🌊',
+  'wonder.doubling_branches.title': 'Hoe een boom telt',
+  'wonder.doubling_branches.body': 'Eén stam splitst in twee takken, twee in vier, vier in acht… tel de topjes: 1, 2, 4, 8! Een boom verdubbelt zich naar de lucht — dezelfde verdubbeling waarmee jij snel telt. 🌳',
   'wonder.gem_tree_64.title': 'Overal dezelfde 64',
   'wonder.gem_tree_64.body': 'De Edelsteenboom heeft 64 edelstenen. De oude I Tjing ook — en de code in je eigen DNA ook: 64 kleine woordjes die alles wat leeft bouwen. Hetzelfde patroon, op drie manieren verteld. 💎🧬',
   'wonder.one_line.title': 'Eén zachte lijn per keer',

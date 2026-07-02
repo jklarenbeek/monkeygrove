@@ -5,8 +5,9 @@
 import { render, backBtn, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { audio } from '../audio.js';
-import { islandBloom } from '../story/engine.js';
-import { LINE_POLARITY } from '../story/constants.js';
+import { islandBloom, islandHexagram } from '../story/engine.js';
+import { LINE_POLARITY, LINE_BIT } from '../story/constants.js';
+import { echoShadow } from '../story/pacing.js';
 import { NARRATIVE_BEATS } from '../story/chapters.js';
 import { voxelSvg } from '../voxelsvg.js';
 import { getCreature } from '../mesh/creatures.js';
@@ -42,21 +43,25 @@ function faceHtml(ev) {
 // bright; not-yet-drawn lines sit faint at their eventual yang/yin shape. The
 // line(s) being celebrated this beat pulse. Exported so the intro can show the
 // same motif (a fallen, all-faint island) as a through-line into the ceremonies.
-export function storyHexagram(story, highlight = []) {
-  return hexagramHtml(story, highlight);
+// With `shadow`, each line takes its shape from the ECHO of the island —
+// echoShadow(islandHexagram): every line flipped, gold turned to moon-silver.
+// That is the Gray Echo Realm drawn by the engine's own inversion.
+export function storyHexagram(story, highlight = [], { shadow = false } = {}) {
+  return hexagramHtml(story, highlight, { shadow });
 }
-function hexagramHtml(story, highlight = []) {
+function hexagramHtml(story, highlight = [], { shadow = false } = {}) {
   const hi = new Set(highlight);
+  const shadowHex = shadow ? echoShadow(islandHexagram(story)) : 0;
   let rows = '';
   for (let i = 5; i >= 0; i--) {
-    const yang = LINE_POLARITY[i] === 1;
+    const yang = shadow ? ((shadowHex >> LINE_BIT[i]) & 1) === 1 : LINE_POLARITY[i] === 1;
     const drawn = !!story.lines[i];
     const bar = yang
       ? '<span style="display:inline-block;width:128px;height:14px;border-radius:7px;background:currentColor"></span>'
       : '<span style="display:inline-block;width:56px;height:14px;border-radius:7px;background:currentColor"></span>'
         + '<span style="display:inline-block;width:16px"></span>'
         + '<span style="display:inline-block;width:56px;height:14px;border-radius:7px;background:currentColor"></span>';
-    const color = drawn ? '#f4c95d' : 'rgba(255,255,255,.18)';
+    const color = drawn ? (shadow ? '#b9c9dd' : '#f4c95d') : 'rgba(255,255,255,.18)';
     const pulse = hi.has(i) ? 'animation:slot-pulse 1.1s ease-in-out infinite;' : '';
     rows += `<div style="color:${color};line-height:0;margin:5px 0;${pulse}">${bar}</div>`;
   }
@@ -141,9 +146,10 @@ export function showLineCeremony(events, ctx, onDone) {
   });
 }
 
-// A narrative beat (the Four-Directions reveal, the finale): a few prose pages
-// with the founding hexagram showing the beat's line freshly drawn. The caller
-// latches the line before showing this, so the hexagram already reflects it.
+// A narrative beat (the Four-Directions reveal, the Crab King sighting, the Gray
+// Echo intro, the finale): a few prose pages with the founding hexagram. Line
+// beats show their line freshly drawn (the caller latches it first); lineIndex
+// null highlights nothing; shadow beats render the island's echo instead.
 export function showStoryBeat(beatKey, ctx, onDone) {
   const beat = NARRATIVE_BEATS[beatKey];
   if (!beat) { onDone?.(); return; }
@@ -155,7 +161,7 @@ export function showStoryBeat(beatKey, ctx, onDone) {
   const el = render(`
     <div style="flex:1"></div>
     <div class="card" style="text-align:center;max-width:420px;margin:0 auto">
-      <div id="story-hex">${hexagramHtml(story, [beat.lineIndex])}</div>
+      <div id="story-hex">${hexagramHtml(story, beat.lineIndex != null ? [beat.lineIndex] : [], { shadow: !!beat.shadow })}</div>
       <div id="story-face" style="font-size:56px;margin-top:10px">${faces[0] || '✨'}</div>
       <div id="story-text" style="font-size:19px;font-weight:700;line-height:1.45;min-height:58px">${t(pages[0])}</div>
     </div>

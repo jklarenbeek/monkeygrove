@@ -11,9 +11,10 @@ import * as THREE from 'three';
 import { Place, TEMPLATES, ensureHostable, varyLayout, scatterFetchSpots } from './chamber.js';
 import { Particles, Crab, Altar, makeCharacter, makeProp, floatLabel } from './entities.js';
 import { VERBS } from './verbs.js';
-import { PROPS, getCreature } from './models.js';
+import { PROPS, CHARS, getCreature } from './models.js';
 import { nextProblem, recordResult } from './mathengine.js';
 import { playTrigger, nextWonderFor } from './story/wonders.js';
+import { ensureStory, markBeat } from './story/engine.js';
 import { tween, ease, wobble } from './anim.js';
 import { fxCorrectGlow, fxThemeAmbience } from './verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
@@ -45,6 +46,23 @@ export class ChamberFlow {
   }
 
   runChamber() {
+    const g = this.game;
+    // The Gray Echo Realm introduces itself ONCE, at the first Echo Door: a
+    // quiet two-page beat showing the island's inversion (echoShadow) — the
+    // shadow world where lines you drew are tended so they stay warm. After
+    // that, the recurring toast in _enterChamber is enough. Never in duels.
+    if (g.isEcho && !g.duel) {
+      const story = ensureStory(g.profile);
+      if (markBeat(story, 'echo_intro')) {
+        persist();
+        screens.showStoryBeat('echo', { story }, () => this._enterChamber());
+        return;
+      }
+    }
+    this._enterChamber();
+  }
+
+  _enterChamber() {
     const g = this.game;
     g.mode = 'chamber';
     g.flowToken++;
@@ -168,6 +186,70 @@ export class ChamberFlow {
       });
       g.helper = helper;
     }
+    this.placeCameoKing(spawn);
+  }
+
+  // The Crab King cameo — Ch04's mystery drip (docs/story/README.md: "the Crab
+  // King first appears inside chambers"). Once the Eight are home (garden line
+  // drawn) and while the Sharing Stump is still being learned, he slips into ONE
+  // sharing chamber and just... watches from the farthest corner. He never moves,
+  // never steals; after the child's first correct answer he scuttles off with
+  // nothing (dismissCameo). One-shot via story.beats — never in duels or echoes,
+  // and anti-anxiety by construction: a quiet watcher, not a threat.
+  placeCameoKing(spawn) {
+    const g = this.game;
+    g.cameoKing = null;
+    if (g.duel || g.isEcho || g.currentWorld !== 'stump') return;
+    const story = ensureStory(g.profile);
+    if (!story.lines[2] || story.lines[3] || story.beats.includes('crab_cameo')) return;
+    let best = null;
+    let bestD = -1;
+    for (let z = 0; z < g.place.size.d; z++) {
+      for (let x = 0; x < g.place.size.w; x++) {
+        const cell = g.place.cellAt(x, z);
+        if (!cell || !cell.walk) continue;
+        const d = Math.abs(x - spawn.x) + Math.abs(z - spawn.z);
+        if (d > bestD) { bestD = d; best = { x, z, cell }; }
+      }
+    }
+    if (!best || bestD < 6) return; // no quiet corner on this board — another chamber, then
+    const mesh = makeCharacter(CHARS.crabKing, 0.8, null, 'char:crabKing');
+    mesh.position.copy(g.place.worldPos(best.x, best.z));
+    g.place.group.add(mesh);
+    best.cell.walk = false;
+    g.cameoKing = { mesh, cell: best.cell, x: best.x, z: best.z };
+    const tok = g.flowToken;
+    delay(1800, () => {
+      if (tok !== g.flowToken || !g.cameoKing) return;
+      hud.say(t('story.cameo.watch'), { face: '👀', transient: true, ms: 5200 });
+    });
+  }
+
+  // The watcher leaves the moment the child succeeds: he scuttles off the board
+  // having pinched nothing — the question ("what was he waiting for?") stays.
+  dismissCameo() {
+    const g = this.game;
+    const cameo = g.cameoKing;
+    if (!cameo) return;
+    g.cameoKing = null;
+    markBeat(ensureStory(g.profile), 'crab_cameo');
+    persist();
+    cameo.cell.walk = true;
+    const mesh = cameo.mesh;
+    hud.toast(t('story.cameo.gone'));
+    if (reducedMotion()) { g.place.group.remove(mesh); return; }
+    const from = mesh.position.clone();
+    const scale = mesh.scale.x;
+    const dir = new THREE.Vector3(cameo.x < g.place.size.w / 2 ? -1 : 1, 0, 0);
+    tween({
+      ms: 900,
+      ease: ease.inQuad,
+      onUpdate: (v, k) => {
+        mesh.position.copy(from).addScaledVector(dir, k * 3.5);
+        mesh.scale.setScalar(Math.max(0.01, scale * (1 - k)));
+      },
+      onDone: () => g.place.group.remove(mesh),
+    });
   }
 
   // Warm helper body-language. 'correct' → a happy hop (excite bump);
@@ -313,6 +395,7 @@ export class ChamberFlow {
     // result decides whether completeChamber hatches)
     const eggFull = g.rewards.payCorrect(g.combo, res);
     this.maybeStashWonder(res); // a gentle "did you know?" for this moment (opt-in, once)
+    this.dismissCameo(); // the watching Crab King scuttles off — with nothing
     const tok = g.flowToken;
     delay(1500, () => {
       // a Home press (or any mode switch) during the celebration invalidates

@@ -21,7 +21,7 @@ import {
   storyProgressReport, storyFinaleReady,
 } from '../src/story/engine.js';
 import {
-  CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS,
+  CHAPTER_LOOK, chapterForLine, lineCeremonies, dueNarrativeBeat, dueSightingBeat, NARRATIVE_BEATS,
 } from '../src/story/chapters.js';
 import { echoShadow, neighborHexes, stepDistance, isGentleStep, gentleNextHex } from '../src/story/pacing.js';
 
@@ -325,6 +325,24 @@ test('narrative beats point at the two narrative lines', () => {
   assert.equal(NARRATIVE_BEATS.reveal.lineIndex, 1);
   assert.equal(NARRATIVE_BEATS.finale.lineIndex, 5);
   assert.ok(NARRATIVE_BEATS.reveal.pages.length >= 1);
+});
+
+test('the mystery-drip beats draw no line; the echo beat renders the shadow', () => {
+  assert.equal(NARRATIVE_BEATS.sighting.lineIndex, null);
+  assert.equal(NARRATIVE_BEATS.echo.lineIndex, null);
+  assert.equal(NARRATIVE_BEATS.echo.shadow, true);
+  assert.ok(NARRATIVE_BEATS.sighting.pages.length >= 2);
+});
+
+test('the Crab King sighting is due once the garden line is home, and only once', () => {
+  const s = freshStory();
+  assert.equal(dueSightingBeat(s), false);          // nothing drawn yet
+  s.lines[0] = true;
+  assert.equal(dueSightingBeat(s), false);          // tide alone is too early
+  s.lines[2] = true;                                // the Eight are home (Ch03)
+  assert.equal(dueSightingBeat(s), true);
+  markBeat(s, 'crab_sighting');                     // shown -> marked
+  assert.equal(dueSightingBeat(s), false);          // never nags again
 });
 
 // ---------------------------------------------------------------------------

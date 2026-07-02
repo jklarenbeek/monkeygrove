@@ -18,9 +18,9 @@ import {
 import { aggregateBusinessReport, ensureShop } from './business/engine.js';
 import { stageReport } from './stage/engine.js';
 import { isBuilt } from './island.js';
-import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine } from './story/engine.js';
+import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine, markBeat } from './story/engine.js';
 import { advanceMimiPhase } from './mimi.js';
-import { lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS } from './story/chapters.js';
+import { lineCeremonies, dueNarrativeBeat, dueSightingBeat, NARRATIVE_BEATS } from './story/chapters.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
 import { t } from './i18n.js';
@@ -465,6 +465,19 @@ class Game {
           drawNarrativeLine(story, revealIdx);
           persist();
           screens.showStoryBeat('reveal', { story }, done);
+        });
+      }
+
+      // The Crab King sighting — the mid-game mystery drip. Once the garden line
+      // (Ch03, the Eight Friends) is home, someone with big pincers starts
+      // watching from the gray shore. One-shot, ceremony-gated like the reveal
+      // (a silent bootstrap leaves it pending so the child never misses it),
+      // and marked only when it actually shows.
+      if (withCeremony && dueSightingBeat(story)) {
+        queue.push((done) => {
+          markBeat(story, 'crab_sighting');
+          persist();
+          screens.showStoryBeat('sighting', { story }, done);
         });
       }
 

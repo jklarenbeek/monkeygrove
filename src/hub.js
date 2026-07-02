@@ -19,6 +19,7 @@ import {
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines, advanceMimiPhase } from './mimi.js';
+import { nextWonderFor } from './story/wonders.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import {
   ensureStory, drawNarrativeLine, islandBloom,
@@ -512,6 +513,7 @@ export class HubController {
   // ---------- menus from the hub ----------
 
   openGems() {
+    const g = this.game;
     audio.sfx('click');
     screens.showGems({
       // the child's Gem Tree only ever rises (anti-anxiety, same contract as the
@@ -519,7 +521,17 @@ export class HubController {
       // Decay stays honest where decisions are made — the parent dashboard and
       // the engine's selection/scoring. The faded skill is still quietly reviewed
       // by Echo Doors and re-lights on its own.
-      report: masteryReport(this.game.profile.math),
+      report: masteryReport(g.profile.math),
+      // the story lines light the Tree of Learning's nodes region by region
+      story: ensureStory(g.profile),
+      // the tree's own wonders (the DNA 64, then the doubling branches) are
+      // offered here as an opt-in door — the same one-time contract as in play
+      wonder: nextWonderFor('gem_tree', g.profile.flags?.wondersSeen || []),
+      onWonderOpen: (id) => {
+        const f = g.profile.flags;
+        f.wondersSeen = f.wondersSeen || [];
+        if (!f.wondersSeen.includes(id)) { f.wondersSeen.push(id); persist(); }
+      },
       onClose: () => screens.closeScreen(),
     });
   }

@@ -80,6 +80,15 @@ export const en = {
   // narrative beats (lines not earned by math). reveal = the Four Directions.
   'story.beat.reveal.1': 'Wait… there used to be <b>four</b> of everything here. Four shores, four winds, four little altars. 🧭',
   'story.beat.reveal.2': 'A second line returns, and the <b>Four Directions</b> wake up — the whole island opens around you. ✨',
+  // the Crab King sighting — the mid-game mystery drip (once the Eight are home)
+  'story.beat.sighting.1': 'Out on the gray shore… two <b>big pincers</b> glint in the mist. Someone is watching the island bloom. 👀',
+  'story.beat.sighting.2': 'Mimi whispers: “He’s there every evening now. He never comes closer… I wonder what he’s waiting for.”',
+  // the Gray Echo Realm intro — played once, before the first Echo Door
+  'story.beat.echo.1': 'Behind every line you draw lives its quiet <b>gray echo</b> — a whole mirror island, asleep in the mist. 🌫️',
+  'story.beat.echo.2': 'Lines you visit stay <b>warm and golden</b>. Step through an Echo Door now and then, and nothing you’ve learned ever fades. ✨',
+  // the Crab King cameo — he watches ONE sharing chamber, then leaves with nothing
+  'story.cameo.watch': 'Psst… someone with <b>big pincers</b> is watching from the corner. He isn’t pinching anything. He’s just… watching you share.',
+  'story.cameo.gone': '🦀💨 He scuttled away — and took nothing at all…',
 
   // the Balance Dial (the Altar of Balance) — the deep reading. Child-safe: the
   // grove is "even" / "in balance", never "all the way full". Balanced beats maxed.
@@ -360,9 +369,29 @@ export const en = {
   'gems.title': 'The Banyan Gem Tree',
   'gems.sub': 'Every table you master becomes a gem. Twins light together!',
   'gems.hex_title': 'The secret 64',
-  'gems.hex_sub': 'Your gems are the same 64 patterns as the ancient Book of Changes — and the 64 tiny letters that spell every living thing. 💎🧬',
+  'gems.hex_sub': 'Your gems light these ancient patterns, one by one — the very same 64. But that’s only the beginning of the secret… ✨',
   'gems.count': '{n} of {total} gems shine',
   'gems.skills': 'Your powers',
+  // the Tree of Learning (story/tree.js drawn live) — 10 lights + 22 little paths.
+  // Child-safe names only; the historical vocabulary stays in the author docs.
+  'tree.title': 'The Tree of Learning',
+  'tree.sub': 'Ten little lights, twenty-two paths between them — the map of everything you are growing.',
+  'tree.node.whole': 'The Whole',
+  'tree.node.foundation': 'Foundation',
+  'tree.node.procedure': 'Steps',
+  'tree.node.fluency': 'Rhythm',
+  'tree.node.sharing': 'Sharing',
+  'tree.node.growth': 'Growth',
+  'tree.node.balance': 'Balance',
+  'tree.node.precision': 'Precision',
+  'tree.node.proportion': 'Proportion',
+  'tree.node.integration': 'The Weave',
+  'tree.count': '{gold} of 22 paths woven gold · {lit} of 10 lights lit',
+  'tree.legend.gold': 'a path you have woven gold',
+  'tree.legend.growing': 'a path you are walking right now',
+  'tree.legend.sleep': 'a path still asleep',
+  'tree.legend.dream': 'a path still dreaming — it opens later',
+  'tree.moral': 'A tree never hurries. It grows roots and branches at the same time — and so do you. Being on a path is exactly where you’re meant to be. 🌳',
 
   // shop
   'shop.title': 'Coco’s Shop',
@@ -401,6 +430,12 @@ export const en = {
   'wonder.music_skip_count.body': 'That little tune is skip-counting! 2, 4, 6, 8 — counting and music are the same heartbeat. 🎵',
   'wonder.bakery_pie.title': 'A fraction you can eat',
   'wonder.bakery_pie.body': 'Cut the pie in 4 and take 1 — that slice IS one quarter. Fractions are just sharing something yummy. 🥧',
+  'wonder.bee_hexagons.title': 'The bees’ favourite trick',
+  'wonder.bee_hexagons.body': 'Bees build their honey rooms in neat rows too — six-sided ones, because that fills every gap with the least wax. Your tidy arrays are the same trick nature uses. 🐝',
+  'wonder.tide_returns.title': 'The tide that gives back',
+  'wonder.tide_returns.body': 'Take 3 shells from the beach, put 3 back — the beach is whole again. Taking away undoes adding, just like the tide goes out and always returns. The sea has been doing sums forever. 🌊',
+  'wonder.doubling_branches.title': 'How a tree counts',
+  'wonder.doubling_branches.body': 'One trunk splits into two branches, two into four, four into eight… count the tips: 1, 2, 4, 8! A tree doubles its way to the sky — the same doubling you use to count fast. 🌳',
   'wonder.gem_tree_64.title': 'The same 64, everywhere',
   'wonder.gem_tree_64.body': 'The Gem Tree holds 64 gems. So does the ancient I Ching — and so does the code inside your own DNA: 64 tiny words that build every living thing. The same pattern, told three ways. 💎🧬',
   'wonder.one_line.title': 'One gentle line at a time',

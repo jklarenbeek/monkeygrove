@@ -80,6 +80,33 @@ test('the reveal beat steps through its prose pages then finishes', () => {
   assert.equal(done, true);
 });
 
+test('the sighting beat pages through the Crab King glimpse without drawing a line', () => {
+  const story = freshStory();
+  story.lines[0] = true; story.lines[1] = true; story.lines[2] = true; // through Ch03
+  let done = false;
+  showStoryBeat('sighting', { story }, () => { done = true; });
+  assert.ok(host().querySelector('#story-hex'), 'hexagram renders');
+  assert.match(host().querySelector('#story-text').innerHTML, /pincers/i);
+  host().querySelector('#story-next').click(); // page 2 — Mimi's whisper
+  assert.match(host().querySelector('#story-text').innerHTML, /waiting/i);
+  host().querySelector('#story-next').click();
+  assert.equal(done, true);
+});
+
+test('the echo beat renders the SHADOW island (moon-silver, inverted) and finishes', () => {
+  const story = freshStory();
+  story.lines[0] = true; // one gold line drawn -> its echo shows silver
+  let done = false;
+  showStoryBeat('echo', { story }, () => { done = true; });
+  const hex = host().querySelector('#story-hex');
+  assert.ok(hex.innerHTML.includes('#b9c9dd'), 'drawn lines render in shadow silver, not gold');
+  assert.ok(!hex.innerHTML.includes('#f4c95d'), 'no gold in the echo realm');
+  assert.match(host().querySelector('#story-text').innerHTML, /echo/i);
+  host().querySelector('#story-next').click();
+  host().querySelector('#story-next').click();
+  assert.equal(done, true);
+});
+
 test('the worktable shows the persistent bloom chip and opens the Altar', () => {
   let altarOpened = false;
   showIsland({
@@ -131,6 +158,47 @@ test('the Gem Tree renders the secret 64 as an 8×8 hexagram grid that fills wit
   assert.match(host().textContent, /secret 64|I Ching|64/i);
   // every glyph is a real six-line hexagram
   assert.equal(host().querySelector('.hx').querySelectorAll('.hx-line').length, 6);
+});
+
+test('the Gem Tree grows the Tree of Learning: 10 nodes, 22 paths, lit from mastery + story', () => {
+  const skills = [
+    { id: 'counting', nameKey: 'skill.add_20', rating: 1100, mastered: true, n: 20 },
+    { id: 'number_bonds', nameKey: 'skill.add_20', rating: 1100, mastered: true, n: 20 },
+    { id: 'add_20', nameKey: 'skill.add_20', rating: 700, mastered: false, n: 4 },
+  ];
+  const worlds = { tide: { pct: 0.4, skills }, garden: { pct: 0, skills: [] }, stump: { pct: 0, skills: [] }, vines: { pct: 0, skills: [] } };
+  const story = freshStory();
+  story.lines[0] = true; // tide line drawn -> Foundation + Steps light up
+  showGems({ report: { worlds, gems: { lit: [], total: 100 } }, story, onClose: () => {} });
+
+  const tree = host().querySelector('#learning-tree');
+  assert.ok(tree, 'the Tree of Learning renders');
+  assert.equal(tree.querySelectorAll('line').length, 22, 'all 22 paths render');
+  assert.equal(tree.querySelectorAll('text').length, 10, 'all 10 node labels render');
+  // counting + number_bonds mastered -> the Foundation-Whole path is woven gold
+  assert.match(tree.innerHTML, /#f4c95d/, 'a gold path renders');
+  // add_20 started (n>0) but not mastered -> a growing (green) path renders
+  assert.match(tree.innerHTML, /#7ccf7c/, 'a growing path renders');
+  assert.match(host().textContent, /Tree of Learning/i);
+});
+
+test('the Gem Tree offers the wonder door and opening it marks the card seen', () => {
+  const worlds = { tide: { pct: 0, skills: [] }, garden: { pct: 0, skills: [] }, stump: { pct: 0, skills: [] }, vines: { pct: 0, skills: [] } };
+  const wonder = { id: 'gem_tree_64', titleKey: 'wonder.gem_tree_64.title', bodyKey: 'wonder.gem_tree_64.body' };
+  let openedId = null;
+  showGems({
+    report: { worlds, gems: { lit: [], total: 100 } },
+    story: freshStory(),
+    wonder,
+    onWonderOpen: (id) => { openedId = id; },
+    onClose: () => {},
+  });
+  // the card stays hidden until the child chooses to open the door (opt-in)
+  assert.ok(host().querySelector('#gems-wonder-card').classList.contains('hidden'));
+  host().querySelector('#gems-wonder').click();
+  assert.ok(!host().querySelector('#gems-wonder-card').classList.contains('hidden'), 'the card reveals on tap');
+  assert.match(host().querySelector('#gems-wonder-card').textContent, /DNA/i);
+  assert.equal(openedId, 'gem_tree_64', 'opening the door marks the wonder discovered');
 });
 
 test('the Altar renders the balance reading and closes', () => {

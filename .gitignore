@@ -11,3 +11,4 @@ PROGRESS*.md
 SUPER_PROMPT.md
 plans/
 tmp/
+.playwright-cli/

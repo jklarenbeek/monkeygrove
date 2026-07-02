@@ -15,10 +15,16 @@ test('every wonder card is well-formed with a distinct id and a real audience', 
   const ids = WONDERS.map((w) => w.id);
   assert.equal(new Set(ids).size, ids.length, 'card ids are distinct');
   for (const w of WONDERS) {
-    assert.ok(['child', 'parent'].includes(w.audience), `${w.id} audience`);
+    assert.ok(['child', 'parent', 'both'].includes(w.audience), `${w.id} audience`);
     assert.ok(w.titleKey.startsWith('wonder.') && w.bodyKey.startsWith('wonder.'), `${w.id} keys`);
     assert.ok(typeof w.trigger === 'string' && w.trigger.length, `${w.id} trigger`);
   }
+});
+
+test('subtraction really undoes adding (yijing_invert is its own undo — the tide returns)', () => {
+  const tide = wonderProof('tide_returns');
+  assert.equal(typeof tide, 'function');
+  for (const h of [0, 7, FOUNDING_HEXAGRAM, 63]) assert.equal(tide(tide(h)), h);
 });
 
 test('commutativity really is a mirror twin (yijing_opposite is its own undo)', () => {
@@ -54,6 +60,8 @@ test('the Gem Tree 64 are the 64 codons — each hexagram names a real amino aci
 test('mechanic-only wonders carry no hexagram proof (the wonder is in the mechanic)', () => {
   assert.equal(wonderProof('music_skip_count'), null);
   assert.equal(wonderProof('bakery_pie'), null);
+  assert.equal(wonderProof('bee_hexagons'), null);
+  assert.equal(wonderProof('doubling_branches'), null);
   assert.equal(wonderProof('one_line_at_a_time'), null);
 });
 
@@ -61,8 +69,9 @@ test('triggers and audiences select the right cards', () => {
   assert.deepEqual(wondersForTrigger('commutativity').map((w) => w.id), ['twin_gem']);
   assert.equal(wondersForTrigger('nope').length, 0);
   const parents = parentWonders().map((w) => w.id);
+  // the DNA reveal ('both') keeps its parent-dashboard home alongside the child door
   assert.ok(parents.includes('gem_tree_64') && parents.includes('one_line_at_a_time'));
-  for (const w of parentWonders()) assert.equal(w.audience, 'parent');
+  for (const w of parentWonders()) assert.notEqual(w.audience, 'child');
 });
 
 test('playTrigger maps in-play moments to child wonder triggers', () => {
@@ -71,16 +80,25 @@ test('playTrigger maps in-play moments to child wonder triggers', () => {
   assert.equal(playTrigger({ skillId: 'div_facts', kind: 'fetch' }), 'division_fact');
   assert.equal(playTrigger({ skillId: 'div_remainder', kind: 'share' }), 'division_fact');
   assert.equal(playTrigger({ world: 'business', skillId: 'percent_of' }), 'bakery');
+  assert.equal(playTrigger({ world: 'tide', kind: 'fetch', skillId: 'sub_20' }), 'tide');
+  assert.equal(playTrigger({ world: 'tide', kind: 'fetch', skillId: 'missing_addend' }), 'tide');
   assert.equal(playTrigger({ kind: 'fetch', skillId: 'add_20' }), null);
 });
 
-test('nextWonderFor offers an undiscovered child card once, then nothing', () => {
+test('nextWonderFor offers an undiscovered child card once, then the next, then nothing', () => {
   assert.equal(nextWonderFor('commutativity', []).id, 'twin_gem');
   assert.equal(nextWonderFor('commutativity', ['twin_gem']), null); // already discovered — no nag
+  // a trigger with a deck deals one card per discovery, in order
   assert.equal(nextWonderFor('array', []).id, 'array_both_ways');
+  assert.equal(nextWonderFor('array', ['array_both_ways']).id, 'bee_hexagons');
+  assert.equal(nextWonderFor('array', ['array_both_ways', 'bee_hexagons']), null);
   assert.equal(nextWonderFor('nope', []), null);
-  // parent-only cards are never offered as in-play child reveals
-  assert.equal(nextWonderFor('gem_tree', []), null);
+  // the Gem Tree door: first the DNA 64 ('both'), then the doubling branches
+  assert.equal(nextWonderFor('gem_tree', []).id, 'gem_tree_64');
+  assert.equal(nextWonderFor('gem_tree', ['gem_tree_64']).id, 'doubling_branches');
+  assert.equal(nextWonderFor('gem_tree', ['gem_tree_64', 'doubling_branches']), null);
+  // strictly parent cards are never offered as child reveals
+  assert.equal(nextWonderFor('pacing', []), null);
 });
 
 test('every wonder card has cozy EN and NL copy', () => {

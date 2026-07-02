@@ -12,12 +12,14 @@
 // question the game keeps asking.
 import '../polyfills.js';
 import {
-  yijing_opposite, yijing_reverse, yijing_center, yijing_toAminoAcidName,
+  yijing_opposite, yijing_reverse, yijing_center, yijing_invert, yijing_toAminoAcidName,
 } from '../yijing/yijing.js';
 
 // trigger: the in-game moment that may quietly offer the card (the UI decides whether to,
 // and the child decides whether to open it). audience: 'child' shows in play; 'parent'
-// is for the dashboard / older children's deeper "did you know".
+// is for the dashboard / older children's deeper "did you know"; 'both' is a child
+// discovery the parent dashboard also carries (the DNA reveal deserves both homes).
+// Cards sharing a trigger are offered in array order, one per discovery (nextWonderFor).
 export const WONDERS = Object.freeze([
   {
     id: 'twin_gem', trigger: 'commutativity', audience: 'child',
@@ -28,6 +30,11 @@ export const WONDERS = Object.freeze([
     id: 'array_both_ways', trigger: 'array', audience: 'child',
     titleKey: 'wonder.array_both_ways.title', bodyKey: 'wonder.array_both_ways.body',
     proof: 'yijing_reverse', // read the rows or the columns — the same garden bed
+  },
+  {
+    id: 'bee_hexagons', trigger: 'array', audience: 'child',
+    titleKey: 'wonder.bee_hexagons.title', bodyKey: 'wonder.bee_hexagons.body',
+    proof: null, // bees pack the plane in tidy rows too — the array IS nature's trick
   },
   {
     id: 'fact_and_division', trigger: 'division_fact', audience: 'child',
@@ -45,9 +52,19 @@ export const WONDERS = Object.freeze([
     proof: null, // the pie you cut and eat IS the fraction
   },
   {
-    id: 'gem_tree_64', trigger: 'gem_tree', audience: 'parent',
+    id: 'tide_returns', trigger: 'tide', audience: 'child',
+    titleKey: 'wonder.tide_returns.title', bodyKey: 'wonder.tide_returns.body',
+    proof: 'yijing_invert', // subtraction undoes adding — invert twice and you're home
+  },
+  {
+    id: 'gem_tree_64', trigger: 'gem_tree', audience: 'both',
     titleKey: 'wonder.gem_tree_64.title', bodyKey: 'wonder.gem_tree_64.body',
     proof: 'yijing_toAminoAcidName', // the 64 gems = the I Ching = the 64 codons of DNA
+  },
+  {
+    id: 'doubling_branches', trigger: 'gem_tree', audience: 'child',
+    titleKey: 'wonder.doubling_branches.title', bodyKey: 'wonder.doubling_branches.body',
+    proof: null, // a tree doubles its way to the sky — 1, 2, 4, 8 counted in branch tips
   },
   {
     id: 'one_line_at_a_time', trigger: 'pacing', audience: 'parent',
@@ -56,7 +73,7 @@ export const WONDERS = Object.freeze([
   },
 ]);
 
-const PROOFS = { yijing_opposite, yijing_reverse, yijing_center, yijing_toAminoAcidName };
+const PROOFS = { yijing_opposite, yijing_reverse, yijing_center, yijing_invert, yijing_toAminoAcidName };
 
 // Resolve a card's `proof` to the engine transform that makes it literally true (null
 // for the cards whose wonder is in the mechanic itself, not a hexagram identity).
@@ -69,16 +86,16 @@ export const wonderProof = (id) => {
 // the child's age/curiosity, never on the clock).
 export const wondersForTrigger = (trigger) => WONDERS.filter((w) => w.trigger === trigger);
 
-// The deeper reveals for the parent dashboard and older children.
-export const parentWonders = () => WONDERS.filter((w) => w.audience === 'parent');
+// The deeper reveals for the parent dashboard and older children ('parent' + 'both').
+export const parentWonders = () => WONDERS.filter((w) => w.audience !== 'child');
 
 // The next child-facing card to gently offer for an in-play moment, or null — the first
-// one for this trigger the child has not already discovered. `seen` is the list of
-// wonder ids already opened (persisted on the profile) so a reveal is a one-time door,
-// never a nag.
+// one for this trigger the child has not already discovered ('child' + 'both'). `seen`
+// is the list of wonder ids already opened (persisted on the profile) so a reveal is a
+// one-time door, never a nag.
 export function nextWonderFor(trigger, seen = []) {
   const seenSet = new Set(seen);
-  return WONDERS.find((w) => w.audience === 'child' && w.trigger === trigger && !seenSet.has(w.id)) || null;
+  return WONDERS.find((w) => w.audience !== 'parent' && w.trigger === trigger && !seenSet.has(w.id)) || null;
 }
 
 // Map a just-answered problem to a child wonder trigger, or null. The trigger vocabulary
@@ -89,5 +106,6 @@ export function playTrigger({ kind, skillId, world, litTwin } = {}) {
   if (kind === 'array') return 'array';
   if (skillId === 'div_facts' || skillId === 'div_remainder') return 'division_fact';
   if (world === 'business') return 'bakery';
+  if (world === 'tide' && /^(sub_|missing_addend)/.test(skillId || '')) return 'tide';
   return null;
 }
