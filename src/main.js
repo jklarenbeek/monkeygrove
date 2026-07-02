@@ -23,6 +23,7 @@ import { advanceMimiPhase } from './mimi.js';
 import { lineCeremonies, dueNarrativeBeat, NARRATIVE_BEATS } from './story/chapters.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
+import { t } from './i18n.js';
 import { audio } from './audio.js';
 import { applyComfortSettings } from './a11y.js';
 import { updateTweens } from './anim.js';
@@ -96,6 +97,7 @@ class Game {
       onAction: () => (this.mode === 'hub' ? this.hub.hubAction() : this.verb?.onAction()),
       onHome: () => this.confirmHome(),
       onSettings: () => this.openSettings(),
+      onResetCamera: () => this.world.resetCamera(),
     });
     this.input.bind();
     this.showTitle();
@@ -616,15 +618,72 @@ class Game {
     this.player?.pathTo(cell.x, cell.z);
   }
 
+  previewTapCell(cell) {
+    if (!cell || !this.player || !this.place) return;
+    this.showPathPreview(cell, 1800);
+  }
+
+  clearPathPreview() {
+    const cells = this.controlTintedCells || [];
+    for (const c of cells) this.place?.resetCellTint?.(c.x, c.z);
+    this.controlTintedCells = [];
+    this.controlPreviewT = 0;
+  }
+
+  showPathPreview(cell, ttlMs = 1200) {
+    if (!this.player || !this.place) return;
+    this.clearPathPreview();
+    const seen = new Set();
+    const tint = (c, hex) => {
+      const key = `${c.x},${c.z}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        this.controlTintedCells.push({ x: c.x, z: c.z });
+      }
+      this.place.tintCell?.(c.x, c.z, hex);
+    };
+    for (const c of this.player.reachableCells?.(3) || []) tint(c, 0xfff3b8);
+    const path = this.player.previewPathTo?.(cell.x, cell.z);
+    if (path) for (const c of path) tint(c, 0xc9a6ff);
+    this.controlPreviewT = ttlMs;
+  }
+
+  refreshControlPrompt() {
+    if (!this.player || !this.place || this.mode === 'title') return;
+    if (document.querySelector('#screens .screen')) return;
+    if (this.mode === 'hub') {
+      const near = this.hub.hubNpcNear();
+      if (near) {
+        hud.setAction('💬', { label: t('controls.talk'), ready: true, visibleWhenIdle: true });
+        hud.setProximityPrompt(t('controls.talk'));
+      } else {
+        hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
+        hud.setProximityPrompt(null);
+      }
+      return;
+    }
+    if (hud.hasActionContext?.()) {
+      hud.setProximityPrompt(t('hud.action'));
+    } else {
+      hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
+      hud.setProximityPrompt(null);
+    }
+  }
+
   // ---------- frame update ----------
 
   update(dt) {
     if (!this.place) return;
     this.place.update(dt);
+    this.input?.update(dt);
     this.player?.update(dt);
     this.pet?.update(dt);
     this.particles?.update(dt);
     this.verb?.update?.(dt);
+    if (this.controlPreviewT > 0) {
+      this.controlPreviewT -= dt;
+      if (this.controlPreviewT <= 0) this.clearPathPreview();
+    }
     // AC-style talk prompt: the action button becomes 💬 beside a friend
     // (checked on a beat — Mimi wanders, so adjacency changes on its own)
     if (this.mode === 'hub' && this.player) {
@@ -632,9 +691,10 @@ class Game {
       if (this.talkBtnT > 140) {
         this.talkBtnT = 0;
         const want = this.hub.hubNpcNear() ? '💬' : null;
-        if (want !== this.talkBtn) { this.talkBtn = want; hud.setAction(want); }
+        if (want !== this.talkBtn) this.talkBtn = want;
       }
     }
+    this.refreshControlPrompt();
     // crab bumps (chamber-only; the controller self-guards on mode/player)
     this.chamber.updateChamber(dt);
     // cosmetic trail while hopping
@@ -661,6 +721,7 @@ class Game {
     this.problem = null;
     this.crabs = [];
     this.pickups = [];
+    this.clearPathPreview();
     this.helper = null;
     this.helpKind = null;
     if (this.place) { this.place.dispose(); this.place = null; }

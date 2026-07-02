@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { screenDirToGridStep } from '../src/world.js';
+import { orbitIsoOffset, screenDirToGridStep } from '../src/world.js';
 
 // Camera-moment guards: camera "moments" animate span/target only — never the angle — so
 // the screen→grid input mapping must be exactly what it is today. This truth table is
@@ -22,4 +22,14 @@ test('input mapping is deterministic (identical inputs → identical hop)', () =
   for (const [sx, sy] of [[0.7, 0.7], [-0.4, 0.9], [1, -0.2], [-1, -1]]) {
     assert.deepEqual(screenDirToGridStep(sx, sy), screenDirToGridStep(sx, sy));
   }
+});
+
+test('camera orbit rotates the presentation offset without changing its height or distance', () => {
+  const base = orbitIsoOffset(0, 40);
+  const rotated = orbitIsoOffset(Math.PI / 4, 40);
+
+  assert.notEqual(Number(rotated.x.toFixed(4)), Number(base.x.toFixed(4)), 'x offset changes when orbiting');
+  assert.notEqual(Number(rotated.z.toFixed(4)), Number(base.z.toFixed(4)), 'z offset changes when orbiting');
+  assert.equal(Number(rotated.y.toFixed(4)), Number(base.y.toFixed(4)), 'camera height stays stable');
+  assert.equal(Number(rotated.length().toFixed(4)), Number(base.length().toFixed(4)), 'camera distance stays stable');
 });

@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 let handlers = {};
 let bubbleTimer = null;
+let actionHasContext = false;
 
 export function initHud(h) {
   handlers = h;
@@ -14,6 +15,7 @@ export function initHud(h) {
   $('btn-action').addEventListener('click', () => { audio.sfx('click'); handlers.onAction?.(); });
   $('btn-home').addEventListener('click', () => { audio.sfx('click'); handlers.onHome?.(); });
   $('btn-settings').addEventListener('click', () => { audio.sfx('click'); handlers.onSettings?.(); });
+  $('btn-camera-reset')?.addEventListener('click', () => { audio.sfx('click'); handlers.onResetCamera?.(); });
   $('bubble').addEventListener('click', () => advanceBubble());
 }
 
@@ -24,6 +26,7 @@ export function refreshLabels() {
   label('btn-action', 'hud.action');
   label('btn-home', 'hud.home');
   label('btn-settings', 'settings.title');
+  label('btn-camera-reset', 'hud.camera_reset');
 }
 
 export function showHud(on = true) {
@@ -31,6 +34,8 @@ export function showHud(on = true) {
   if (!on) {
     $('banner').classList.add('hidden');
     $('verb-panel').classList.add('hidden');
+    setJoystickActive(false);
+    setProximityPrompt(null);
     hideBubble();
     hideModelPanel();
   }
@@ -86,12 +91,22 @@ export function setCombo(n) {
   }
 }
 
-export function setAction(emoji) {
+export function setAction(emoji, opts = {}) {
   const b = $('btn-action');
-  b.classList.remove('ready');
-  if (emoji) { b.textContent = emoji; b.classList.remove('hidden'); }
-  else b.classList.add('hidden');
+  b.classList.remove('ready', 'idle');
+  const visible = !!emoji || opts.visibleWhenIdle;
+  actionHasContext = !!emoji;
+  if (visible) {
+    b.textContent = emoji || '✋';
+    b.classList.remove('hidden');
+    b.classList.toggle('idle', !emoji);
+    if (opts.ready) b.classList.add('ready');
+    if (opts.label) { b.setAttribute('aria-label', opts.label); b.title = opts.label; }
+    else refreshLabels();
+  } else b.classList.add('hidden');
 }
+
+export function hasActionContext() { return actionHasContext; }
 
 export function setActionReady(on) {
   const b = $('btn-action');
@@ -99,6 +114,30 @@ export function setActionReady(on) {
 }
 
 export function showHintButton(on) { $('btn-hint').classList.toggle('hidden', !on); }
+
+export function setJoystickActive(on) {
+  $('joystick')?.classList.toggle('active', !!on);
+}
+
+export function setJoystickVector(x = 0, y = 0) {
+  const k = $('joystick-knob');
+  if (!k) return;
+  const px = Math.max(-1, Math.min(1, x)) * 38;
+  const py = Math.max(-1, Math.min(1, y)) * 38;
+  k.style.transform = `translate(${px}px, ${py}px)`;
+}
+
+export function setProximityPrompt(text) {
+  const p = $('proximity-prompt');
+  if (!p) return;
+  if (text) {
+    p.textContent = text;
+    p.classList.remove('hidden');
+  } else {
+    p.textContent = '';
+    p.classList.add('hidden');
+  }
+}
 
 // ---------- model fallback panel (always-available visual model) ----------
 

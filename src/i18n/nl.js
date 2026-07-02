@@ -262,6 +262,7 @@ export const nl = {
   'ex.comma_misalign': 'Houd de komma op één lijn! Tienen bij tienen, tienden bij tienden — het wordt <b>{answer}</b>.',
   'hint.look': 'Kijk goed naar het plaatje — en probeer opnieuw. Jij kan dit! 💪',
   'hint.pinch': '✌️ Knijp om te zoomen · sleep met twee vingers om rond te kijken',
+  'hint.controls': 'Sleep de linker stick om te lopen. Sleep rechts om rond te kijken. Tik op de grote knop.',
   'verb.array_plant': 'loop de aarde op — 🌱 plant het eerste hoekje',
   'verb.array_stretch': 'druk op 🌱 als de maat klopt · 🌱 op het vlaggetje pakt het terug',
   'verb.array_offsoil': 'bedjes groeien alleen op aarde — spring er weer op!',
@@ -554,6 +555,8 @@ export const nl = {
   'hud.hint': 'Tip',
   'hud.action': 'Actie',
   'hud.home': 'Home',
+  'hud.camera_reset': 'Camera terugzetten',
+  'controls.talk': 'Praat',
 
   'duel.title': 'Bananenduel',
   'duel.sub': 'Twee ontdekkers, dezelfde kamers — wie verzamelt meer bananen?',

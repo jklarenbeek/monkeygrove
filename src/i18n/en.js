@@ -268,6 +268,7 @@ export const en = {
   'ex.comma_misalign': 'Keep the comma in line! Tens with tens, tenths with tenths — it makes <b>{answer}</b>.',
   'hint.look': 'Watch the picture — then try again. You can do this! 💪',
   'hint.pinch': '✌️ Pinch to zoom · drag with two fingers to look around',
+  'hint.controls': 'Drag the left stick to move. Drag the right side to look. Tap the big button to act.',
   'verb.array_plant': 'walk onto the soil — 🌱 plants the first corner',
   'verb.array_stretch': 'press 🌱 when the size is right · 🌱 on the flag takes it back',
   'verb.array_offsoil': 'beds only grow on the soil — hop back on!',
@@ -567,6 +568,8 @@ export const en = {
   'hud.hint': 'Hint',
   'hud.action': 'Action',
   'hud.home': 'Home',
+  'hud.camera_reset': 'Reset camera',
+  'controls.talk': 'Talk',
 
   // duel
   'duel.title': 'Banana Duel',

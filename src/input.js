@@ -11,12 +11,51 @@ import { delay } from './anim.js';
 import { TILE, IS_TOUCH, MOBILE_DEFAULT_ZOOM } from './config.js';
 import { screenDirToGridStep } from './world.js';
 
+export const JOYSTICK_RADIUS = 48;
+export const JOYSTICK_DEAD_ZONE = 0.22;
+
+const clamp01 = (n) => Math.max(0, Math.min(1, n));
+
+export function joystickVectorFromPointer(origin, point, radius = JOYSTICK_RADIUS, deadZone = JOYSTICK_DEAD_ZONE) {
+  if (!origin || !point || radius <= 0) return null;
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const dist = Math.hypot(dx, dy);
+  const strength = clamp01(dist / radius);
+  if (strength < deadZone || dist === 0) return null;
+  const clamped = Math.min(dist, radius);
+  return {
+    x: Number((dx / dist * (clamped / radius)).toFixed(4)),
+    y: Number((dy / dist * (clamped / radius)).toFixed(4)),
+    strength: Number(strength.toFixed(4)),
+  };
+}
+
+export function joystickStepFromVector(v) {
+  if (!v) return null;
+  return screenDirToGridStep(v.x, -v.y);
+}
+
+export function joystickRepeatMs(strength) {
+  const s = clamp01(strength || 0);
+  return Math.round(260 - s * 95);
+}
+
+export function isJoystickZone(x, y, width = window.innerWidth || 1, height = window.innerHeight || 1) {
+  return x <= Math.min(360, width * 0.46) && y >= height - Math.min(260, height * 0.46);
+}
+
+export function softVibrate(ms = 10) {
+  try { navigator.vibrate?.(ms); } catch { /* unsupported or denied: harmless */ }
+}
+
 export class InputController {
   constructor(game) {
     this.game = game;
     this.canvas = game.canvas;
     this.userZoom = null;        // player's retained pinch/wheel zoom (null = comfort default)
     this.gestureHintDone = false; // pinch/pan hint shows at most once per session
+    this.joystick = { active: false, pointerId: null, origin: null, vector: null };
   }
 
   bind() {
@@ -61,6 +100,7 @@ export class InputController {
     // gesture suppresses the one-finger tap that would otherwise fire on lift.
     const pointers = new Map();        // active pointers: id -> {x, y}
     let downPos = null, dragging = false, gestured = false;
+    let orbitDrag = null;             // { pointerId, x, y } while one-finger orbiting
     let pinch = null;                  // { dist, zoom, cx, cy } during 2 fingers
 
     const centroid = () => {
@@ -75,18 +115,54 @@ export class InputController {
     };
 
     this.canvas.addEventListener('pointerdown', (e) => {
+      if (game.mode !== 'title' && e.pointerType !== 'mouse' && isJoystickZone(e.clientX, e.clientY)) {
+        this.joystick = {
+          active: true,
+          pointerId: e.pointerId,
+          origin: { x: e.clientX, y: e.clientY },
+          vector: null,
+        };
+        hud.setJoystickActive(true);
+        hud.setJoystickVector(0, 0);
+        this.canvas.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        return;
+      }
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (pointers.size === 1) {
         downPos = { x: e.clientX, y: e.clientY };
         dragging = false; gestured = false;
+        orbitDrag = null;
+        if (game.mode !== 'title' && !document.querySelector('#screens .screen')) {
+          const cell = this.pickCell(e.clientX, e.clientY);
+          if (cell) game.previewTapCell?.(cell);
+        }
       } else if (pointers.size === 2) {
         const c = centroid();
         pinch = { dist: spread() || 1, zoom: game.world.zoom, cx: c.x, cy: c.y };
         gestured = true;
+        orbitDrag = null;
       }
     });
 
     this.canvas.addEventListener('pointermove', (e) => {
+      if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
+        const v = joystickVectorFromPointer(this.joystick.origin, { x: e.clientX, y: e.clientY });
+        this.joystick.vector = v;
+        hud.setJoystickVector(v?.x || 0, v?.y || 0);
+        const step = joystickStepFromVector(v);
+        if (step) {
+          const key = `${step[0]},${step[1]}`;
+          if (this.joystick.lastStepKey !== key) softVibrate(12);
+          this.joystick.lastStepKey = key;
+          game.player?.setMoveIntent(step[0], step[1], v.strength);
+        } else {
+          this.joystick.lastStepKey = null;
+          game.player?.clearMoveIntent();
+        }
+        e.preventDefault();
+        return;
+      }
       if (!pointers.has(e.pointerId)) return;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (game.mode === 'title') return;
@@ -99,22 +175,40 @@ export class InputController {
         this.userZoom = game.world.zoom; // remember the level they settled on
       } else if (pointers.size === 1 && downPos) {
         const dx = e.clientX - downPos.x, dy = e.clientY - downPos.y;
-        if (Math.hypot(dx, dy) > 14) dragging = true;
+        const wantsOrbit = e.pointerType === 'mouse' || downPos.x > (window.innerWidth || 1) * 0.45;
+        if (wantsOrbit && Math.hypot(dx, dy) > 8) {
+          dragging = true;
+          gestured = true;
+          if (!orbitDrag) orbitDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+          game.world.orbitByPixels(e.clientX - orbitDrag.x);
+          orbitDrag.x = e.clientX;
+          orbitDrag.y = e.clientY;
+        } else if (Math.hypot(dx, dy) > 14) dragging = true;
       }
     });
 
     const endPointer = (e) => {
+      if (this.joystick.active && this.joystick.pointerId === e.pointerId) {
+        this.joystick = { active: false, pointerId: null, origin: null, vector: null };
+        game.player?.clearMoveIntent();
+        hud.setJoystickActive(false);
+        hud.setJoystickVector(0, 0);
+        e.preventDefault();
+        return;
+      }
       const start = downPos;
       const had = pointers.delete(e.pointerId);
       if (pointers.size < 2) pinch = null;
       if (pointers.size > 0) return;   // wait until every finger is up
       downPos = null;
+      orbitDrag = null;
       const wasDrag = dragging, wasGesture = gestured;
       dragging = false; gestured = false;
       if (!had || game.mode === 'title' || wasGesture) return;
       if (!wasDrag) {
         const cell = this.pickCell(e.clientX, e.clientY);
         if (!cell) return;
+        game.previewTapCell?.(cell);
         game.inputTapCell(cell);
       } else {
         const dx = e.clientX - (start?.x ?? e.clientX), dy = e.clientY - (start?.y ?? e.clientY);
@@ -141,6 +235,10 @@ export class InputController {
     }, { passive: false });
   }
 
+  update(dtMs) {
+    this.game.player?.updateMoveIntent?.(dtMs);
+  }
+
   // One-time nudge so touch players discover the camera gestures.
   maybeGestureHint() {
     if (!IS_TOUCH || this.gestureHintDone) return;
@@ -149,7 +247,7 @@ export class InputController {
       if (localStorage.getItem('monkeygrove.gestureHint')) return; // shown on a past visit
       localStorage.setItem('monkeygrove.gestureHint', '1');
     } catch { /* private mode: the session flag above still holds it to one toast */ }
-    delay(1200, () => hud.toast(t('hint.pinch')));
+    delay(900, () => hud.toast(t('hint.controls')));
   }
 
   // Startup zoom for the next scene. Portrait phones open closer in (the full
@@ -174,7 +272,23 @@ export class InputController {
   }
 
   pickCell(cx, cy) {
+    const direct = this._pickCellAt(cx, cy);
+    if (direct) return direct;
+    // Fat-finger fallback: sample a small ring around the touch point before
+    // giving up. This keeps picking forgiving without changing the world.
+    for (const r of [14, 24, 34]) {
+      for (let i = 0; i < 8; i++) {
+        const a = (Math.PI * 2 * i) / 8;
+        const cell = this._pickCellAt(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+        if (cell) return cell;
+      }
+    }
+    return null;
+  }
+
+  _pickCellAt(cx, cy) {
     const place = this.game.place;
+    if (!place) return null;
     const hit = this.game.world.pick(cx, cy);
     if (!hit) return null;
     const gridList = hit.object?.userData?.gridList;

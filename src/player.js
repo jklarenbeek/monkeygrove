@@ -6,6 +6,7 @@ import { reducedMotion } from './a11y.js';
 import { audio } from './audio.js';
 import { GFX } from './gfx.js';
 import { makeContactShadow } from './blobshadow.js';
+import { joystickRepeatMs } from './input.js';
 
 const NO_SQUASH = { sy: 1, sxz: 1 };
 
@@ -43,6 +44,7 @@ export class Player {
     this.sfx = true;                // attract-mode demo walks silently
     this.headH = 1.0;               // world height of head top (set by main)
     this.baseScale = mesh.scale.x || 1;
+    this.moveIntent = null;         // held joystick/grid direction
   }
 
   setPlace(place, x, z) {
@@ -73,6 +75,41 @@ export class Player {
     return this._step(dx, dz);
   }
 
+  setMoveIntent(dx, dz, strength = 1) {
+    if (this.locked || (!dx && !dz) || strength <= 0) {
+      this.clearMoveIntent();
+      return false;
+    }
+    const key = `${dx},${dz}`;
+    const changed = this.moveIntent?.key !== key;
+    if (changed) this.queue.length = 0;
+    this.moveIntent = {
+      key, dx, dz,
+      strength: Math.max(0, Math.min(1, strength)),
+      waitMs: changed ? 0 : (this.moveIntent?.waitMs ?? 0),
+    };
+    if (changed || this.moveIntent.waitMs <= 0) this._heldStep();
+    return true;
+  }
+
+  clearMoveIntent() {
+    this.moveIntent = null;
+  }
+
+  updateMoveIntent(dtMs) {
+    const intent = this.moveIntent;
+    if (!intent || this.locked) return;
+    intent.waitMs -= dtMs;
+    if (intent.waitMs <= 0) this._heldStep();
+  }
+
+  _heldStep() {
+    const intent = this.moveIntent;
+    if (!intent) return;
+    this.tryStep(intent.dx, intent.dz);
+    intent.waitMs = joystickRepeatMs(intent.strength);
+  }
+
   _step(dx, dz) {
     const nx = this.x + dx, nz = this.z + dz;
     const from = this.place.cellAt(this.x, this.z);
@@ -83,10 +120,11 @@ export class Player {
       this.hopping = true;
       const m = this.mesh;
       const sx = m.position.x, sz = m.position.z;
+      if (this.sfx) audio.sfx('boop', { gain: 0.32 });
       tween({
         ms: 140, ease: ease.outQuad,
         onUpdate: (v, k) => {
-          const off = Math.sin(k * Math.PI) * 0.18;
+          const off = Math.sin(k * Math.PI) * 0.22;
           m.position.x = sx + dx * off; m.position.z = sz + dz * off;
         },
         onDone: () => { this.hopping = false; this._next(); },
@@ -132,9 +170,8 @@ export class Player {
     }
   }
 
-  // BFS path to target cell; walks as far as reachable.
-  pathTo(tx, tz) {
-    if (this.locked || !this.place) return;
+  _findPathTo(tx, tz) {
+    if (this.locked || !this.place) return false;
     const { w, d } = this.place.size;
     const inb = (x, z) => x >= 0 && z >= 0 && x < w && z < d;
     const idx = (x, z) => z * w + x;
@@ -162,12 +199,49 @@ export class Player {
       path.unshift({ x: cur % w, z: Math.floor(cur / w) });
       cur = prev[cur];
     }
+    return path;
+  }
+
+  previewPathTo(tx, tz) {
+    return this._findPathTo(tx, tz);
+  }
+
+  reachableCells(maxSteps = 4) {
+    if (!this.place || this.locked) return [];
+    const { w, d } = this.place.size;
+    const inb = (x, z) => x >= 0 && z >= 0 && x < w && z < d;
+    const seen = new Set([`${this.x},${this.z}`]);
+    const q = [{ x: this.x, z: this.z, dist: 0 }];
+    const out = [];
+    while (q.length) {
+      const cur = q.shift();
+      if (cur.dist >= maxSteps) continue;
+      const from = this.place.cellAt(cur.x, cur.z);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cur.x + dx, nz = cur.z + dz;
+        const key = `${nx},${nz}`;
+        if (!inb(nx, nz) || seen.has(key)) continue;
+        seen.add(key);
+        const c = this.place.cellAt(nx, nz);
+        if (!c || !c.walk || !this.place.canWalk(from, c)) continue;
+        const next = { x: nx, z: nz, dist: cur.dist + 1 };
+        out.push({ x: nx, z: nz });
+        q.push(next);
+      }
+    }
+    return out;
+  }
+
+  // BFS path to target cell; walks as far as reachable.
+  pathTo(tx, tz) {
+    const path = this._findPathTo(tx, tz);
+    if (!path) return false;
     this.queue = path.map((p) => ({ x: p.x, z: p.z }));
     if (!this.hopping) this._next();
     return true;
   }
 
-  stop() { this.queue.length = 0; }
+  stop() { this.queue.length = 0; this.clearMoveIntent(); }
 
   carry(mesh, data) {
     this.carrying = mesh;

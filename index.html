@@ -21,6 +21,7 @@
       <div class="chip" id="chip-streak"><span class="chip-icon">🔥</span><span id="streak-count">0</span></div>
     </div>
     <div id="hud-top-right">
+      <button class="round-btn" id="btn-camera-reset" title="Reset camera">🎯</button>
       <button class="round-btn" id="btn-home" title="Home">🏝️</button>
       <button class="round-btn" id="btn-settings" title="Settings">⚙️</button>
     </div>
@@ -31,6 +32,10 @@
       <button class="round-btn big" id="btn-hint" title="Hint">💡</button>
       <button class="round-btn big hidden" id="btn-action" title="Action">✋</button>
     </div>
+    <div id="joystick" aria-hidden="true">
+      <div id="joystick-base"><div id="joystick-knob"></div></div>
+    </div>
+    <div id="proximity-prompt" class="hidden" aria-hidden="true"></div>
     <div id="combo" class="hidden">x<span id="combo-count">2</span></div>
   </div>
 

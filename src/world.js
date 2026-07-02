@@ -9,7 +9,20 @@ import { reducedMotion } from './a11y.js';
 
 const ISO_DIR = new THREE.Vector3(1, 1.15, 1).normalize();
 const CAM_DIST = 40;
-const CAM_OFF = ISO_DIR.clone().multiplyScalar(CAM_DIST); // hot path: no per-frame clone
+
+export function orbitIsoOffset(angle = 0, dist = CAM_DIST, target = new THREE.Vector3()) {
+  target.copy(ISO_DIR).multiplyScalar(dist);
+  if (angle) {
+    const c = Math.cos(angle), s = Math.sin(angle);
+    const x = target.x * c - target.z * s;
+    const z = target.x * s + target.z * c;
+    target.x = x;
+    target.z = z;
+  }
+  return target;
+}
+
+const CAM_OFF = orbitIsoOffset(0, CAM_DIST); // hot path: no per-frame clone
 
 // Screen-space share of one ground-plane world unit under the iso camera
 // (derived from ISO_DIR so the two stay in sync) — used to pick a span that
@@ -120,6 +133,7 @@ export class World {
     this.camera = this.orthoCam;
     this.perspDist = CAM_DIST;            // camera distance along ISO_DIR (perspective)
     this._perspOff = new THREE.Vector3(); // reused per-frame in _place (no GC churn)
+    this._orbitOff = new THREE.Vector3(); // reused when the player has orbited the view
     this.span = 14;                       // world units visible vertically-ish
     this.fitBoard = null;                 // when set: keep this {w,d} board fully in frame
     this.target = new THREE.Vector3();    // smoothed look-at
@@ -140,6 +154,7 @@ export class World {
     this.boardCenter = new THREE.Vector3();
     this.followMode = null;
     this.aspect = 1;
+    this.orbit = 0;
 
     // Light rig. Intensities flow through GFX_TUNING so the dev sliders (gfxdev.js)
     // dial the warm/cool/hemisphere balance in by eye. When tone mapping is on we
@@ -306,7 +321,18 @@ export class World {
   resetCamera() {
     this.zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, this.defaultZoom || 1));
     this.pan.set(0, 0, 0);
+    this.orbit = 0;
     this._applyProjection();
+  }
+
+  setOrbit(angle) {
+    this.orbit = Number.isFinite(angle) ? angle : 0;
+    this._place();
+  }
+
+  orbitByPixels(dxPx) {
+    if (!Number.isFinite(dxPx) || dxPx === 0) return;
+    this.setOrbit(this.orbit - dxPx * 0.006);
   }
 
   // Frame a static diorama (hub overview / chamber)
@@ -365,8 +391,8 @@ export class World {
     // Same ISO_DIR angle for both cameras — only the distance differs, so the on-screen
     // grid directions (and thus input mapping + picking) are identical either way.
     const off = this.camera.isPerspectiveCamera
-      ? this._perspOff.copy(ISO_DIR).multiplyScalar(this.perspDist)
-      : CAM_OFF;
+      ? orbitIsoOffset(this.orbit, this.perspDist, this._perspOff)
+      : (this.orbit ? orbitIsoOffset(this.orbit, CAM_DIST, this._orbitOff) : CAM_OFF);
     let sx = 0, sz = 0;
     if (this.shakeAmp > 0.001) {
       sx = (Math.random() - 0.5) * this.shakeAmp;

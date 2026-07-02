@@ -5,6 +5,7 @@
 // buckets, the way the old `Math.round(ang / (PI/2))` octant table did.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
+import { joystickRepeatMs, joystickStepFromVector, joystickVectorFromPointer } from '../src/input.js';
 import { screenDirToGridStep } from '../src/world.js';
 
 const key = (s) => (s ? `${s[0]},${s[1]}` : 'null');
@@ -65,4 +66,40 @@ test('swipe buckets are total and 1:1 — every angle hits exactly one of four h
 
 test('zero vector resolves to null (a tap, not a swipe)', () => {
   assert.equal(screenDirToGridStep(0, 0), null);
+});
+
+test('joystick vector normalizes drag distance and applies a forgiving dead zone', () => {
+  assert.equal(
+    joystickVectorFromPointer({ x: 100, y: 100 }, { x: 106, y: 104 }, 48),
+    null,
+    'tiny thumb drift is ignored',
+  );
+
+  const v = joystickVectorFromPointer({ x: 100, y: 100 }, { x: 148, y: 100 }, 48);
+  assert.ok(v, 'a real drag produces a vector');
+  assert.equal(v.x, 1);
+  assert.equal(v.y, 0);
+  assert.equal(v.strength, 1);
+
+  const clamped = joystickVectorFromPointer({ x: 100, y: 100 }, { x: 220, y: 100 }, 48);
+  assert.equal(clamped.x, 1, 'long drags clamp to the rim');
+  assert.equal(clamped.strength, 1, 'strength is capped at 1');
+});
+
+test('joystick vector resolves through the same screen-relative grid mapping', () => {
+  const upRight = joystickStepFromVector({ x: Math.SQRT1_2, y: -Math.SQRT1_2, strength: 1 });
+  assert.deepEqual(upRight, HOP.upRight);
+
+  const downLeft = joystickStepFromVector({ x: -Math.SQRT1_2, y: Math.SQRT1_2, strength: 1 });
+  assert.deepEqual(downLeft, HOP.downLeft);
+
+  assert.equal(joystickStepFromVector(null), null);
+});
+
+test('joystick repeat timing gets faster as the thumbstick is pushed farther', () => {
+  const slow = joystickRepeatMs(0.25);
+  const fast = joystickRepeatMs(1);
+  assert.ok(slow > fast, `expected weak stick repeat ${slow}ms to be slower than ${fast}ms`);
+  assert.ok(fast >= 145 && fast <= 190, `full-strength repeat stays near hop timing, got ${fast}ms`);
+  assert.ok(slow <= 280, `weak repeat remains responsive, got ${slow}ms`);
 });
