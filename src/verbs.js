@@ -700,6 +700,9 @@ export class LineVerb extends VerbBase {
     this.endB = makeTextSprite(String(hi), { bg: '#fff8ec', scale: 0.8 });
     this.endB.position.copy(place.worldPos(b.x, b.z, 0.9));
     place.group.add(this.endA, this.endB);
+    // tapping a floating end label means "walk to that end of the vine"
+    place.registerPickable(this.endA, a, { magnet: 0 });
+    place.registerPickable(this.endB, b, { magnet: 0 });
     this._showTicks(problem.scaffold ?? 1);
     hud.setAction('🔔');
   }
@@ -711,7 +714,7 @@ export class LineVerb extends VerbBase {
   //   level 2 — benchmark posts only; the ½ anchor always survives
   _showTicks(level) {
     const { place } = this.ctx;
-    for (const t of this.ticks) place.group.remove(t);
+    for (const t of this.ticks) { place.unregisterPickable(t); place.group.remove(t); }
     this.ticks = [];
     this.level = level;
     const span = this.hi - this.lo;
@@ -722,11 +725,14 @@ export class LineVerb extends VerbBase {
       const mark = makeTextSprite('▲', { color: big ? '#e8a23d' : '#7c4fd0', scale: big ? 1.0 : 0.95 });
       mark.position.copy(place.worldPos(tile.x, tile.z, 0.34));
       place.group.add(mark);
+      // tapping a tick post (or its fraction label) walks to that tick's tile
+      place.registerPickable(mark, tile, { magnet: 0 });
       this.ticks.push(mark);
       if (label) {
         const sp = makeTextSprite(label, { bg: big ? '#ffd966dd' : '#ffffffe0', color: '#6a4a8a', scale: 0.68 });
         sp.position.copy(place.worldPos(tile.x, tile.z, big ? 0.92 : 0.82));
         place.group.add(sp);
+        place.registerPickable(sp, tile, { magnet: 0 });
         this.ticks.push(sp);
       }
     };
@@ -871,10 +877,12 @@ export class LineVerb extends VerbBase {
   destroy() {
     super.destroy();
     const { place } = this.ctx;
+    place.unregisterPickable(this.endA);
+    place.unregisterPickable(this.endB);
     place.group.remove(this.endA, this.endB);
     if (this.knot) place.group.remove(this.knot);
     if (this.readyMark) place.group.remove(this.readyMark);
-    for (const t of this.ticks) place.group.remove(t);
+    for (const t of this.ticks) { place.unregisterPickable(t); place.group.remove(t); }
     this.ctx.hud.setAction(null);
     this.ctx.hud.setActionReady?.(false);
   }
@@ -894,12 +902,14 @@ export class ShareVerb extends VerbBase {
       this.stumpMesh = makeProp(PROPS.stump, 0.5, 'prop:stump');
       this.stumpMesh.position.copy(place.worldPos(stump.x, stump.z));
       place.group.add(this.stumpMesh);
+      place.registerPickable(this.stumpMesh, this.stumpPos, { anchorY: 0.3 });
       place.cellAt(stump.x, stump.z).walk = false;
     }
-    // pile display
+    // pile display — tapping the floating 🥥 count means the stump (take-back)
     this.pileSprite = makeTextSprite('🥥 ' + this.pile, { bg: '#fff8ec', scale: 0.8 });
     this.pileSprite.position.copy(place.worldPos(this.stumpPos.x, this.stumpPos.z, 1.0));
     place.group.add(this.pileSprite);
+    place.registerPickable(this.pileSprite, this.stumpPos, { magnet: 0 });
     // choose nearest k baskets
     const all = (place.markers.B || []).slice()
       .sort((a, b) =>
@@ -909,9 +919,11 @@ export class ShareVerb extends VerbBase {
       const mesh = makeProp(PROPS.basket, 0.42, 'prop:basket');
       mesh.position.copy(place.worldPos(b.x, b.z));
       place.group.add(mesh);
+      place.registerPickable(mesh, b, { anchorY: 0.25 });
       const label = makeTextSprite('0', { bg: '#fff8ec', scale: 0.6 });
       label.position.copy(place.worldPos(b.x, b.z, 0.85));
       place.group.add(label);
+      place.registerPickable(label, b, { magnet: 0 });
       return { x: b.x, z: b.z, count: 0, mesh, label, order: [] };
     });
     this.lastDrops = [];
@@ -930,18 +942,22 @@ export class ShareVerb extends VerbBase {
 
   _updateLabel(b) {
     const { place } = this.ctx;
+    place.unregisterPickable(b.label);
     place.group.remove(b.label);
     b.label = makeTextSprite(String(b.count), { bg: '#fff8ec', scale: 0.6 });
     b.label.position.copy(place.worldPos(b.x, b.z, 0.85));
     place.group.add(b.label);
+    place.registerPickable(b.label, b, { magnet: 0 });
   }
 
   _updatePile() {
     const { place } = this.ctx;
+    place.unregisterPickable(this.pileSprite);
     place.group.remove(this.pileSprite);
     this.pileSprite = makeTextSprite('🥥 ' + this.pile, { bg: '#fff8ec', scale: 0.8 });
     this.pileSprite.position.copy(place.worldPos(this.stumpPos.x, this.stumpPos.z, 1.0));
     place.group.add(this.pileSprite);
+    place.registerPickable(this.pileSprite, this.stumpPos, { magnet: 0 });
     this.ctx.hud.setVerbPanel(this._panel());
   }
 
@@ -1053,9 +1069,15 @@ export class ShareVerb extends VerbBase {
   destroy() {
     super.destroy();
     const { place } = this.ctx;
-    if (this.stumpMesh) place.group.remove(this.stumpMesh);
+    if (this.stumpMesh) { place.unregisterPickable(this.stumpMesh); place.group.remove(this.stumpMesh); }
+    place.unregisterPickable(this.pileSprite);
     place.group.remove(this.pileSprite);
-    for (const b of this.baskets) { place.group.remove(b.mesh); place.group.remove(b.label); }
+    for (const b of this.baskets) {
+      place.unregisterPickable(b.mesh);
+      place.unregisterPickable(b.label);
+      place.group.remove(b.mesh);
+      place.group.remove(b.label);
+    }
     this.ctx.hud.setVerbPanel(null);
     this.ctx.hud.setAction(null);
   }

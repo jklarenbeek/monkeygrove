@@ -385,6 +385,41 @@ export class Place {
 
   addEntity(e) { this.entities.push(e); return e; }
 
+  // Perception-first tap targets. A child taps the THING they see — the altar,
+  // a stone's floating number, a friend, a building — not the floor tile the
+  // iso-projected ray would reach behind it. Registering an object here makes
+  // its 3D body raycastable (nearest hit wins, so it beats the floor behind it)
+  // and lets picking resolve the tap to the cell the object stands on.
+  // `cell` is {x, z}, or a function returning it for wanderers (Mimi, NPCs).
+  // opts.magnet: screen-px radius of the "they meant this" snap for taps that
+  // land NEAR the object (0 opts out — e.g. secondary meshes of one target).
+  // opts.anchorY: world-units lift for the magnet anchor (≈ the visual middle).
+  registerPickable(obj, cell, opts = {}) {
+    if (!obj) return obj;
+    obj.userData.pickCell = typeof cell === 'function' ? cell : { x: cell.x, z: cell.z };
+    obj.userData.pickMagnet = opts.magnet ?? 26;
+    obj.userData.pickAnchorY = opts.anchorY ?? 0.35;
+    this.world.pickables.push(obj);
+    return obj;
+  }
+
+  unregisterPickable(obj) {
+    if (!obj) return;
+    const i = this.world.pickables.indexOf(obj);
+    if (i >= 0) this.world.pickables.splice(i, 1);
+  }
+
+  // Move a registration from a swapped-out mesh to its replacement (label
+  // sprites are rebuilt on language change and count updates).
+  transferPickable(from, to) {
+    if (!from?.userData?.pickCell || !to) return;
+    to.userData.pickCell = from.userData.pickCell;
+    to.userData.pickMagnet = from.userData.pickMagnet;
+    to.userData.pickAnchorY = from.userData.pickAnchorY;
+    this.unregisterPickable(from);
+    this.world.pickables.push(to);
+  }
+
   // Visual-event bus. Reactors opt in via react(type, payload); those that also
   // need per-frame work expose update() and get ticked in the entities loop. The bus
   // never touches game state, RNG, scoring, or pathing — purely cosmetic broadcast.
@@ -600,6 +635,7 @@ export class HubPlace extends Place {
       this.tree = makeProp(PROPS.palm, 2.6, 'prop:bigpalm');
       this.tree.position.copy(this.worldPos(tree.x, tree.z));
       this.group.add(this.tree);
+      this.registerPickable(this.tree, tree, { anchorY: 1.2, magnet: 30 });
       this.addGroundShadow(tree.x, tree.z, { radius: 0.7, opacity: 0.22 });
       // a soft magic glow crowns the gem tree on high tier (additive glow sprite);
       // gated to bloom so low/medium stay exactly as today
@@ -615,6 +651,7 @@ export class HubPlace extends Place {
       const stand = makeProp(PROPS.sign, 0.85, 'prop:sign');
       stand.position.copy(this.worldPos(shop.x, shop.z));
       this.group.add(stand);
+      this.registerPickable(stand, shop, { anchorY: 0.45 });
       this.addGroundShadow(shop.x, shop.z, { radius: 0.4 });
     }
     const nest = (this.markers.N || [])[0];
@@ -622,6 +659,7 @@ export class HubPlace extends Place {
       const egg = makeProp(PROPS.egg, 0.6, 'prop:egg');
       egg.position.copy(this.worldPos(nest.x, nest.z));
       this.group.add(egg);
+      this.registerPickable(egg, nest, { anchorY: 0.3 });
       this.addGroundShadow(nest.x, nest.z, { radius: 0.34 });
       attachNestGlow(this, nest.x, nest.z); // warm breathing nest glow (med/high)
     }
@@ -651,9 +689,13 @@ export class HubPlace extends Place {
     if (this.island.crabKing) this._placeCrabKing();
     this.applyBloom(masteryPct);
     // friends (and Mimi's tag) are pickable too — a tap on a character must
-    // not fall through to the floor tile behind them (iso projection!)
-    for (const o of [this.mimi, this.mimiTag, ...this.npcs.map((n) => n.mesh)]) {
-      if (o) this.world.pickables.push(o);
+    // not fall through to the floor tile behind them (iso projection!). Mimi
+    // and the NPCs wander, so their registrations read the LIVE cell.
+    const mimiCell = () => this.mimiPos;
+    if (this.mimi) this.registerPickable(this.mimi, mimiCell, { anchorY: 0.4, magnet: 30 });
+    if (this.mimiTag) this.registerPickable(this.mimiTag, mimiCell, { magnet: 0 });
+    for (const n of this.npcs) {
+      this.registerPickable(n.mesh, () => ({ x: n.x, z: n.z }), { anchorY: 0.35, magnet: 30 });
     }
   }
 
@@ -758,6 +800,8 @@ export class HubPlace extends Place {
     const tag = makeTextSprite(`🔨 ${def.emoji}`, { bg: '#fff8ecdd', scale: 0.7, fontSize: 44 });
     tag.position.copy(this.worldPos(spot.x, spot.z, 1.45));
     this.group.add(tag);
+    this.registerPickable(sign, spot, { anchorY: 0.4 });
+    this.registerPickable(tag, spot, { magnet: 0 });
     this.cellAt(spot.x, spot.z).walk = false;
     this._plotSigns[def.id] = [sign, tag];
   }
@@ -783,7 +827,9 @@ export class HubPlace extends Place {
     this._placeBuilt(def, spot);
     // a friend who just moved in must be tappable too — the constructor does
     // this for every npc; here we add only the ones _placeBuilt just pushed
-    for (const n of this.npcs.slice(npcBefore)) this.world.pickables.push(n.mesh);
+    for (const n of this.npcs.slice(npcBefore)) {
+      this.registerPickable(n.mesh, () => ({ x: n.x, z: n.z }), { anchorY: 0.35, magnet: 30 });
+    }
     return this.buildSpots[buildId];
   }
 
@@ -795,6 +841,7 @@ export class HubPlace extends Place {
     const meshes = this._plotSigns[buildId];
     if (!meshes) return;
     for (const o of meshes) {
+      this.unregisterPickable(o);
       this.group.remove(o);
       o.traverse((c) => {
         if (c.geometry && !c.geometry._cached) c.geometry.dispose?.();
@@ -816,47 +863,52 @@ export class HubPlace extends Place {
       this.decorateSpot(spot, { role: def.id === 'plaza' ? 'festival' : 'near-build', bloom: this.storyBloom || 0.75 });
       attachBuildIdle(this, def, spot); // a lived-in idle effect per build
     }
+    // a tap anywhere on a build's 3D silhouette (the bakery's roof, the
+    // stall's awning) must read as "this build", never the tile behind it —
+    // register every prop standing on the plot with the plot's cell
+    const reg = (prop, anchorY = 0.4) => this.registerPickable(prop, spot, { anchorY });
     if (def.id === 'lanterns') {
       for (const dx of [-1, 0, 1]) {
-        if (this.cellAt(x + dx, z)) { this._prop('lantern', 0.55, x + dx, z); block(x + dx, z); }
+        if (this.cellAt(x + dx, z)) { reg(this._prop('lantern', 0.55, x + dx, z), 0.3); block(x + dx, z); }
       }
     } else if (def.id === 'fruitstand') {
-      this._prop('stall', 1.15, x, z);
-      this._prop('basket', 0.3, x, z, 0.62, 0.45);
+      reg(this._prop('stall', 1.15, x, z), 0.6);
+      reg(this._prop('basket', 0.3, x, z, 0.62, 0.45), 0.2);
       block(x, z);
     } else if (def.id === 'garden') {
-      this._prop('flowerPink', 0.34, x, z);
-      this._prop('flowerYellow', 0.32, x, z, 0.55, 0.3);
-      this._prop('flowerBlue', 0.32, x, z, -0.5, 0.32);
-      this._prop('bush', 0.42, x, z, 0.12, -0.5);
-      this._prop('sprout', 0.3, x, z, -0.45, -0.35);
-      this._prop('flowerPink', 0.3, x, z, 0.5, -0.28);
+      reg(this._prop('flowerPink', 0.34, x, z), 0.2);
+      reg(this._prop('flowerYellow', 0.32, x, z, 0.55, 0.3), 0.2);
+      reg(this._prop('flowerBlue', 0.32, x, z, -0.5, 0.32), 0.2);
+      reg(this._prop('bush', 0.42, x, z, 0.12, -0.5), 0.2);
+      reg(this._prop('sprout', 0.3, x, z, -0.45, -0.35), 0.2);
+      reg(this._prop('flowerPink', 0.3, x, z, 0.5, -0.28), 0.2);
       block(x, z);
     } else if (def.id === 'stage') {
-      this._prop('gong', 1.0, x, z);
-      this._prop('lantern', 0.5, x, z, 0.85, 0.2);
-      this._prop('lantern', 0.5, x, z, -0.85, 0.2);
+      reg(this._prop('gong', 1.0, x, z), 0.55);
+      reg(this._prop('lantern', 0.5, x, z, 0.85, 0.2), 0.3);
+      reg(this._prop('lantern', 0.5, x, z, -0.85, 0.2), 0.3);
       block(x, z);
     } else if (def.id === 'bakery') {
       // a cozy Dutch/German stepped-gable bakery townhouse (not a bare oven)
-      this._prop('bakeryBuilding', 2.2, x, z);
-      this._prop('basket', 0.3, x, z, 0.78, 0.5);
+      reg(this._prop('bakeryBuilding', 2.2, x, z), 1.0);
+      reg(this._prop('basket', 0.3, x, z, 0.78, 0.5), 0.2);
       block(x, z);
     } else if (def.id === 'pizzeria') {
       // a typical Italian trattoria: ochre walls, tricolore awning, tiled roof + chimney
-      this._prop('pizzeriaBuilding', 2.2, x, z);
-      this._prop('pizzaPan', 0.3, x, z, 0.82, 0.5);
-      this._prop('toppingCrate', 0.3, x, z, -0.72, 0.42);
+      reg(this._prop('pizzeriaBuilding', 2.2, x, z), 1.0);
+      reg(this._prop('pizzaPan', 0.3, x, z, 0.82, 0.5), 0.2);
+      reg(this._prop('toppingCrate', 0.3, x, z, -0.72, 0.42), 0.2);
       block(x, z);
     } else if (def.id === 'plaza') {
-      this._prop('portal', 1.7, x, z);
-      this._prop('lantern', 0.5, x, z, 1.0, 0.4);
-      this._prop('lantern', 0.5, x, z, -1.0, 0.4);
-      this._prop('flowerYellow', 0.3, x, z, 0.9, -0.5);
-      this._prop('flowerPink', 0.3, x, z, -0.9, -0.5);
+      reg(this._prop('portal', 1.7, x, z), 0.9);
+      reg(this._prop('lantern', 0.5, x, z, 1.0, 0.4), 0.3);
+      reg(this._prop('lantern', 0.5, x, z, -1.0, 0.4), 0.3);
+      reg(this._prop('flowerYellow', 0.3, x, z, 0.9, -0.5), 0.2);
+      reg(this._prop('flowerPink', 0.3, x, z, -0.9, -0.5), 0.2);
       const tag = makeTextSprite('🎪', { scale: 0.8 });
       tag.position.copy(this.worldPos(x, z, 2.3));
       this.group.add(tag);
+      this.registerPickable(tag, spot, { magnet: 0 });
       block(x, z);
     }
     // 'bridge' renders through the V plank cells — nothing at the plot itself.
@@ -895,6 +947,7 @@ export class HubPlace extends Place {
     c.walk = false;
     this._bob(mesh, 1.4, 0.03);
     this.npcs.push({ id: 'crabking', face: '🦀', x: plaza.x - 1, z: plaza.z, mesh });
+    // (the constructor's npc registration sweep runs after this and picks him up)
   }
 
   // masteryPct: {tide:0..1, garden:.., stump:.., vines:..} — desaturate regions by progress.

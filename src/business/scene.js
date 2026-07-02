@@ -180,6 +180,7 @@ export class BusinessPlace extends Place {
       const next = makeTextSprite(text, record.opts);
       next.position.copy(record.position);
       this.group.add(next);
+      this.transferPickable(record.sprite, next); // station labels stay tappable
       this.group.remove(record.sprite);
       this._disposeTextSprite(record.sprite);
       record.sprite = next;
@@ -204,8 +205,13 @@ export class BusinessPlace extends Place {
       this.stationMarkers[name] = { ...def };
       const cell = this.cellAt(def.x, def.z);
       if (cell) cell.walk = false;
-      this._prop(def.prop, def.x, def.z, { targetH: propHeight(def.prop, def.height), lift: def.lift ?? 0 });
-      this._textSprite('business.station.' + name, t('business.station.' + name), { bg, scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
+      // station prop + its floating name label both resolve taps to the
+      // station's cell — a tap on the oven's body must open the oven, not
+      // walk to the tile the iso ray reaches behind it
+      const prop = this._prop(def.prop, def.x, def.z, { targetH: propHeight(def.prop, def.height), lift: def.lift ?? 0 });
+      this.registerPickable(prop, def, { anchorY: (def.height ?? 0.5) * 0.5, magnet: 30 });
+      const label = this._textSprite('business.station.' + name, t('business.station.' + name), { bg, scale: 0.36, fontSize: 34 }, this.worldPos(def.x, def.z, 1.15));
+      this.registerPickable(label, def, { magnet: 0 });
     }
     for (const item of this.zone.decor) this._prop(item.key, item.x, item.z, item);
     this._placeAmbientPets();
@@ -291,6 +297,9 @@ export class BusinessPlace extends Place {
       group,
     };
     this.customers.push(record);
+    // tapping a queued customer (or their name tag) walks toward their spot,
+    // never to the floor tile behind them
+    this.registerPickable(group, () => ({ x: record.x, z: record.z }), { anchorY: 0.35 });
 
     const baseY = group.position.y;
     const bob = {
@@ -315,6 +324,7 @@ export class BusinessPlace extends Place {
 
   clearCustomers() {
     for (const customer of this.customers) {
+      this.unregisterPickable(customer.group);
       this._disposeCustomerLabel(customer.label);
       this.group.remove(customer.group);
     }

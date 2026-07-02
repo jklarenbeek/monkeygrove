@@ -23,6 +23,7 @@ export function orbitIsoOffset(angle = 0, dist = CAM_DIST, target = new THREE.Ve
 }
 
 const CAM_OFF = orbitIsoOffset(0, CAM_DIST); // hot path: no per-frame clone
+const _screenV = new THREE.Vector3();        // scratch for screenPos/magnetPick
 
 // Screen-space share of one ground-plane world unit under the iso camera
 // (derived from ISO_DIR so the two stay in sync) — used to pick a span that
@@ -487,6 +488,40 @@ export class World {
     this.raycaster.setFromCamera(ndc, this.camera);
     const hits = this.raycaster.intersectObjects(this.pickables, true);
     return hits[0] || null;
+  }
+
+  // Client-pixel screen position of a world-space point (canvas-rect aware,
+  // matching pick()'s coordinate space).
+  screenPos(worldPoint) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const v = _screenV.copy(worldPoint).project(this.camera);
+    return {
+      x: r.left + (v.x * 0.5 + 0.5) * r.width,
+      y: r.top + (-v.y * 0.5 + 0.5) * r.height,
+    };
+  }
+
+  // The tap "intent magnet": children aim at things, not pixels. Any registered
+  // interactable (Place.registerPickable) whose on-screen anchor sits within its
+  // fingertip radius of the tap claims it, nearest first — so a tap just beside
+  // a stone means the stone, never the floor tile the ray landed on behind it.
+  // Returns the interactable's grid cell, or null when no anchor is close.
+  magnetPick(clientX, clientY) {
+    let best = null, bestD = Infinity;
+    for (const o of this.pickables) {
+      const pc = o.userData?.pickCell;
+      const radius = o.userData?.pickMagnet || 0;
+      if (!pc || radius <= 0 || !o.visible || !o.parent) continue;
+      o.getWorldPosition(_screenV);
+      _screenV.y += o.userData.pickAnchorY || 0;
+      const s = this.screenPos(_screenV);
+      const d = Math.hypot(s.x - clientX, s.y - clientY);
+      if (d <= radius && d < bestD) {
+        const cell = typeof pc === 'function' ? pc() : pc;
+        if (cell) { bestD = d; best = { x: cell.x, z: cell.z }; }
+      }
+    }
+    return best;
   }
 
 }

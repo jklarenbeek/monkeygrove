@@ -66,7 +66,7 @@ export class StagePlace extends Place {
     this._gongBase = gongProp.scale.clone();
     this._gongPulse = 0; // 1 right after a note, eased back to 0 each frame
     this._kikiPulse = 0;
-    this.world.pickables?.push(gongProp);
+    this.registerPickable(gongProp, this.gong, { anchorY: 0.55, magnet: 32 });
     // Ease the gong pulse (and Kiki's extra hop) back down every frame, so pulseStage()
     // just needs to bump them. The gong scales relative to its authored base scale.
     this.addEntity({
@@ -94,7 +94,7 @@ export class StagePlace extends Place {
     kiki.position.copy(kikiPos);
     kiki.rotation.y = Math.PI;
     this.group.add(kiki);
-    this.world.pickables?.push(kiki);
+    this.registerPickable(kiki, KIKI, { anchorY: 0.35, magnet: 30 });
     const kikiCell = this.cellAt(KIKI.x, KIKI.z);
     if (kikiCell) kikiCell.walk = false;
     this.kiki = kiki;

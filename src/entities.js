@@ -277,6 +277,9 @@ export class LivingPortal {
     this.group = new THREE.Group();
     this.group.position.copy(place.worldPos(spot.x, spot.z));
     place.group.add(this.group);
+    // the whole living gate — arch, vines, film, floating world label — is one
+    // tap target: a tap anywhere on it walks to the gate, never behind it
+    place.registerPickable?.(this.group, { x: spot.x, z: spot.z }, { anchorY: 0.9, magnet: 32 });
     this.body = new THREE.Group(); // everything that jelly-bounces
     this.group.add(this.body);
 
@@ -504,11 +507,15 @@ export class NumberStone {
     this.group.position.copy(place.worldPos(x, z));
     this.bobT = Math.random() * 10;
     place.group.add(this.group);
+    // kids tap the NUMBER (the floating label), not the tile under it — the
+    // whole group (stone + label) resolves taps to the stone's cell
+    place.registerPickable?.(this.group, { x, z }, { anchorY: 0.6 });
   }
 
   // Compact mesh version for carrying (label shrinks onto the stone).
   pickUpMesh() {
     this.taken = true;
+    this.place.unregisterPickable?.(this.group);
     this.place.group.remove(this.group);
     const g = new THREE.Group();
     const s = makeProp(PROPS.stone, 0.5, 'prop:stone');
@@ -525,7 +532,11 @@ export class NumberStone {
     this.label.position.y = 0.95 + Math.sin(this.bobT * 2.2) * 0.05;
   }
 
-  remove() { this.place.group.remove(this.group); this.taken = true; }
+  remove() {
+    this.place.unregisterPickable?.(this.group);
+    this.place.group.remove(this.group);
+    this.taken = true;
+  }
 }
 
 export class Pot {
@@ -537,6 +548,7 @@ export class Pot {
     this.mesh = makeProp(PROPS.pot, 0.6, 'prop:pot');
     this.mesh.position.copy(place.worldPos(x, z));
     place.group.add(this.mesh);
+    place.registerPickable?.(this.mesh, { x, z }, { anchorY: 0.3 });
     // the pot's voxel mesh is scaled, so the blob can't be its child — sit it in the
     // place group at the pot's foot, and clear it when the pot smashes.
     this.shadow = addBlob(place.group, 0.28);
@@ -546,6 +558,7 @@ export class Pot {
   smash(particles) {
     if (this.smashed) return null;
     this.smashed = true;
+    this.place.unregisterPickable?.(this.mesh);
     audio.sfx('pop');
     if (this.shadow) { this.place.group.remove(this.shadow); this.shadow = null; }
     particles.poof(this.mesh.position.clone().add(new THREE.Vector3(0, 0.3, 0)), 18, 0xd9906f);
@@ -714,6 +727,10 @@ export class Altar {
     this.glow = makeTextSprite('✨', { scale: 0.8 });
     this.glow.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.45, 0));
     place.group.add(this.glow);
+    // the altar reads as one tall golden thing — its body AND its floating
+    // sparkle both resolve taps to the altar's cell, not the tile behind it
+    place.registerPickable?.(this.mesh, { x, z }, { anchorY: 0.7, magnet: 32 });
+    place.registerPickable?.(this.glow, { x, z }, { magnet: 0 });
     this.t = 0;
   }
 
@@ -756,6 +773,7 @@ export class Chest {
     this.lid.position.y = 0.55;
     this.group.add(this.base, this.lid);
     addBlob(this.group, 0.34); // pops in with the chest, then grounded
+    place.registerPickable?.(this.group, { x, z }, { anchorY: 0.4 });
     this.group.position.copy(place.worldPos(x, z));
     this.group.scale.setScalar(0.001);
     place.group.add(this.group);

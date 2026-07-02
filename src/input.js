@@ -309,8 +309,18 @@ export class InputController {
     return this.userZoom ?? this.mobileZoom(kind);
   }
 
+  // Resolve a tap to the grid cell the child MEANT, in three passes:
+  //  1. the ray hit an interactable's own 3D body (altar, stone, friend,
+  //     building — anything a Place registered) → that thing's cell, always;
+  //  2. otherwise the intent magnet: a registered interactable whose on-screen
+  //     anchor is within a fingertip of the tap claims it — so tapping just
+  //     beside the altar never reads as "walk to the tile behind it";
+  //  3. otherwise the floor tile the ray hit, then the old fat-finger ring.
   pickCell(cx, cy) {
     const direct = this._pickCellAt(cx, cy);
+    if (direct?.target) return direct;
+    const magnet = this.game.world.magnetPick?.(cx, cy);
+    if (magnet) return magnet;
     if (direct) return direct;
     // Fat-finger fallback: sample a small ring around the touch point before
     // giving up. This keeps picking forgiving without changing the world.
@@ -329,20 +339,36 @@ export class InputController {
     if (!place) return null;
     const hit = this.game.world.pick(cx, cy);
     if (!hit) return null;
-    const gridList = hit.object?.userData?.gridList;
-    if (gridList && hit.instanceId !== undefined) {
-      const it = gridList[hit.instanceId];
-      if (it) return { x: it.x, z: it.z };
-    }
-    if (hit.object === place?.floor && hit.instanceId !== undefined) {
-      const it = place.floorList[hit.instanceId];
-      if (it) return { x: it.x, z: it.z };
-    }
-    // fall back: derive from point
-    const p = hit.point;
-    const x = Math.floor(p.x / TILE + place.size.w / 2);
-    const z = Math.floor(p.z / TILE + place.size.d / 2);
-    if (place.cellAt(x, z)) return { x, z };
-    return null;
+    return pickCellFromHit(hit, place);
   }
+}
+
+// Map a raycast hit to a grid cell. Registered interactables carry the cell
+// they stand on (userData.pickCell, set by Place.registerPickable) — the ray
+// strikes a child mesh of the registered group, so walk up the parent chain.
+// `target: true` marks "the tap landed on the thing itself" so pickCell can
+// trust it over any forgiveness heuristics. Exported pure for tests.
+export function pickCellFromHit(hit, place) {
+  for (let o = hit.object; o; o = o.parent) {
+    const pc = o.userData?.pickCell;
+    if (pc) {
+      const cell = typeof pc === 'function' ? pc() : pc;
+      if (cell) return { x: cell.x, z: cell.z, target: true };
+    }
+  }
+  const gridList = hit.object?.userData?.gridList;
+  if (gridList && hit.instanceId !== undefined) {
+    const it = gridList[hit.instanceId];
+    if (it) return { x: it.x, z: it.z };
+  }
+  if (hit.object === place?.floor && hit.instanceId !== undefined) {
+    const it = place.floorList[hit.instanceId];
+    if (it) return { x: it.x, z: it.z };
+  }
+  // fall back: derive from point
+  const p = hit.point;
+  const x = Math.floor(p.x / TILE + place.size.w / 2);
+  const z = Math.floor(p.z / TILE + place.size.d / 2);
+  if (place.cellAt(x, z)) return { x, z };
+  return null;
 }
