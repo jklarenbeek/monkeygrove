@@ -305,8 +305,17 @@ export class InputController {
   // one, fall back to the per-device comfort default, which is fit (1) for the
   // number line so both ends show for magnitude estimation. The title is not
   // routed through here — it stays pinned to its full-island framing.
+  //
+  // One guardrail on portrait phones: a remembered pinch-OUT never carries a
+  // scene below its comfort default. Retaining "zoomed all the way out" made
+  // every later chamber open as a tiny speck in a sea of blue — the child had
+  // to pinch back in each time. Zooming out within a scene still works; it just
+  // doesn't become the permanent opening shot. (Scenes whose comfort default is
+  // fit — the number line, desktop, landscape — keep the retained zoom as-is.)
   sceneZoom(kind) {
-    return this.userZoom ?? this.mobileZoom(kind);
+    const comfort = this.mobileZoom(kind);
+    if (this.userZoom == null) return comfort;
+    return comfort > 1 ? Math.max(this.userZoom, comfort) : this.userZoom;
   }
 
   // Resolve a tap to the grid cell the child MEANT, in three passes:

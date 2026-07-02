@@ -61,6 +61,17 @@ added to the home screen like a native app.
   - Mastery unlocks Mimi's blueprints
   - Bananas fund eight builds: lanterns, fruit stand, garden, music stage, bakery, pizzeria, bridge, and festival plaza
   - Gates and island life bloom as skills improve
+- **A living island** (auto-tuned to the device)
+  - Stylized shader water: a shallow-to-deep gradient, foam hugging the real
+    coastline, gentle waves, and rare sun glints — driven by one session-wide
+    clock so scene changes never visibly reset it
+  - No two chambers look alike: seeded daylight moods, carved coastlines,
+    distant islets, and a landmark per world (lighthouse, mushroom ring,
+    grand palm, flowering arch)
+  - Completing a chamber makes the board itself bloom with flowers
+  - Graphics quality auto-detects by device capability (desktop high, capable
+    phones and tablets medium, weak or tiny devices low) and can be overridden
+    in Settings → Graphics
 - **Two shops** (each its own scene + economy)
   - Bakery (Mo the Piglet) — an octagonal cottage baking flatbread and berry tart
   - Pizzeria (Olli the Owl) — a wider trattoria serving margherita and tomato pizza
@@ -252,8 +263,13 @@ src/
   chamberflow.js    one math chamber: pick problem, build, present, score, complete
   rewards.js        banana/egg/combo/chest payouts + emoji-fly juice
   avatar.js         player + pet follower mesh lifecycle
-  world.js          Three.js renderer, orthographic camera, picking, zoom/pan
-  chamber.js        ASCII diorama layouts, hub island, portals, build plots
+  world.js          Three.js renderer, orthographic camera, picking, zoom/pan,
+                    daylight moods
+  chamber.js        ASCII diorama layouts + seeded variation (coastline carving,
+                    landmarks, islets), hub island, portals, build plots
+  gfx.js            quality tiers: device tier + Graphics setting -> GFX flags
+  water.js          stylized shader water (shore-distance field, foam, waves);
+                    waterfx.js adds lazy ripple/fish/bubble moments
   player.js         grid-hop movement, tap-to-walk, carrying, pet follower
   entities.js       stones, pots, crabs, portals, particles, props, labels
   ambient.js        living-island critters (butterflies, birds)

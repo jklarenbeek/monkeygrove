@@ -123,7 +123,20 @@ export const MOBILE_DEFAULT_ZOOM = { hub: 1.8, chamber: 1.5 };
 
 export const QUALITY = (() => {
   if (typeof window === 'undefined') return 'high';
-  const dpr = window.devicePixelRatio || 1;
-  const small = Math.min(window.screen?.width || 1024, window.screen?.height || 768) < 480;
-  return (IS_TOUCH && (small || dpr > 2.5)) ? 'low' : 'high';
+  if (!IS_TOUCH) return 'high';
+  // Touch devices: judge by capability, not by CSS pixels or DPR. The old
+  // heuristic (`min(screen dimension) < 480 || dpr > 2.5`) classed EVERY modern
+  // phone as low — an iPhone 14 Pro Max is 430 CSS px wide at dpr 3, so one of
+  // the fastest mobile GPUs on the market got the flattest renderer. Instead:
+  //   - low memory / few cores (cheap or old Androids) -> 'low'
+  //   - a physically small panel (< ~700 device px on the short side: old
+  //     iPhone SE class, budget handsets) -> 'low'
+  //   - every other phone/tablet -> 'medium' (sky, animated water, shadows —
+  //     but no bloom/DoF), with the Graphics setting as the escape hatch.
+  const mem = navigator.deviceMemory || 0;           // Chrome/Android only
+  const cores = navigator.hardwareConcurrency || 0;  // 0 when unavailable
+  const shortPx = Math.min(window.screen?.width || 1024, window.screen?.height || 768)
+    * (window.devicePixelRatio || 1);
+  if ((mem && mem <= 2) || (cores && cores <= 3) || shortPx < 700) return 'low';
+  return 'medium';
 })();

@@ -110,6 +110,70 @@ export function varyLayout(rows, rng) {
   take(coast, rng.int(2, 4), '1');   // walkable knolls hugging the shore
   take(open, rng.int(1, 3), 'd');    // extra greenery (open field: safe to block)
   take(open, rng.int(2, 5), ',');    // shade patches, purely cosmetic
+
+  // Carve the coastline itself: a few shore tiles return to the sea, so the
+  // island SILHOUETTE varies between chambers (bites and little coves) — the
+  // outline is what makes two boards read as different at a glance. A carve may
+  // only take a plain '.' whose whole 3×3 is plain floor or water (never beside
+  // a marker, knoll, or path tile), and is reverted unless every tile the
+  // player could reach before is still reachable after (same |dh|<=1 hop graph
+  // the player walks) — so no stone, altar, or corridor is ever pinched off.
+  const hOf = (ch) => HEIGHTS[ch] ?? 0;
+  const reachable = () => {
+    let start = null;
+    for (let z = 0; z < d && !start; z++) {
+      for (let x = 0; x < w && !start; x++) {
+        if (grid[z][x] === 'P') start = { x, z };
+      }
+    }
+    for (let z = 0; z < d && !start; z++) {
+      for (let x = 0; x < w && !start; x++) {
+        if (grid[z][x] !== '#') start = { x, z };
+      }
+    }
+    const seen = new Set(start ? [start.x + ',' + start.z] : []);
+    const q = start ? [start] : [];
+    while (q.length) {
+      const { x, z } = q.pop();
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, nz = z + dz;
+        if (nx < 0 || nz < 0 || nx >= w || nz >= d) continue;
+        const ch = grid[nz][nx];
+        if (ch === '#' || seen.has(nx + ',' + nz)) continue;
+        if (Math.abs(hOf(ch) - hOf(grid[z][x])) > 1) continue;
+        seen.add(nx + ',' + nz);
+        q.push({ x: nx, z: nz });
+      }
+    }
+    return seen;
+  };
+  let bites = rng.int(0, 3);
+  if (bites > 0) {
+    const shoreline = [];
+    for (let z = 1; z < d - 1; z++) {
+      for (let x = 1; x < w - 1; x++) {
+        if (grid[z][x] !== '.') continue;
+        let sea = false, clean = true;
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const ch = grid[z + dz][x + dx];
+            if (!plain(ch) && ch !== '#') clean = false;
+            if ((dx === 0) !== (dz === 0) && ch === '#') sea = true;
+          }
+        }
+        if (sea && clean) shoreline.push({ x, z });
+      }
+    }
+    for (const s of rng.shuffle(shoreline)) {
+      if (bites <= 0) break;
+      const before = reachable();
+      grid[s.z][s.x] = '#';
+      const after = reachable();
+      const lost = before.has(s.x + ',' + s.z) ? 1 : 0;
+      if (after.size >= before.size - lost) bites--;
+      else grid[s.z][s.x] = '.';
+    }
+  }
   return grid.map((g) => g.join(''));
 }
 
@@ -345,6 +409,131 @@ export class Place {
       }
       const cell = this.cellAt(spot.x, spot.z);
       if (key === 'palm' || key === 'rockA' || key === 'rockB') cell.walk = false;
+    }
+    if (this.theme !== 'hub') {
+      this._landmark(rng);
+      this._islets(rng);
+    }
+  }
+
+  // Every walkable tile reachable from (any) start over the |dh|<=1 hop graph —
+  // used to prove a landmark can block its cell without pinching off a path.
+  _reachableWalk(blocked) {
+    const { w, d } = this.size;
+    let start = null;
+    for (let z = 0; z < d && !start; z++) {
+      for (let x = 0; x < w && !start; x++) {
+        const c = this.cellAt(x, z);
+        if (c && c.walk && !(blocked && x === blocked.x && z === blocked.z)) start = { x, z };
+      }
+    }
+    const seen = new Set(start ? [start.x + ',' + start.z] : []);
+    const q = start ? [start] : [];
+    while (q.length) {
+      const { x, z } = q.pop();
+      const from = this.cellAt(x, z);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, nz = z + dz;
+        if (blocked && nx === blocked.x && nz === blocked.z) continue;
+        const to = this.cellAt(nx, nz);
+        if (!to || !to.walk || seen.has(nx + ',' + nz)) continue;
+        if (Math.abs(to.h - from.h) > 1) continue;
+        seen.add(nx + ',' + nz);
+        q.push({ x: nx, z: nz });
+      }
+    }
+    return seen;
+  }
+
+  // One recognizable set piece per world — a postcard silhouette so two
+  // chambers in different worlds can never be mistaken for each other:
+  // Tide Pools a lighthouse, Banana Garden a mushroom ring, Sharing Stump a
+  // grand old palm, Vine Heights a flowering arch. Placed on a shore-side
+  // plain tile far from every task cell; the tile is blocked like a tree, and
+  // only when blocking it provably cuts off nothing (same reachability rule
+  // the coastline carver uses). Seeded rng → duel boards stay identical.
+  _landmark(rng) {
+    const build = {
+      tide: (g) => g.add({ key: 'lighthouse', h: 1.7 }),
+      garden: (g) => {
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 + 0.4;
+          g.add({ key: 'mushroom', s: 0.055 + rng.float() * 0.02, dx: Math.cos(a) * 0.34, dz: Math.sin(a) * 0.34 });
+        }
+        g.add({ key: 'sprout', s: 0.06 });
+      },
+      stump: (g) => {
+        g.add({ key: 'palm', s: 0.095 });
+        g.add({ key: 'coconut', s: 0.05, dx: 0.3, dz: 0.18 });
+        g.add({ key: 'coconut', s: 0.05, dx: -0.26, dz: 0.3 });
+      },
+      vines: (g) => g.add({ key: 'vineArch', h: 1.5 }),
+    }[this.theme];
+    if (!build) return;
+    const { w, d } = this.size;
+    const m = this.markers;
+    const keep = [];
+    for (const ch of 'APMsmBVDopc') keep.push(...(m[ch] || []));
+    const spots = [];
+    for (let z = 1; z < d - 1; z++) {
+      for (let x = 1; x < w - 1; x++) {
+        const c = this.cellAt(x, z);
+        if (!c || !c.walk || c.h !== 0 || !FLOOR_CHARS.has(c.ch)) continue;
+        if (!keep.every((q) => Math.abs(q.x - x) + Math.abs(q.z - z) >= 3)) continue;
+        let coast = false;
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (!this.cellAt(x + dx, z + dz)) coast = true;
+        }
+        if (coast) spots.push({ x, z });
+      }
+    }
+    for (const spot of rng.shuffle(spots)) {
+      const before = this._reachableWalk();
+      const after = this._reachableWalk(spot);
+      if (after.size < before.size - 1) continue; // would pinch a path — next spot
+      const p = this.worldPos(spot.x, spot.z);
+      const group = {
+        add: ({ key, h, s, dx = 0, dz = 0 }) => {
+          const prop = makeProp(PROPS[key], h, 'prop:' + key);
+          if (s) prop.scale.setScalar(s);
+          prop.position.set(p.x + dx, p.y, p.z + dz);
+          prop.rotation.y = rng.float() * Math.PI * 2;
+          this.group.add(prop);
+        },
+      };
+      build(group);
+      this.cellAt(spot.x, spot.z).walk = false;
+      this.addGroundShadow(spot.x, spot.z, { radius: 0.42, opacity: 0.22 });
+      return;
+    }
+  }
+
+  // A few tiny uninhabited islets drifting past the board — they fill the open
+  // water that portrait screens frame around the island, and give every
+  // chamber a slightly different horizon. Pure backdrop: never walkable, never
+  // pickable, skipped entirely at decorDensity 0 (low tier stays lean).
+  _islets(rng) {
+    if (!GFX.decorDensity) return;
+    const { w, d } = this.size;
+    const n = rng.int(2, 3 + Math.min(1, GFX.decorDensity));
+    for (let i = 0; i < n; i++) {
+      const a = rng.float() * Math.PI * 2;
+      const dist = Math.max(w, d) * 0.5 + 2.5 + rng.float() * 3.5;
+      const cx = Math.cos(a) * dist, cz = Math.sin(a) * dist;
+      const size = 0.9 + rng.float() * 0.8;
+      const geo = new THREE.BoxGeometry(size * 1.25, 0.6, size);
+      const mat = new THREE.MeshLambertMaterial({ color: rng.chance(0.5) ? PALETTE.sand : PALETTE.sandDark });
+      mat._owned = true;
+      const base = new THREE.Mesh(geo, mat);
+      base.rotation.y = rng.float() * Math.PI * 2;
+      base.position.set(cx, -0.32, cz);
+      this.group.add(base);
+      const key = rng.pick(['palmSmall', 'palmSmall', 'palm', 'rockB', 'bush']);
+      const prop = makeProp(PROPS[key], undefined, 'prop:' + key);
+      prop.scale.setScalar(key === 'palm' ? 0.06 : 0.05 + rng.float() * 0.012);
+      prop.position.set(cx, -0.02, cz);
+      prop.rotation.y = rng.float() * Math.PI * 2;
+      this.group.add(prop);
     }
   }
 

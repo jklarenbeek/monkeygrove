@@ -1,16 +1,11 @@
-// Lazy animated water effects: theme tint, shimmer, foam, shoreline ripples,
-// fish shadows, and bubbles. Loaded only when GFX.water asks for animation.
+// Lazy water-life moments layered over the shader surface (water.js): shoreline
+// ripples on world events, fish shadows, and bubbles. The shore gradient, foam
+// band, highlights, and sparkle all live in the water shader itself now — this
+// chunk only owns the playful one-shot sprites and the shoreline anchors that
+// ambient.js uses to place them.
 import * as THREE from 'three';
 import { GFX } from './gfx.js';
 import { reducedMotion } from './a11y.js';
-
-const WATER_TINT = {
-  hub: { surface: 0x7ec8e3, deep: 0x5fb0d4, foam: 1.0 },
-  tide: { surface: 0x86cfe6, deep: 0x5fb0d4, foam: 1.5 },
-  garden: { surface: 0x7ec8e3, deep: 0x5fb0d4, foam: 0.8 },
-  stump: { surface: 0x7ec8e3, deep: 0x5fb0d4, foam: 1.0 },
-  vines: { surface: 0x79b8e0, deep: 0x6a8fd4, foam: 0.8 },
-};
 
 function streakTexture() {
   const c = document.createElement('canvas');
@@ -26,25 +21,6 @@ function streakTexture() {
       g.moveTo(0, y);
       g.bezierCurveTo(40, y - 10, 88, y + 10, 128, y - 4);
       g.stroke();
-    }
-  } catch { /* incomplete ctx (test stub) -> blank texture is fine */ }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  return t;
-}
-
-function dotTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  try {
-    for (let i = 0; i < 18; i++) {
-      const x = (i * 37) % 64, y = (i * 53) % 64;
-      const grad = g.createRadialGradient(x, y, 0, x, y, 3);
-      grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = grad;
-      g.fillRect(x - 3, y - 3, 6, 6);
     }
   } catch { /* incomplete ctx (test stub) -> blank texture is fine */ }
   const t = new THREE.CanvasTexture(c);
@@ -81,41 +57,6 @@ function shoreAnchorsOf(place) {
       outZ: s.oz / mag,
     };
   });
-}
-
-function overlayPlane(geo, tex, y, opacity, repeat) {
-  tex.repeat.set(repeat, repeat);
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending,
-  });
-  mat._owned = true;
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.y = y;
-  return mesh;
-}
-
-function buildFoam(group, shore, tint) {
-  if (!shore.length) return;
-  const foamGeo = new THREE.PlaneGeometry(0.7, 0.7);
-  foamGeo._owned = true;
-  const foamMat = new THREE.MeshBasicMaterial({
-    map: dotTexture(), color: 0xeafcff, transparent: true,
-    opacity: 0.22 * (tint.foam || 1), depthWrite: false, blending: THREE.AdditiveBlending,
-  });
-  foamMat._owned = true;
-  const foam = new THREE.InstancedMesh(foamGeo, foamMat, shore.length);
-  const m4 = new THREE.Matrix4();
-  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
-  const scl = new THREE.Vector3(1, 1, 1);
-  const pos = new THREE.Vector3();
-  shore.forEach((s, i) => {
-    pos.set(s.x, -0.18, s.z);
-    m4.compose(pos, q, scl);
-    foam.setMatrixAt(i, m4);
-  });
-  foam.instanceMatrix.needsUpdate = true;
-  group.add(foam);
 }
 
 function nearestAnchor(anchors, position, maxDist = Infinity) {
@@ -242,32 +183,12 @@ function createPool(group) {
   return { spawnFishShadow, spawnBubble, spawnSparkle: spawnBubble, update, dispose };
 }
 
-export function attachWaterEffects(place, { group, surface, deep, theme = 'hub', lifeAnchors }) {
-  const tint = WATER_TINT[theme] || WATER_TINT.hub;
-  surface.material.color.setHex(tint.surface);
-  deep.material.color.setHex(tint.deep);
+export function attachWaterEffects(place, { group, lifeAnchors }) {
   lifeAnchors.splice(0, lifeAnchors.length, ...shoreAnchorsOf(place));
-
-  const geo = surface.geometry;
-  const highlight = overlayPlane(geo, streakTexture(), -0.205, 0.12, 3);
-  const sparkle = GFX.bloom ? overlayPlane(geo, dotTexture(), -0.2, 0.08, 4) : null;
-  group.add(highlight);
-  if (sparkle) group.add(sparkle);
-  buildFoam(group, lifeAnchors, tint);
-
   const shore = createShoreMoments(group, lifeAnchors);
   const pool = createPool(group);
-  let t = 0;
   return {
     update(dtMs) {
-      t += dtMs / 1000;
-      const calm = reducedMotion() ? 0.25 : 1;
-      highlight.material.map.offset.set((t * 0.012 * calm) % 1, (t * 0.008 * calm) % 1);
-      highlight.material.opacity = 0.10 + 0.05 * (0.5 + 0.5 * Math.sin(t * 0.8)) * calm;
-      if (sparkle) {
-        sparkle.material.map.offset.x = (-t * 0.02 * calm) % 1;
-        sparkle.material.opacity = (0.05 + 0.04 * (0.5 + 0.5 * Math.sin(t * 1.3))) * calm;
-      }
       shore.update(dtMs);
       pool.update(dtMs);
     },

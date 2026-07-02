@@ -86,6 +86,16 @@ const ZOOM_MAX = 4;
 const PERSP_FOV = 28;                                   // degrees — narrow, diorama-ish
 const PERSP_TAN = Math.tan((PERSP_FOV * Math.PI) / 360); // tan(fov/2)
 
+// Daylight moods (setDaylight): tiny hue/intensity nudges around the default
+// rig ('noon' == exactly the constructor's values). All bright, all friendly.
+// waterMood multiplies the water shader's tint so the sea agrees with the sun.
+const DAYLIGHT = {
+  noon:    { sun: 0xfff2d8, hemiSky: 0xeaf6ff, hemiGround: 0xcdeac0, sunMul: 1.00, waterMood: { r: 1, g: 1, b: 1 } },
+  morning: { sun: 0xfff8ea, hemiSky: 0xe2f3ff, hemiGround: 0xd2ecc8, sunMul: 0.97, waterMood: { r: 0.97, g: 1.0, b: 1.04 } },
+  golden:  { sun: 0xffe2ae, hemiSky: 0xf4eefc, hemiGround: 0xdbe6b4, sunMul: 1.06, waterMood: { r: 1.05, g: 1.0, b: 0.95 } },
+  breezy:  { sun: 0xfff6e0, hemiSky: 0xf0faff, hemiGround: 0xd6f0cc, sunMul: 1.03, waterMood: { r: 0.98, g: 1.02, b: 1.03 } },
+};
+
 export class World {
   constructor(canvas) {
     this.renderer = new THREE.WebGLRenderer({
@@ -226,14 +236,37 @@ export class World {
     this.aspect = w / h;
     // fit-board mode (chambers): the whole diorama must stay visible on ANY
     // aspect — stones in the far corner can't hide off-screen, and number-line
-    // magnitude estimation needs the full bridge in view
+    // magnitude estimation needs the full bridge in view. The fit targets the
+    // USABLE viewport: the equation banner eats the top of the screen, so the
+    // board fits and centers in the clear band below it instead of hiding a
+    // slice of itself behind the HUD (worst on portrait phones).
     if (this.fitBoard) {
+      const ins = this._viewInsets(h);
+      const usable = Math.max(0.4, 1 - ins.top - ins.bottom);
       const diag = (this.fitBoard.w + this.fitBoard.d) * TILE;
       const horiz = diag * ISO_PROJ_H + 1.5;  // side margin
-      const vert = diag * ISO_PROJ_V + 2.5;   // headroom for props & HUD banner
-      this.span = Math.max(vert, horiz / this.aspect);
+      const vert = diag * ISO_PROJ_V + 1.5;   // prop headroom (banner handled via insets)
+      this.span = Math.max(vert / usable, horiz / this.aspect);
+      this._insetShift = (ins.top - ins.bottom) / 2; // fraction of view height
+    } else {
+      this._insetShift = 0;
     }
     this._applyProjection();
+  }
+
+  // Fractions of the viewport covered by persistent overlay UI. Today that is
+  // the equation banner pinned to the top; measured live so language/wrapping
+  // changes are folded into the next resize()/frameBoard(). Defensive: no DOM
+  // (tests) or hidden banner → no insets.
+  _viewInsets(h) {
+    let top = 0;
+    try {
+      const b = document.getElementById('banner');
+      if (b && !b.classList.contains('hidden')) {
+        top = Math.min(0.4, Math.max(0, b.getBoundingClientRect().bottom / (h || 1)));
+      }
+    } catch { /* no DOM (tests) -> no insets */ }
+    return { top, bottom: 0 };
   }
 
   // Rebuild the ortho frustum from span + aspect + user zoom. Split out from
@@ -262,8 +295,12 @@ export class World {
       // Keep DoF focused on the look-at plane so the player/build stays crisp.
       if (this.composer && GFX.dof) this.composer.setDofParams({ focus: this.perspDist });
     } else {
-      this.camera.top = vSpan / 2;
-      this.camera.bottom = -vSpan / 2;
+      // Frustum shift: with a top HUD inset the whole view slides up in world
+      // space, so the framed board renders centered in the CLEAR band below the
+      // banner. Picking stays exact — the raycaster reads this same projection.
+      const shift = this.fitBoard ? (this._insetShift || 0) * vSpan : 0;
+      this.camera.top = vSpan / 2 + shift;
+      this.camera.bottom = -vSpan / 2 + shift;
       this.camera.left = (-vSpan * aspect) / 2;
       this.camera.right = (vSpan * aspect) / 2;
       this.camera.updateProjectionMatrix();
@@ -421,6 +458,20 @@ export class World {
   shake(amount = 0.15) {
     if (reducedMotion()) return; // camera shake is the motion most worth skipping
     this.shakeAmp = Math.max(this.shakeAmp, amount);
+  }
+
+  // Seeded per-chamber atmosphere: a SUBTLE retune of the sun/hemisphere colors
+  // so two visits to the same world never feel like the same hour of the day.
+  // Deliberately gentle — readability of numbers/props always wins over mood —
+  // and every preset stays bright and friendly (no dusk, no gloom). The hub
+  // resets to 'noon'. Returns the preset so callers can tint the water to match.
+  setDaylight(name = 'noon') {
+    const mood = DAYLIGHT[name] || DAYLIGHT.noon;
+    this.sun.color.setHex(mood.sun);
+    this.sun.intensity = GFX_TUNING.sunIntensity * mood.sunMul;
+    this.hemi.color.setHex(mood.hemiSky);
+    this.hemi.groundColor.setHex(mood.hemiGround);
+    return mood;
   }
 
   // Short, eased orthographic "moment": a gentle push-in/pull-back on a

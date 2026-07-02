@@ -44,7 +44,7 @@ src/
   avatar.js             AvatarRig: player monkey + pet follower mesh lifecycle (shared scenes)
   config.js             central knobs: palette, world themes (accent/bloom colors),
                         grid metrics, timings, balance, portal growth stages, QUALITY
-                        (device-tier heuristic; back-compat alias — see gfx.js)
+                        (capability-based device-tier heuristic — see gfx.js)
   gfx.js                quality tiers: resolves a frozen GFX feature-flag object from
                         device tier + the "Graphics" setting + reducedMotion(); the
                         single place renderer/scene features read instead of QUALITY
@@ -91,7 +91,9 @@ src/
   models.js             re-exports CHARS/PETS + CREATURES/getCreature, plus props,
                         hats, portal vine overlays, ambient critters
   world.js              renderer, fixed-angle iso ortho camera rig, lighting, picking
-  chamber.js            diorama builder: ASCII templates + variation, hub island (HubPlace)
+  chamber.js            diorama builder: ASCII templates + seeded variation (mirrors,
+                        sprinkles, coastline carving with a reachability proof),
+                        per-world landmarks + distant islets, hub island (HubPlace)
   player.js             grid-hop movement w/ squash & stretch, BFS tap-to-walk, carrying
   entities.js           crabs (patrol), pots, number stones, altar, chest, particles,
                         living hub portals (mastery-staged vines, glow, fireflies)
@@ -140,9 +142,14 @@ scripts/
 - **Lighting**: hemisphere + warm directional sun (PCF-soft shadow map — 2048 on high,
   1024 on medium, off on low, via `GFX.shadowMapSize`, bias re-tuned per texel size) +
   faint cool fill light. The sun follows the camera target so the shadow camera stays
-  tight. On low-quality devices (touch + small screen or very high DPR) the real sun
-  shadow is disabled entirely. The device heuristic lives in `config.js` (`QUALITY`);
+  tight. On low-tier devices the real sun shadow is disabled entirely. The device
+  heuristic lives in `config.js` (`QUALITY` — capability-based, see Quality tiers);
   renderer and scene features read it through the resolved `GFX` flags in `gfx.js`.
+  **Daylight moods** (`world.setDaylight('noon'|'morning'|'golden'|'breezy')`): a
+  subtle seeded per-chamber retune of the sun/hemisphere colors + water tint so two
+  visits never feel like the same hour — always bright and friendly (readability of
+  numbers beats mood), drawn from the chamber rng (duels light identically), and the
+  hub always resets to 'noon'.
 - **Contact shadows** (`blobshadow.js`, `GFX.contactShadows` — ON at *every* tier,
   including low): a soft blob quad grounds each character, pet, NPC, prop, and build
   cluster so nothing reads as floating, even where the real sun map is soft or off. One
@@ -151,8 +158,9 @@ scripts/
   lightweight per-place mesh wrapper is freed. Hopping characters track the blob on the
   X/Z plane with Y pinned to the floor, so it never rides the hop arc. No shipped asset.
 - **Camera moments** (`world.cameraShot`, `GFX.cameraMoments`): short, eased
-  orthographic push-in/pull-back on non-gameplay beats (e.g. a gentle hub-arrival
-  settle). Animates **span only** — never the angle — so `screenDirToGridStep` and
+  orthographic push-in/pull-back on non-gameplay beats (a gentle hub-arrival
+  settle; a short welcome drift into each chamber's framing). Animates **span
+  only** — never the angle — so `screenDirToGridStep` and
   picking stay valid (no input lock). `'minimal'` tier and `reducedMotion()` play
   nothing (snap only) → Low = today; never runs during chamber solving. The optional
   perspective-hub + depth-of-field high tier is deferred (open decision #5; DoF needs
@@ -173,12 +181,22 @@ scripts/
   interactable, and scatter **never** sets `cell.walk` (pathing/duel-safe). Build plots
   are dressed into small "places" via `decorateSpot()`. Off at low → floor unchanged.
 - **Water** (`water.js`, `GFX.water` — 'flat' low / 'animated' med-high): `Place` owns a
-  `createWaterSurface()` handle (`{group, update, dispose, spawn*}`). 'flat' reproduces
-  today's two planes + bob exactly; 'animated' adds a scrolling highlight overlay, a
-  high-tier sparkle overlay, an instanced shore-foam rim (offset off walkable centers),
-  and per-theme tint. Procedural canvas textures (defensive draw → tests get blank but
-  valid textures); `reducedMotion()` damps motion; pooled/capped fish-shadow & bubble
-  hooks are available for the ecosystem. No pickables/collision added.
+  `createWaterSurface()` handle (`{group, update, setMood, react, dispose, spawn*}`).
+  'flat' reproduces the original two Lambert planes + bob exactly. 'animated' is **one
+  custom `ShaderMaterial` plane**: a **shore-distance field** baked per place from the
+  island's real cell footprint (a small one-channel `DataTexture`) drives a
+  shallow→deep gradient, an animated foam band hugging the actual coastline, and a
+  breathing outer foam ring; low-frequency vertex waves move the surface itself, and
+  two drifting highlight layers + rare sun glints come from cheap hash noise in the
+  fragment shader. The shader includes the fog/tone-mapping/colorspace chunks so it
+  grades identically to the rest of the scene, and the mesh extends past the shore
+  field so its edge sits out in the fog. The time uniform reads a **session-global
+  clock** (module epoch), so scene rebuilds resume the same phase — the water never
+  visibly "resets" between hub, chambers, and shops (pinned by a test). `setMood()`
+  applies the daylight tint. Playful one-shot sprite moments — event shoreline
+  ripples, pooled/capped fish shadows & bubbles — live in the lazy `waterfx.js`
+  chunk, which also exposes the shoreline `lifeAnchors` the ambient ecosystem uses.
+  No pickables/collision added.
 - **Idle sway** (`GFX.ambientScale`): a capped set of foliage hero props gets a
   tiny CPU "breathing" tilt; the dense scatter field sways on the **GPU** via a wind
   variant of the voxel material (`windMaterial()` in `voxel.js`, one `uTime` uniform per
@@ -202,7 +220,12 @@ scripts/
   glow" wash on the model on correct (on the ground, never behind the banner), a gentle
   warm shimmer on not-yet (no red/shake), light per-theme ambient motes (≪ hub), and
   `visualEvent('correct-answer'|'wrong-answer')` broadcasts. Never imports `mathengine`
-  (math stays pure); own Rng; off at low; honors `reducedMotion()`.
+  (math stays pure); own Rng; off at low; honors `reducedMotion()`. It also owns the
+  **chamber-complete transformation** (`fxChamberBloom`, fired by `chamberflow.js` on
+  the final correct answer, never in duels): a staggered flower/sprout carpet pops
+  across plain floor tiles + a `build-complete` shoreline ripple, so a cleared chamber
+  visibly blooms. Runs at every tier (it is the payoff beat; smaller carpet on low);
+  purely cosmetic — `cell.walk`, pathing, and math rng streams are untouched.
 - **World reactivity** (`reactive.js`): a tiny event bus — `place.visualEvent(type,
   payload)` over an opt-in `_reactors` list (`player-hop`/`correct-answer`/`wrong-answer`/
   `build-complete`/`portal-stage-up`/…) — plus helpers `makePulse`/`onPlayerNear`/
@@ -242,6 +265,14 @@ scripts/
   `ISO_DIR` angle, only the projection + distance differ, so `screenDirToGridStep()` and
   picking are provably unchanged (`tests/camera.test.mjs`). DoF attaches only when this
   perspective camera is active. `cameraShot()` animates SPAN only (never the angle).
+  The fit-board math targets the **usable viewport**: it measures the live equation
+  banner (re-measured when the prompt changes) and both fits and centers the board in
+  the clear band below it via a vertical frustum shift — the raycaster reads the same
+  projection, so taps stay exact. On portrait phones scenes open at a comfort zoom
+  (`MOBILE_DEFAULT_ZOOM`); a remembered pinch-**in** is retained across scenes, but a
+  remembered pinch-**out** never drops a chamber below its comfort default
+  (`input.js sceneZoom`) — zooming out within a scene still works, it just doesn't
+  become the permanent opening shot.
 - **Juice**: hand-rolled tween engine (`anim.js`), particle bursts from a pooled
   `THREE.Points` per place (`entities.js`), camera shake, instanced floor-tile color
   tints (island bloom, answer feedback), DOM emoji flights from world to HUD.
@@ -439,9 +470,11 @@ never sees a blank screen.
 ## Determinism
 Chamber layout generation/variation and duels flow through `rng.js` (mulberry32):
 a challenge code (world + rounds + base36 seed) reproduces the identical run on any
-machine. Free-play problem selection seeds itself randomly. `AmbientLife` forks its
-own rng stream from a single seed draw, so cosmetic critters never disturb
-duel-critical draws. The ambient ecosystem (`ambient.js`) extends this with
+machine. All board variation — mirror flips, sprinkles, **coastline carving**,
+**landmark placement**, distant islets, and the **daylight mood** — draws from the
+chamber rng, so duel boards look and light identically. Free-play problem selection
+seeds itself randomly. `AmbientLife` forks its own rng stream from a single seed
+draw, so cosmetic critters never disturb duel-critical draws. The ambient ecosystem (`ambient.js`) extends this with
 fireflies, region pollen motes, and bees (`GFX.ambientScale`-scaled, per-type
 hard-capped, `reducedMotion()`-calmed); counts come from the pure, tested
 `ambientExtras()` resolver. Existing butterflies/birds/clouds are untouched so
@@ -451,14 +484,17 @@ Low-tier ambient density still equals today's.
 The renderer and every scene feature read a single resolved feature-flag object,
 `GFX` (`gfx.js`), instead of branching on a raw quality constant. `GFX` is resolved
 once per session from three inputs: the auto-detected device tier (`QUALITY` in
-`config.js` — the touch + small-screen / high-DPR heuristic, today's only signal), the
-player's **Graphics** setting (`auto | low | medium | high`, persisted in `settings()`,
+`config.js` — a **capability heuristic**: desktops → `high`; capable phones/tablets →
+`medium`; only genuinely weak or tiny touch devices — low `deviceMemory`, very few
+cores, or a small physical panel — → `low`. DPR is deliberately NOT a signal: the old
+`dpr > 2.5` / CSS-px check classed every modern iPhone as low), the player's
+**Graphics** setting (`auto | low | medium | high`, persisted in `settings()`,
 exposed in the settings screen), and `reducedMotion()` (which folds *motion-heavy*
 flags — ambient density, sway, DoF, camera moves, animated water — down, but never
 disables static bloom/fog/tone mapping). `resolveGfx()` is a pure function covered by a
-truth-table test. **Hard rule:** the `low` tier reproduces today's renderer, and the
-default `auto` setting leaves today's behaviour unchanged — so `GFX` is the clean
-rollback boundary every later "liveliness" layer is built behind. Performance targets:
+truth-table test. **Hard rule:** the `low` tier reproduces the original baseline
+renderer, and `auto` resolves purely from the detected tier — so `GFX` is the clean
+rollback boundary every "liveliness" layer is built behind. Performance targets:
 desktop on `high` ≈ 60 fps; tablet/phone on `medium` ≈ 30 fps+; `low` ≈ today's
 complexity. A DEV-only tuning panel + perf overlay (`gfxdev.js`, `npm run dev`) and a
 visual baseline pack (`npm run baseline` → `tmp/baseline/`, git-ignored) make every
@@ -467,9 +503,9 @@ later visual change tunable and measurable; both are excluded from the productio
 ### Per-tier budget & kill-switches
 | Tier | Frame target | Bloom | Shadows | Ambient/decor | Water |
 |---|---|---|---|---|---|
-| Desktop · High | 60 fps sustained | additive glow boost + selective bloom | real 2048 + contact | rich | animated + sparkle |
-| Tablet/Phone · Medium | 30 fps+ | off | real 1024 + contact | reduced | animated |
-| Low | ≈ baseline renderer | off | contact blob only | off (none) | flat bobbing plane |
+| Desktop · High | 60 fps sustained | additive glow boost + selective bloom | real 2048 + contact | rich | shader (foam + waves + glints) |
+| Tablet/Phone · Medium | 30 fps+ | off | real 1024 + contact | reduced | shader (foam + waves + glints) |
+| Weak/tiny touch · Low | ≈ baseline renderer | off | contact blob only | off (none) | flat bobbing planes |
 
 Every liveliness layer is a **kill-switch** behind a `GFX` flag: `graphics = low`
 reproduces the baseline renderer (no tone-map/sky/fog, no scatter/ambient extras/sway,
@@ -498,8 +534,9 @@ guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
   layer (the shared voxel→SVG renderer for the friend-mesh ceremony + the Gem Tree's 8×8
   hexagram grid) took it 242 → 244 on 2026-07-01; and the two new minigames — the
   **bakery/pizzeria split** (two independent shops) and the **music-stage minigame**
-  (Kiki's three grade-gated songs) — took it **244 → 300 on 2026-07-01** (today ~246 kB
-  gzip). Both heavy scenes stay lazy (`business-*` / `stage-*` chunks), but their pure
+  (Kiki's three grade-gated songs) — took it **244 → 300 on 2026-07-01** (2026-07-02:
+  ~262 kB gzip after the shader-water + chamber-variety layers, all procedural code,
+  no assets). Both heavy scenes stay lazy (`business-*` / `stage-*` chunks), but their pure
   engine/data are eager (`state.js` heals shop + stage state; curriculum/parents read the
   reports), so first-load grew ~2 kB gzip; the cap was raised generously at the author's
   request. Raised *deliberately*, not removed: the target is kids on slow school Wi-Fi /
@@ -509,9 +546,11 @@ guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
 - **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
-- **PWA precache ≤ 1300 KiB** — today 25 entries / ~1251 KiB (1150→1200 for the
+- **PWA precache ≤ 1300 KiB** — 25 entries / ~1296 KiB on 2026-07-02 (1150→1200 for the
   procedural "liveliness" layers; 1200→1235 for selective bloom + DoF; **1235→1300 on
-  2026-07-01** for the new always-lazy `stage-*` minigame chunk, precached for offline play).
+  2026-07-01** for the new always-lazy `stage-*` minigame chunk, precached for offline
+  play). Headroom is now only ~4 KiB — the next feature that grows any precached chunk
+  will need a deliberate bump here and in `scripts/check-budget.mjs`.
 - **The `business-*` and `stage-*` chunks stay lazy** — the check fails if either folds
   back into `index` or the entry static-imports it (Vite would module-preload it into
   `index.html`). The music stage mirrors the bakery sim: heavy scene lazy, pure data eager.
@@ -543,10 +582,10 @@ the distrobox fallback. Both are documented in [README.md](README.md#fedora--rhe
 `npm run lint` runs ESLint (flat config in `eslint.config.js`), kept intentionally
 lenient — the goal is *guardrails*, not a formatting wall (devDeps only; no runtime
 dependency added):
-- **`max-lines` (400)** and **`max-lines-per-function` (60)** are `warn`, flagging the
+- **`max-lines` (777)** and **`max-lines-per-function` (108)** are `warn`, flagging the
   god-file / god-method pattern before it re-forms. They are meant to flip to `error`
-  once the remaining large modules (`screens.js`, `verbs.js`, `mathengine.js`, …) are
-  split the way `main.js` was.
+  once the remaining large modules (`verbs.js`, `mathengine.js`, `chamber.js`, …) are
+  split the way `main.js` and `screens.js` were.
 - The `recommended` correctness set (`no-undef`, `eqeqeq`, `no-unused-vars`, …) plus a
   small `@stylistic` group matching the house style (2-space indent, single quotes,
   semicolons, trailing commas). A handful of `recommended` rules are softened to fit

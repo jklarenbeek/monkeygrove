@@ -270,6 +270,7 @@ export class HubController {
       g.avatar.spawnPet(spawn);
     }
     g.world.defaultZoom = g.input.sceneZoom('hub');
+    g.world.setDaylight('noon'); // home is always the same warm hour
     g.world.follow(g.player.mesh, 13, { x: g.place.size.w * 0.5, z: g.place.size.d * 0.5 });
     g.world.cameraShot({ fromSpanMul: 1.22, duration: 950 }); // gentle camera arrival settle (full tier only)
     g.player.onArrive = (x, z) => this.hubArrive(x, z);

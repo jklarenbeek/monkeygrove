@@ -153,8 +153,9 @@ test('varyLayout: deterministic, preserves markers, only dresses plain floor', (
       for (const ch of 'PAspcDoBmVM') {
         assert.equal(count(a, ch), count(rows, ch), `${ctx} seed ${seed} lost '${ch}'`);
       }
-      // sprinkles only ever replace plain floor — never water
-      assert.equal(count(a, '#'), count(rows, '#'), `${ctx} water changed`);
+      // sprinkles only ever replace plain floor; coastline carving may hand a
+      // few plain shore tiles BACK to the sea — so water can only ever grow
+      assert.ok(count(a, '#') >= count(rows, '#'), `${ctx} seed ${seed} water shrank`);
     }
   });
 });

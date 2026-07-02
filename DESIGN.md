@@ -29,7 +29,14 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   - 🥥 **Sharing Stump** — division (fair sharing, remainders)
   - 🍇 **Vine Heights** — fractions (magnitude first, then equivalence)
 - Each region portal leads to a **chamber run**: 3 problems per chamber,
-  hand-authored diorama layouts (ASCII templates), seeded decoration.
+  hand-authored diorama layouts (ASCII templates) with seeded variation so no
+  two boards read alike: mirror flips, knolls and shade sprinkles, **carved
+  coastlines** (a few shore tiles handed back to the sea — every carve is
+  reverted unless all task cells provably stay reachable), a **per-world
+  landmark** (Tide Pools lighthouse, Garden mushroom ring, Stump grand palm,
+  Vines flowering arch), distant palm islets on the horizon, and a seeded
+  **hour-of-the-day** light mood (the hub is always noon). All drawn from the
+  chamber rng, so duel boards stay identical.
 - Regions bloom (gray → color, props appear) as skill mastery rises — and so
   do their gates (see Hub island → Living gates).
 
@@ -86,9 +93,12 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
    (floor tiles light up as the array; tick marks fade in; baskets animate)
    and the world's helper friend (Pip, Olli…) explains in one short line,
    targeting the tagged misconception. Retry free, always.
-5. 3 solves → treasure chest: bananas + egg progress + sometimes a hat/gem.
-   Occasionally an **Echo Door** shimmers afterwards: a 2-problem bonus room
-   that secretly reviews her weakest stale skill (spaced retrieval as loot).
+5. 3 solves → the board itself **blooms** — flowers and sprouts pop across the
+   floor with a shoreline ripple, so "Chamber complete!" is a place transformed,
+   not just a toast — then the treasure chest: bananas + egg progress +
+   sometimes a hat/gem. Occasionally an **Echo Door** shimmers afterwards: a
+   2-problem bonus room that secretly reviews her weakest stale skill (spaced
+   retrieval as loot).
 
 ## Math engine (src/mathengine.js — pure logic)
 - **Skill ladder** (prereq chains):
@@ -310,13 +320,25 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
 - **Liveliness layers (tier-gated, child-safe).** A quality-tier system (`gfx.js`,
   Settings → Graphics: Auto/Low/Medium/High) drives in-engine sky + warm tone mapping,
   contact shadows, prop-density scatter, an ambient ecosystem (fireflies/bees/motes),
-  gentle GPU sway, a glow language, animated water, world reactivity, build-NPC
+  gentle GPU sway, a glow language, shader water, world reactivity, build-NPC
   routines, per-creature animation, chamber juice, and soft camera moments. All are
   **additive and reversible**: every layer keys off a `GFX` flag, `reducedMotion()`
   calms all motion, and **Low tier reproduces the pre-liveliness renderer**. The
   non-negotiable bar (see Anti-anxiety guarantees): a child always reads every number,
   prompt, button, and model instantly; nothing decorative obscures or out-competes the
   math; a wrong answer stays a warm "try this way," never red/shake/wilt.
+- **Water is one stylized shader** (`water.js`): a shore-distance field baked from
+  the island's real footprint drives a shallow→deep gradient and an animated foam
+  band that hugs the actual coastline; low-frequency vertex waves and rare drifting
+  sun glints keep the sea alive without competing with the math. Its clock is
+  **global to the session**, so hub↔chamber↔shop transitions never visibly reset the
+  water. Playful one-shot moments (hop ripples, fish shadows, bubbles) stay in a
+  lazy chunk (`waterfx.js`). Per-chamber **daylight moods** (noon/morning/golden/
+  breezy) retune sun, hemisphere, and water tint subtly — always bright, never dusky.
+- **Auto graphics tier is capability-based**: desktops → High, capable phones and
+  tablets → Medium (sky, fog, shadows, shader water, decor), and only genuinely
+  weak or tiny touch devices → Low. DPR is deliberately not a signal — it used to
+  class every modern iPhone as Low.
 
 ## Build order (each step was shippable — 1–10 shipped, secrets pending)
 1. Chamber + grid-hop player feel (touch-first) → 2. Fetch loop + juice +

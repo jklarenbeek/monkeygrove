@@ -16,7 +16,7 @@ import { nextProblem, recordResult } from './mathengine.js';
 import { playTrigger, nextWonderFor } from './story/wonders.js';
 import { ensureStory, markBeat } from './story/engine.js';
 import { tween, ease, wobble } from './anim.js';
-import { fxCorrectGlow, fxThemeAmbience } from './verbfx.js';
+import { fxCorrectGlow, fxThemeAmbience, fxChamberBloom } from './verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import { addBananas, persist } from './state.js';
 import { t } from './i18n.js';
@@ -84,6 +84,9 @@ export class ChamberFlow {
     hud.showHud(true);
     hud.showHintButton(true);
     this.presentProblem(problem);
+    // a short welcome drift into the framing — breaks the static-diorama feel;
+    // cameraShot itself skips on 'minimal' camera moments / reduced motion
+    g.world.cameraShot({ fromSpanMul: 1.1, duration: 700 });
     audio.music(problem.world ? `chamber:${problem.world}` : 'chamber');
     audio.ambience('chamber'); // very sparse generative chamber ambience bed
     audio.attachEvents(g.place);
@@ -132,6 +135,10 @@ export class ChamberFlow {
     // already trails them; the number line stays fit so both ends show.
     g.world.defaultZoom = g.input.sceneZoom(kind);
     g.world.frameBoard(new THREE.Vector3(0, 0, 0), g.place.size.w, g.place.size.d, g.player.mesh);
+    // seeded atmosphere: every chamber gets its own hour of the day (subtle sun/
+    // hemisphere/water retune). Drawn from chamberRng so duels light identically.
+    const mood = g.world.setDaylight(g.chamberRng.pick(['noon', 'morning', 'golden', 'breezy']));
+    g.place.water?.setMood?.(mood.waterMood);
     g.player.onArrive = (x, z) => {
       g.pet?.notePlayerAt(x, z);
       landingReaction(g.place, x, z, g.player?.mesh.position); // gentle landing puff + event
@@ -334,6 +341,9 @@ export class ChamberFlow {
     g.verb.begin();
     const vars = this.promptVars(problem);
     hud.setBanner(t(problem.prompt.key, vars), problem.equation);
+    // the banner height just changed (new prompt text) — refold it into the
+    // fit-board insets so the board centers in the clear band below it
+    g.world.resize();
     // the helper explains each task type the first time it shows up here
     if (g.helper && problem.kind !== g.helpKind) {
       g.helpKind = problem.kind;
@@ -399,6 +409,17 @@ export class ChamberFlow {
     this.maybeStashWonder(res); // a gentle "did you know?" for this moment (opt-in, once)
     this.dismissCameo(); // the watching Crab King scuttles off — with nothing
     const tok = g.flowToken;
+    // last answer of the chamber: the board itself blooms during the
+    // celebration beat, so "Chamber complete!" is a place transformed, not just
+    // a toast. Never in duels (both boards must stay identical mid-round).
+    const chamberGoal = g.isEcho ? BALANCE.echoProblems : BALANCE.problemsPerChamber;
+    if (!g.duel && g.solvedInChamber >= chamberGoal) {
+      delay(reducedMotion() ? 0 : 250, () => {
+        if (tok === g.flowToken && g.mode === 'chamber') {
+          fxChamberBloom(g.place, g.currentWorld, new Rng(g.rng.int(1, 1e9)));
+        }
+      });
+    }
     delay(1500, () => {
       // a Home press (or any mode switch) during the celebration invalidates
       // this pending transition — without the guard it would pop a result

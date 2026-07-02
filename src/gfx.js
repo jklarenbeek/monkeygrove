@@ -9,9 +9,10 @@
 // rollback boundary.
 //
 // HARD RULES (tested in tests/gfx.test.mjs):
-//   1. The `low` tier reproduces today's renderer exactly.
-//   2. The default 'auto' setting leaves today's behaviour unchanged (on a desktop
-//      that means today's `high`; on a low-end touch device today's `low`).
+//   1. The `low` tier reproduces the original renderer exactly.
+//   2. The default 'auto' setting resolves purely from the detected device tier
+//      (desktop → `high`, capable phone/tablet → `medium`, weak/tiny touch
+//      device → `low`) — see config.js QUALITY for the capability heuristic.
 // Because of (1)/(2) the per-tier table below is intentionally conservative: only
 // `shadows`/`shadowMapSize` are wired up by the renderer (world.js). Every other flag
 // is declared so individual features have a home, but flipping one on is that feature's
@@ -24,9 +25,9 @@ import { reducedMotion as a11yReducedMotion } from './a11y.js';
 // The valid values for the user-facing "Graphics" setting.
 export const GRAPHICS_SETTINGS = ['auto', 'low', 'medium', 'high'];
 
-// Auto device tier == today's QUALITY heuristic (touch + small screen or very high
-// DPR → 'low', else 'high'). 'medium' is never auto-detected; it only appears when
-// the player explicitly opts into it.
+// Auto device tier == the QUALITY heuristic (config.js): desktops → 'high',
+// capable phones/tablets → 'medium', genuinely weak or tiny touch devices →
+// 'low'. The Graphics setting overrides in either direction.
 export function detectDeviceTier() { return QUALITY; }
 
 // Per-tier flag sets. Tune per feature; keep the `low` column == today's renderer.

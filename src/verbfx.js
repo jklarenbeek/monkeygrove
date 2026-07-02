@@ -9,9 +9,11 @@
 import * as THREE from 'three';
 import { GFX } from './gfx.js';
 import { reducedMotion } from './a11y.js';
-import { WORLD_THEME } from './config.js';
+import { WORLD_THEME, FLOOR_CHARS } from './config.js';
 import { tween, ease, delay } from './anim.js';
 import { makeGlowPlane, makeMoteField } from './glow.js';
+import { makeProp } from './entities.js';
+import { PROPS } from './models.js';
 import { Rng } from './rng.js';
 
 const GOLD = 0xffd966;
@@ -246,6 +248,53 @@ export function fxShareDeal(ctx, { basket, fair = false } = {}) {
     });
   }
   return handles.filter(Boolean);
+}
+
+// The chamber-complete transformation: the board itself celebrates. Flowers and
+// sprouts pop up across the plain floor (staggered, gentle), so every cleared
+// chamber visibly BLOOMS instead of just showing a toast — the reward lands in
+// the world the child is looking at. Purely cosmetic: props sit on walkable
+// tiles without ever touching cell.walk, pathing, or rng streams the math uses
+// (callers pass a forked/seeded rng). Runs at every tier — this is the payoff
+// beat — with a smaller carpet on 'low'; reduced motion pops without tweens.
+const BLOOM_PROPS = ['flowerPink', 'flowerYellow', 'flowerBlue', 'sprout'];
+export function fxChamberBloom(place, world, rng = new Rng(20260702)) {
+  if (!place?.group || !place.size?.w) return;
+  const spots = [];
+  for (let z = 1; z < place.size.d - 1; z++) {
+    for (let x = 1; x < place.size.w - 1; x++) {
+      const c = place.cellAt?.(x, z);
+      if (c && c.walk && c.h === 0 && FLOOR_CHARS.has(c.ch)) spots.push({ x, z });
+    }
+  }
+  const count = Math.min(GFX.tier === 'low' ? 7 : 12, spots.length);
+  const picked = [];
+  for (const s of rng.shuffle(spots)) {
+    if (picked.length >= count) break;
+    if (picked.every((q) => Math.abs(q.x - s.x) + Math.abs(q.z - s.z) >= 2)) picked.push(s);
+  }
+  const reduced = isReduced(null);
+  picked.forEach((s, i) => {
+    const prop = makeProp(PROPS[rng.pick(BLOOM_PROPS)], undefined, undefined, { castShadow: false });
+    prop.scale.setScalar(0.055 + rng.float() * 0.015); // matches the themed decor props
+    const p = place.worldPos(s.x, s.z);
+    prop.position.copy(p);
+    prop.rotation.y = rng.float() * Math.PI * 2;
+    const grow = () => {
+      place.group.add(prop);
+      if (reduced) return;
+      const target = prop.scale.x;
+      prop.scale.setScalar(0.01);
+      tween({
+        ms: 420, ease: ease.outBack ?? ease.outQuad,
+        onUpdate: (_v, k) => prop.scale.setScalar(Math.max(0.01, target * k)),
+        onDone: () => prop.scale.setScalar(target),
+      });
+    };
+    if (reduced) grow();
+    else delay(120 + i * 90, grow);
+  });
+  place.visualEvent?.('build-complete', { position: new THREE.Vector3(0, 0, 0) });
 }
 
 // Light per-theme chamber ambience — deliberately BELOW hub density so it never

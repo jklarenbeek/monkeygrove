@@ -603,6 +603,46 @@ const shell = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// World landmarks — one recognizable set piece per math world (chamber.js
+// _landmark), so every world has a postcard silhouette. Kept small and chunky
+// like every other prop; the warm Y voxel on the lighthouse is a glow slot.
+// ---------------------------------------------------------------------------
+
+// Tide Pools: a stubby striped lighthouse with a warm lamp room.
+const lighthouse = {
+  palette: {
+    W: '#fdf6ec', R: '#e86a5e', r: '#c9544a',
+    G: '#bfe8f7', Y: '#ffdf8a', k: '#7d5540',
+  },
+  layers: [
+    ['.WWW.', 'WWWWW', 'WWWWW', 'WWWWW', '.WWW.'],
+    ['.....', '.RRR.', '.RRR.', '.RRR.'],
+    ['.....', '.RRR.', '.RRR.', '.RRR.'],
+    ['.....', '.WWW.', '.WWW.', '.WWW.'],
+    ['.....', '.WWW.', '.WWW.', '.WWW.'],
+    ['.....', '.RRR.', '.RRR.', '.RRR.'],
+    ['.....', '.rRr.', '.RRR.', '.rRr.'],
+    ['.....', '..G..', '.GYG.', '..G..'],
+    ['.....', '..r..', '.rrr.', '..r..'],
+    ['.....', '.....', '..k..'],
+  ],
+};
+
+// Vine Heights: an overgrown flowering arch you could hop through.
+const vineArch = {
+  palette: { V: '#7cc08a', v: '#5da26e', P: '#f7a8c4', L: '#c9a6ff' },
+  layers: [
+    ['V.....V'],
+    ['V.....V'],
+    ['L.....P'],
+    ['V.....V'],
+    ['vV...Vv'],
+    ['.VVPVV.'],
+    ['..LvL..'],
+  ],
+};
+
 const sprout = {
   palette: { g: '#6aa84f', L: '#8fd18a' },
   layers: [
@@ -785,7 +825,7 @@ export const PROPS = {
   pot, stone, altar, chestBase, chestLid, egg, basket, coconut,
   bananas, stump, gong, plank, portal, portalVine1, portalVine2, portalVine3,
   sign, rockA, rockB,
-  lantern, shell, sprout, berry, stall, oven,
+  lantern, shell, sprout, berry, stall, oven, lighthouse, vineArch,
   counter, prepBoard, pizzaPan, doughBowl, toppingCrate, coinTray, orderBoard, shopTable,
   bakeryBuilding, pizzeriaBuilding,
   grassA, grassB, pebble, mushroom, crystal,

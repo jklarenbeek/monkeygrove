@@ -2,7 +2,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { createWaterSurface } from '../src/water.js';
+import { createWaterSurface, WATER_TINT } from '../src/water.js';
 import { PALETTE } from '../src/config.js';
 
 function fakePlace(w, d) {
@@ -10,7 +10,7 @@ function fakePlace(w, d) {
   return {
     size: { w, d },
     cellAt: (x, z) => (x < 0 || z < 0 || x >= w || z >= d) ? null : cells[z][x],
-    worldPos: (x, z) => new THREE.Vector3(x, 0, z),
+    worldPos: (x, z) => new THREE.Vector3(x - w / 2 + 0.5, 0, z - d / 2 + 0.5),
   };
 }
 
@@ -48,7 +48,7 @@ test('flat water bobs gently and exposes the helper contract', () => {
   const y0 = water.surface.position.y;
   water.update(500);
   assert.notEqual(water.surface.position.y, y0, 'the surface bobs');
-  for (const fn of ['update', 'dispose', 'spawnFishShadow', 'spawnBubble', 'spawnSparkle']) {
+  for (const fn of ['update', 'dispose', 'setMood', 'spawnFishShadow', 'spawnBubble', 'spawnSparkle']) {
     assert.equal(typeof water[fn], 'function', `exposes ${fn}`);
   }
 });
@@ -64,19 +64,37 @@ test('flat water spawns nothing (hooks are no-ops without the animated tier)', (
   assert.equal(water.group.children.length, before, 'no spawns on flat water');
 });
 
-test('animated water lazy-loads shimmer + foam overlays beyond the two base planes', async () => {
-  const prevDoc = globalThis.document;
-  stubCanvas();
-  try {
-    const place = fakePlace(8, 8);
-    const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'tide' });
-    assert.equal(water.group.children.filter((o) => o.isMesh).length, 2, 'animated water starts as readable base planes');
-    await waitForWaterFx(water);
-    assert.ok(water.group.children.length > 2, 'overlays/foam added on animated water');
-    assert.doesNotThrow(() => water.update(300));
-  } finally {
-    if (prevDoc === undefined) delete globalThis.document; else globalThis.document = prevDoc;
-  }
+test('animated water is ONE shader plane with a baked shore-distance field', () => {
+  const place = fakePlace(8, 8);
+  const water = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE, theme: 'tide' });
+  const meshes = water.group.children.filter((o) => o.isMesh);
+  assert.equal(meshes.length, 1, 'a single shader surface, no overlay stack');
+  const mat = water.surface.material;
+  assert.ok(mat.isShaderMaterial, 'the surface is a custom shader');
+  const shore = mat.uniforms.uShore.value;
+  assert.ok(shore?.isDataTexture, 'the shore-distance field is a baked data texture');
+  // the field must be 0-ish under the island and rise toward open water
+  const { data, width, height } = shore.image;
+  const at = (u, v) => data[Math.floor(v * height) * width + Math.floor(u * width)];
+  assert.ok(at(0.5, 0.5) < 16, 'center of the island reads as land');
+  assert.ok(at(0.02, 0.02) > 128, 'far open water reads as deep');
+  assert.equal(
+    mat.uniforms.uShallow.value.getHex(),
+    new THREE.Color(WATER_TINT.tide.shallow).getHex(),
+    'the theme tint colors the shader',
+  );
+});
+
+test('the water clock is global: a rebuilt surface resumes the same phase (no reset)', () => {
+  const place = fakePlace(6, 6);
+  const a = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE });
+  a.update(16);
+  const b = createWaterSurface(place, { size: place.size, quality: 'animated', palette: PALETTE });
+  b.update(16);
+  const ta = a.surface.material.uniforms.uTime.value;
+  const tb = b.surface.material.uniforms.uTime.value;
+  assert.ok(tb >= ta, 'time never runs backwards across scene rebuilds');
+  assert.ok(Math.abs(tb - ta) < 0.5, 'both surfaces read the same session clock');
 });
 
 test('animated water exposes safe shoreline anchors for ambient life', async () => {
@@ -127,7 +145,7 @@ test('animated water reacts to world events with local ripples', async () => {
   }
 });
 
-test('animated water effects are loaded through a lazy chunk', () => {
+test('water-life sprite moments are loaded through a lazy chunk', () => {
   const src = readFileSync(new URL('../src/water.js', import.meta.url), 'utf8');
   assert.match(src, /import\(['"]\.\/waterfx\.js['"]\)/, 'water.js dynamically imports waterfx');
   assert.doesNotMatch(src, /from ['"]\.\/waterfx\.js['"]/, 'waterfx must not be statically imported');
