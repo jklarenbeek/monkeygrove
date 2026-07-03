@@ -3,7 +3,7 @@
 // seeded board variation must never disturb task cells.
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { TEMPLATES, parseLayout, varyLayout, HOST_LIMITS } from '../src/chamber.js';
+import { TEMPLATES, parseLayout, varyLayout, HOST_LIMITS } from '../src/chamber/index.js';
 import { SOLID_MARKERS, OCCUPIED_MARKERS } from '../src/config.js';
 import { Rng } from '../src/rng.js';
 

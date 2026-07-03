@@ -6,7 +6,7 @@
 // through `this.game` for the shared scene (world/place/player/pet/particles/
 // rng/profile), the avatar/HUD helpers, and the chamber/business entry points.
 import * as THREE from 'three';
-import { HubPlace } from './chamber.js';
+import { HubPlace } from './chamber/index.js';
 import { Player, PetFollower } from './player.js';
 import { Particles, makeCharacter, floatLabel } from './entities.js';
 import { getCreature } from './models.js';

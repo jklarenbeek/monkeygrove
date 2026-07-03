@@ -15,7 +15,7 @@ import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { pickCellFromHit } from '../src/input.js';
 import { World } from '../src/world.js';
-import { Place } from '../src/chamber.js';
+import { Place } from '../src/chamber/index.js';
 
 const registerOn = (world) => (obj, cell, opts) =>
   Place.prototype.registerPickable.call({ world }, obj, cell, opts);

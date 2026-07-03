@@ -3,7 +3,7 @@
 // with a shared seed, so both players face IDENTICAL chambers. Answers are
 // still recorded into each player's real profile (duel practice counts).
 import { createMathState, nextProblem, recordResult } from './mathengine.js';
-import { ensureHostable } from './chamber.js';
+import { ensureHostable } from './chamber/index.js';
 import { profiles, selectProfile } from './state.js';
 import { t } from './i18n.js';
 import { Rng } from './rng.js';

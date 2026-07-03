@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { TEMPLATES, parseLayout } from '../src/chamber.js';
+import { TEMPLATES, parseLayout } from '../src/chamber/index.js';
 import { eligibleScatterCells, planScatter, scatterTypes } from '../src/scatter.js';
 import { OCCUPIED_MARKERS, FLOOR_CHARS } from '../src/config.js';
 import { Rng } from '../src/rng.js';

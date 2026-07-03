@@ -7,14 +7,14 @@
 // HARD rule: this module NEVER imports mathengine.js — the math logic stays pure.
 // All randomness forks its own Rng; all motion checks reducedMotion(); off at low.
 import * as THREE from 'three';
-import { GFX } from './gfx.js';
-import { reducedMotion } from './a11y.js';
-import { WORLD_THEME, FLOOR_CHARS } from './config.js';
-import { tween, ease, delay } from './anim.js';
-import { makeGlowPlane, makeMoteField } from './glow.js';
-import { makeProp } from './entities.js';
-import { PROPS } from './models.js';
-import { Rng } from './rng.js';
+import { GFX } from '../gfx.js';
+import { reducedMotion } from '../a11y.js';
+import { WORLD_THEME, FLOOR_CHARS } from '../config.js';
+import { tween, ease, delay } from '../anim.js';
+import { makeGlowPlane, makeMoteField } from '../glow.js';
+import { makeProp } from '../entities.js';
+import { PROPS } from '../models.js';
+import { Rng } from '../rng.js';
 
 const GOLD = 0xffd966;
 const CREAM = 0xfff3bf;

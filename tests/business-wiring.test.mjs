@@ -121,7 +121,7 @@ test('business scene source declares the place, factories, and customer model wi
   const source = sceneSource();
 
   assert.match(source, /export\s+class\s+BusinessPlace\s+extends\s+Place/);
-  assert.match(source, /from\s+['"]\.\.\/chamber\.js['"]/);
+  assert.match(source, /from\s+['"]\.\.\/chamber\/index\.js['"]/);
   assert.match(source, /from\s+['"]\.\.\/entities\.js['"]/);
   assert.match(source, /from\s+['"]\.\.\/models\.js['"]/);
   assert.match(source, /from\s+['"]\.\/data\.js['"]/);

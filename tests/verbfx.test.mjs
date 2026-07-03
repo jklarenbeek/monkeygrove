@@ -1,11 +1,16 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import * as verbfx from '../src/verbfx.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import * as verbfx from '../src/verbs/verbfx.js';
 import { WORLD_THEME } from '../src/config.js';
 
-const src = readFileSync(new URL('../src/verbfx.js', import.meta.url), 'utf8');
-const verbs = readFileSync(new URL('../src/verbs.js', import.meta.url), 'utf8');
+const src = readFileSync(new URL('../src/verbs/verbfx.js', import.meta.url), 'utf8');
+// The verbs layer is split into src/verbs/*.js — read every module so the
+// "each verb calls its helper" assertions stay location-agnostic.
+const verbs = readdirSync(new URL('../src/verbs/', import.meta.url))
+  .filter((f) => f.endsWith('.js'))
+  .map((f) => readFileSync(new URL(`../src/verbs/${f}`, import.meta.url), 'utf8'))
+  .join('\n');
 
 test('verbfx never imports mathengine — the math logic stays pure', () => {
   assert.doesNotMatch(src, /\bimport\b[^;]*mathengine/, 'no import of the pure math engine');

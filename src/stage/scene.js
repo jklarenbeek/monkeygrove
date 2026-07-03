@@ -1,4 +1,4 @@
-import { Place } from '../chamber.js';
+import { Place } from '../chamber/index.js';
 import { makeCharacter, makeProp, makeTextSprite } from '../entities.js';
 import { PROPS, getCreature } from '../models.js';
 import { t } from '../i18n.js';

@@ -7,7 +7,7 @@ import {
   newBlueprints, markSeen, canFund, fund, playerCost, grantDailyPerks,
   applyIslandRows,
 } from '../src/island.js';
-import { TEMPLATES, parseLayout } from '../src/chamber.js';
+import { TEMPLATES, parseLayout } from '../src/chamber/index.js';
 
 const HUB = TEMPLATES.hub[0];
 

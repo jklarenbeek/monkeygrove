@@ -8,15 +8,15 @@
 // currentWorld/isEcho/problem/...); this controller reads and writes them
 // through `this.game`.
 import * as THREE from 'three';
-import { Place, TEMPLATES, ensureHostable, varyLayout, scatterFetchSpots } from './chamber.js';
+import { Place, TEMPLATES, ensureHostable, varyLayout, scatterFetchSpots } from './chamber/index.js';
 import { Particles, Crab, Altar, makeCharacter, makeProp, floatLabel } from './entities.js';
-import { VERBS } from './verbs.js';
+import { VERBS } from './verbs/index.js';
 import { PROPS, CHARS, getCreature } from './models.js';
 import { nextProblem, recordResult } from './mathengine.js';
 import { playTrigger, nextWonderFor } from './story/wonders.js';
 import { ensureStory, markBeat } from './story/engine.js';
 import { tween, ease, wobble } from './anim.js';
-import { fxCorrectGlow, fxThemeAmbience, fxChamberBloom } from './verbfx.js';
+import { fxCorrectGlow, fxThemeAmbience, fxChamberBloom } from './verbs/verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import { addBananas, persist } from './state.js';
 import { t } from './i18n.js';

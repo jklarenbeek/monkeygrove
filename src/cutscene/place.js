@@ -3,7 +3,7 @@
 // drains the grove; the reveal washes colour back in). Same recipe as the
 // hub's applyBloom, but uniform — cutscene dioramas have no portal regions.
 import * as THREE from 'three';
-import { Place } from '../chamber.js';
+import { Place } from '../chamber/index.js';
 import { PALETTE } from '../config.js';
 import { tween, ease } from '../anim.js';
 

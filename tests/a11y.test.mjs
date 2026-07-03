@@ -10,6 +10,9 @@ const readScreens = () => [
   ...readdirSync(new URL('../src/screens/', import.meta.url))
     .filter((f) => f.endsWith('.js')).map((f) => read(`screens/${f}`)),
 ].join('\n');
+// The verbs layer is likewise split into src/verbs/*.js — read every module.
+const readVerbs = () => readdirSync(new URL('../src/verbs/', import.meta.url))
+  .filter((f) => f.endsWith('.js')).map((f) => read(`verbs/${f}`)).join('\n');
 
 function mockStorage() {
   const data = new Map();
@@ -129,8 +132,8 @@ test('settings language changes repaint the active game screen immediately', () 
   const chamber = read('chamberflow.js');
   const business = read('business/controller.js');
   const businessScene = read('business/scene.js');
-  const verbs = read('verbs.js');
-  const hubPlace = read('chamber.js');
+  const verbs = readVerbs();
+  const hubPlace = read('chamber/hubplace.js');
   const entities = read('entities.js');
   const screens = readScreens();
 
