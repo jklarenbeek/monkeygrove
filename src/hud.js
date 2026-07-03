@@ -16,7 +16,11 @@ export function initHud(h) {
   $('btn-home').addEventListener('click', () => { audio.sfx('click'); handlers.onHome?.(); });
   $('btn-settings').addEventListener('click', () => { audio.sfx('click'); handlers.onSettings?.(); });
   $('btn-camera-reset')?.addEventListener('click', () => { audio.sfx('click'); handlers.onResetCamera?.(); });
-  $('bubble').addEventListener('click', () => advanceBubble());
+  $('bubble').addEventListener('click', () => {
+    // dialogue pages advance; a transient reaction just dismisses — either
+    // way a tap always answers (kids poke the box that's in the way)
+    if (!advanceBubble()) { audio.sfx('click'); hideBubble(); }
+  });
 }
 
 export function refreshLabels() {

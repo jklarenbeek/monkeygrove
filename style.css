@@ -195,25 +195,6 @@ html, body {
 #banner.wiggle { animation: wiggle .4s; }
 @keyframes wiggle { 25% { transform: translate(-50%) rotate(-2deg); } 75% { transform: translate(-50%) rotate(2deg); } }
 
-@media (max-width: 640px) {
-  #banner {
-    top: calc(max(10px, env(safe-area-inset-top)) + 64px);
-    max-width: calc(100vw - 28px);
-    padding: 8px 18px 10px;
-  }
-  #banner-instruction {
-    font-size: calc(14px * var(--text-scale));
-    line-height: 1.24;
-    max-width: 220px;
-    margin: 0 auto;
-  }
-  #banner-equation {
-    font-size: clamp(25px, 8vw, 34px);
-    line-height: 1.02;
-    letter-spacing: 1px;
-  }
-}
-
 /* fraction rendering */
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; line-height: 1.05; font-size: .72em; margin: 0 3px; }
 .frac > .n { border-bottom: 3px solid currentColor; padding: 0 5px; }
@@ -276,6 +257,12 @@ html, body {
 }
 @keyframes next-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
 
+/* the verb panel and the bubble share the bottom-center slot: while the live
+   counts are up, speech hops above them instead of landing on top of them */
+#verb-panel:not(.hidden) ~ #bubble {
+  bottom: max(196px, calc(env(safe-area-inset-bottom) + 184px));
+}
+
 /* ---------- toasts ---------- */
 #toasts { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; width: max-content; max-width: 92vw; }
 .toast {
@@ -286,6 +273,56 @@ html, body {
 .toast.gem { border-color: var(--lav); }
 @keyframes toast-in { 0% { transform: scale(.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 @keyframes toast-out { to { transform: translateY(-18px) scale(.85); opacity: 0; } }
+
+/* ---------- small screens: one calm text column ----------
+   Phones stack every text box top-down under the chips, in the order they
+   matter: the task banner, then the live verb counts (entering a beat later,
+   so the child reads the task first), then speech (tap to dismiss). Nothing
+   overlaps, and the bottom of the screen belongs to the joystick, the egg
+   meter, and the buttons. world.js folds the stack height into the camera
+   insets so the board centers in the clear band below it. */
+@media (max-width: 640px) {
+  #top-stack {
+    position: absolute;
+    top: calc(max(10px, env(safe-area-inset-top)) + 64px);
+    left: 12px; right: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  #banner, #verb-panel, #bubble {
+    position: static; top: auto; bottom: auto; left: auto; right: auto;
+    transform: none; max-width: 100%;
+  }
+  #banner { padding: 8px 18px 10px; animation: drop-in-m .45s cubic-bezier(.34,1.56,.64,1); }
+  #banner.wiggle { animation: wiggle-m .4s; }
+  #banner-instruction {
+    font-size: calc(14px * var(--text-scale));
+    line-height: 1.24;
+    max-width: 260px;
+    margin: 0 auto;
+  }
+  #banner-equation {
+    font-size: clamp(25px, 8vw, 34px);
+    line-height: 1.02;
+    letter-spacing: 1px;
+  }
+  /* compact enough that five basket counts fit on one line */
+  #verb-panel {
+    padding: 8px 14px;
+    font-size: calc(18px * var(--text-scale));
+    animation: panel-in-m .45s ease-out 1.1s backwards;
+  }
+  #verb-panel .sub { font-size: calc(13px * var(--text-scale)); }
+  #bubble { animation: bubble-in-m .35s cubic-bezier(.34,1.56,.64,1); }
+  #bubble:active { transform: translateY(2px); }
+  /* toasts move into the bottom band the verb panel used to occupy */
+  #toasts { top: auto; bottom: max(215px, calc(env(safe-area-inset-bottom) + 205px)); }
+}
+/* stacked (static) variants: the desktop entrances slide via translateX(-50%),
+   which would yank flex items sideways */
+@keyframes drop-in-m { 0% { transform: translateY(-14px); opacity: 0; } }
+@keyframes wiggle-m { 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@keyframes bubble-in-m { 0% { transform: translateY(10px); opacity: 0; } }
+@keyframes panel-in-m { 0% { transform: translateY(-8px); opacity: 0; } }
 
 /* ---------- full screens ---------- */
 .screen {
@@ -974,8 +1011,7 @@ html, body {
   .round-btn { width: 48px; height: 48px; font-size: calc(20px * var(--text-scale)); }
   .round-btn.big { width: 60px; height: 60px; font-size: calc(26px * var(--text-scale)); }
   #banner-instruction { font-size: calc(13px * var(--text-scale)); }
-  /* keep the banner clear of the corner buttons */
-  #banner { max-width: 56vw; padding: 6px 14px 9px; }
+  #banner { padding: 6px 14px 9px; }
   #banner-equation { font-size: clamp(22px, 7vw, 32px); }
 }
 
@@ -997,7 +1033,7 @@ html, body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: .001s !important; transition-duration: .001s !important; }
+  * { animation-duration: .001s !important; animation-delay: 0s !important; transition-duration: .001s !important; }
 }
 
 /* ---- Accessibility & comfort (toggled in Settings, applied via src/a11y.js) ---- */
@@ -1005,6 +1041,7 @@ html, body {
 /* Manual "Calm motion" toggle — same effect as the OS preference above, on demand. */
 :root.reduce-motion * {
   animation-duration: .001s !important;
+  animation-delay: 0s !important;
   animation-iteration-count: 1 !important;
   transition-duration: .001s !important;
 }

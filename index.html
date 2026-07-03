@@ -39,17 +39,23 @@
     <div id="combo" class="hidden">x<span id="combo-count">2</span></div>
   </div>
 
-  <!-- equation banner -->
-  <div id="banner" class="hidden"><div id="banner-instruction"></div><div id="banner-equation"></div></div>
+  <!-- text stack: on small screens these flow top-down in one calm column
+       (equation banner, then live verb counts, then speech — never overlapping);
+       on desktop the banner stays pinned top and the panel/bubble keep their
+       bottom-center spots (see #top-stack in style.css) -->
+  <div id="top-stack">
+    <!-- equation banner -->
+    <div id="banner" class="hidden"><div id="banner-instruction"></div><div id="banner-equation"></div></div>
 
-  <!-- verb helper panel (share counts / array size) -->
-  <div id="verb-panel" class="hidden"></div>
+    <!-- verb helper panel (share counts / array size) -->
+    <div id="verb-panel" class="hidden"></div>
+
+    <!-- Mimi speech bubble (tap or Space/Enter to continue, Zelda-style) -->
+    <div id="bubble" class="hidden"><div id="bubble-face">🐵</div><div id="bubble-text"></div><div id="bubble-next" class="hidden">▼</div></div>
+  </div>
 
   <!-- visual model fallback panel (when the floor can't host the model) -->
   <div id="model-panel" class="hidden"></div>
-
-  <!-- Mimi speech bubble (tap or Space/Enter to continue, Zelda-style) -->
-  <div id="bubble" class="hidden"><div id="bubble-face">🐵</div><div id="bubble-text"></div><div id="bubble-next" class="hidden">▼</div></div>
 
   <!-- toasts (rewards, gems, streak) -->
   <div id="toasts"></div>

@@ -254,17 +254,23 @@ export class World {
     this._applyProjection();
   }
 
-  // Fractions of the viewport covered by persistent overlay UI. Today that is
-  // the equation banner pinned to the top; measured live so language/wrapping
-  // changes are folded into the next resize()/frameBoard(). Defensive: no DOM
-  // (tests) or hidden banner → no insets.
+  // Fractions of the viewport covered by persistent overlay UI, measured live
+  // so language/wrapping changes are folded into the next resize()/frameBoard().
+  // The equation banner always pins to the top; on small screens the verb panel
+  // stacks under it (its position turns static inside #top-stack — style.css),
+  // so it joins the inset there and stays a bottom overlay everywhere else.
+  // The bubble is transient, so it never shifts the camera. Defensive: no DOM
+  // (tests) or hidden elements → no insets.
   _viewInsets(h) {
     let top = 0;
     try {
-      const b = document.getElementById('banner');
-      if (b && !b.classList.contains('hidden')) {
-        top = Math.min(0.4, Math.max(0, b.getBoundingClientRect().bottom / (h || 1)));
+      for (const id of ['banner', 'verb-panel']) {
+        const el = document.getElementById(id);
+        if (!el || el.classList.contains('hidden')) continue;
+        if (id === 'verb-panel' && getComputedStyle(el).position !== 'static') continue;
+        top = Math.max(top, el.getBoundingClientRect().bottom / (h || 1));
       }
+      top = Math.min(0.4, Math.max(0, top));
     } catch { /* no DOM (tests) -> no insets */ }
     return { top, bottom: 0 };
   }
