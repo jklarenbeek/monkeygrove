@@ -8,8 +8,8 @@
 <meta name="description" content="A cozy island adventure that brings the numbers home. Een knus eiland-avontuur dat de getallen thuisbrengt.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐵</text></svg>">
 <link rel="apple-touch-icon" href="/monkeygrove/apple-touch-icon.png">
-  <script type="module" crossorigin src="/monkeygrove/assets/index-CGZCs-Kk.js"></script>
-  <link rel="stylesheet" crossorigin href="/monkeygrove/assets/index-C6CSHYsO.css">
+  <script type="module" crossorigin src="/monkeygrove/assets/index-eMlAd7Z6.js"></script>
+  <link rel="stylesheet" crossorigin href="/monkeygrove/assets/index-D4NxGaAW.css">
 <link rel="manifest" href="/monkeygrove/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/monkeygrove/registerSW.js"></script></head>
 <body>
 <canvas id="game-canvas"></canvas>
@@ -40,17 +40,23 @@
     <div id="combo" class="hidden">x<span id="combo-count">2</span></div>
   </div>
 
-  <!-- equation banner -->
-  <div id="banner" class="hidden"><div id="banner-instruction"></div><div id="banner-equation"></div></div>
+  <!-- text stack: on small screens these flow top-down in one calm column
+       (equation banner, then live verb counts, then speech — never overlapping);
+       on desktop the banner stays pinned top and the panel/bubble keep their
+       bottom-center spots (see #top-stack in style.css) -->
+  <div id="top-stack">
+    <!-- equation banner -->
+    <div id="banner" class="hidden"><div id="banner-instruction"></div><div id="banner-equation"></div></div>
 
-  <!-- verb helper panel (share counts / array size) -->
-  <div id="verb-panel" class="hidden"></div>
+    <!-- verb helper panel (share counts / array size) -->
+    <div id="verb-panel" class="hidden"></div>
+
+    <!-- Mimi speech bubble (tap or Space/Enter to continue, Zelda-style) -->
+    <div id="bubble" class="hidden"><div id="bubble-face">🐵</div><div id="bubble-text"></div><div id="bubble-next" class="hidden">▼</div></div>
+  </div>
 
   <!-- visual model fallback panel (when the floor can't host the model) -->
   <div id="model-panel" class="hidden"></div>
-
-  <!-- Mimi speech bubble (tap or Space/Enter to continue, Zelda-style) -->
-  <div id="bubble" class="hidden"><div id="bubble-face">🐵</div><div id="bubble-text"></div><div id="bubble-next" class="hidden">▼</div></div>
 
   <!-- toasts (rewards, gems, streak) -->
   <div id="toasts"></div>
