@@ -292,6 +292,8 @@ src/
   curriculum/       NL_PO pack, age/groep placement, Mimi's Check probe machine,
                     64-step ladder, coverage, eligibility
   business/         bakery/pizzeria sim: data, pure engine, controller, scene
+  cutscene/         lazy 3D story cutscenes: director, dialog bar, scene scripts,
+                    diorama place (DOM story cards remain the fallback)
   verbs.js          fetch, array, number-line, and share interactions
   island.js         restoration blueprints, gating, funding, daily perks
   mimi.js           Mimi's advice ladder

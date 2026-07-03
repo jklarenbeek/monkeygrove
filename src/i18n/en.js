@@ -82,6 +82,7 @@ export const en = {
   'ui.ok': 'OK',
   'ui.delete': 'Delete',
   'ui.confirm_delete': 'Delete this explorer forever?',
+  'cutscene.skip': 'Skip',
 
   // story
   'story.1': 'Oh no! The <b>Crab King</b> pinched all the numbers of our island…',

@@ -223,8 +223,10 @@ class Game {
           if (this.needsCheckup()) this.startCheckupThenHub();
           else this.startHub();
         };
-        if (isNew || !this.profile.flags.introSeen) screens.showStory(continueFromIntro);
-        else if (this.needsCheckup()) this.startCheckupThenHub();
+        if (isNew || !this.profile.flags.introSeen) {
+          // the theft, played by the engine itself (DOM cards as fallback)
+          this.playCutscene('intro', continueFromIntro, () => screens.showStory(continueFromIntro));
+        } else if (this.needsCheckup()) this.startCheckupThenHub();
         else this.startHub();
       },
       onParents: () => this.showParentSelect(() => this.showPlayerSelect()),
@@ -537,7 +539,9 @@ class Game {
   // title->hub bootstrap the lines are drawn silently (a remembered older-child
   // batch shouldn't front-load a pile of pop-ups before the kid even arrives).
   startHub() {
-    const ceremonial = this.mode !== 'title' && this.mode !== 'hub';
+    // 'cutscene' counts as bootstrap: the only cutscene->hub path is the intro
+    // (via Mimi's Check), and the first arrival must stay pop-up-free.
+    const ceremonial = this.mode !== 'title' && this.mode !== 'hub' && this.mode !== 'cutscene';
     const queue = this.advanceStory(ceremonial);
     if (queue.length) { this.runStoryQueue(queue, () => this.hub.startHub()); return; }
     this.hub.startHub();
@@ -586,7 +590,7 @@ class Game {
         queue.push((done) => {
           drawNarrativeLine(story, revealIdx);
           persist();
-          screens.showStoryBeat('reveal', { story }, done);
+          this.playCutscene('reveal', done, () => screens.showStoryBeat('reveal', { story }, done));
         });
       }
 
@@ -599,7 +603,7 @@ class Game {
         queue.push((done) => {
           markBeat(story, 'crab_sighting');
           persist();
-          screens.showStoryBeat('sighting', { story }, done);
+          this.playCutscene('sighting', done, () => screens.showStoryBeat('sighting', { story }, done));
         });
       }
 
@@ -717,6 +721,74 @@ class Game {
     audio.music('island');
     this.stage.open();
     return true;
+  }
+
+  // ---------- story cutscenes ----------
+
+  // Play a story beat as a directed 3D scene (lazy `cutscene-*` chunk, like the
+  // shop/stage). The cutscene layer must NEVER block story flow (anti-anxiety):
+  // if the chunk can't load or the scene is unknown, `fallback` (the eager DOM
+  // card version, which calls the continuation itself) plays instead; a play
+  // failure mid-scene still reaches `onDone`. Skip and finish both land here.
+  async playCutscene(id, onDone, fallback = null) {
+    let mod = null;
+    try { mod = await import('./cutscene.js'); } catch { mod = null; }
+    const scene = mod?.CUTSCENES?.[id];
+    if (!scene) { (fallback || onDone)(); return; }
+    try {
+      if (scene.staged) await this._playStagedCutscene(mod, scene);
+      else await this._playPlacedCutscene(mod, scene);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error('[cutscene] play failed:', e);
+    }
+    onDone();
+  }
+
+  // A cutscene with its own diorama: swap the current place out (behind the
+  // portal transition), play, and leave the diorama standing — the caller's
+  // continuation (hub build, checkup screen) replaces or covers it.
+  async _playPlacedCutscene(mod, scene) {
+    this.mode = 'cutscene';
+    const token = ++this.flowToken;
+    let director = null;
+    await runSceneTransition(() => {
+      if (token !== this.flowToken) return;
+      screens.closeScreen();
+      hud.showHud(false);
+      hud.hideBubble();
+      this.clearPlace();
+      this.player = null;
+      this.pet = null;
+      this.place = new mod.CutscenePlace(this.world, scene.place);
+      this.particles = new Particles(this.place.group);
+      this.place.fx = this.particles;
+      director = new mod.CutsceneDirector(this, scene, { place: this.place });
+    }, { kind: 'soft' });
+    if (!director) return;
+    try { await director.play(); } finally { director.dispose(); }
+  }
+
+  // A cutscene staged on the LIVE place (the finale on the hub): freeze the
+  // player, dim the HUD, play, then hand the camera and controls back.
+  async _playStagedCutscene(mod, scene) {
+    const world = this.world;
+    const prev = { mode: this.mode, followObj: world.followObj, followMode: world.followMode, span: world.span };
+    this.mode = 'cutscene';
+    hud.showHud(false);
+    hud.hideBubble();
+    if (this.player) { this.player.stop(); this.player.locked = true; }
+    const director = new mod.CutsceneDirector(this, scene, { place: this.place });
+    try {
+      await director.play();
+    } finally {
+      director.dispose();
+      this.mode = prev.mode;
+      if (this.player) this.player.locked = false;
+      world.followObj = prev.followObj;
+      world.followMode = prev.followMode;
+      world.setSpan(prev.span);
+      hud.showHud(true);
+    }
   }
 
   // ---------- duel ----------

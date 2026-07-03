@@ -65,8 +65,14 @@ import { join } from 'node:path';
 // would not shrink the precache anyway — lazy chunks are precached too. Real
 // first-load functionality (~19 KiB raw), bumped DELIBERATELY with jitter room;
 // the cap stays a real guardrail. index gzip stays well under its own cap.
+// 2026-07-03: precache 1340 -> 1370 for the 3D story cutscenes — the intro theft,
+// the Four-Directions reveal, the Crab King sighting, and the finale confession now
+// play as directed scenes on the real engine (voxel actors, camera glides, the
+// gray↔bloom dial) instead of emoji cards. All of it lives in the lazy `cutscene-*`
+// chunk (~11 KiB raw, guarded below) so first-load is untouched; only the offline
+// precache grew. Bumped DELIBERATELY with jitter room; the cap stays a guardrail.
 const INDEX_JS_GZIP_BUDGET_KB = 300;   // decimal kB (÷1000), matches Vite's report
-const PRECACHE_BUDGET_KIB = 1340;      // binary KiB (÷1024), matches workbox's report
+const PRECACHE_BUDGET_KIB = 1370;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
 const ASSETS = join(DIST, 'assets');
@@ -173,6 +179,19 @@ if (!stageChunk) {
   checks.push(fail('index.html preloads the stage chunk — it is no longer lazy'));
 } else {
   checks.push(pass('music stage chunk stays lazy'));
+}
+
+// 4c. The story cutscenes stay lazy too: their own `cutscene-*` chunk (director +
+//     dialog overlay + scene scripts + diorama place), reached only via the dynamic
+//     `import('./cutscene.js')` in playCutscene(). The DOM story cards stay eager as
+//     the fallback, so a missing chunk never blocks the story. Mirrors guard #4.
+const cutsceneChunk = assets.find((f) => /^cutscene-.*\.js$/.test(f));
+if (!cutsceneChunk) {
+  checks.push(fail('no cutscene-*.js chunk — the story cutscenes folded back into index'));
+} else if (indexHtml.includes('cutscene-')) {
+  checks.push(fail('index.html preloads the cutscene chunk — it is no longer lazy'));
+} else {
+  checks.push(pass('story cutscene chunk stays lazy'));
 }
 
 // 5. Selective bloom / DoF post-processing stays lazy: world.js reaches it only via a

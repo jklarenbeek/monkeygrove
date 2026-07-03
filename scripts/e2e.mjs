@@ -78,9 +78,35 @@ try {
   await waitSel('#new-go');
   await click('#new-go');
 
-  // 4. through the intro story, then skip Mimi's Check at its groep page
+  // 4. the intro now plays as a 3D cutscene (lazy cutscene-* chunk): the dialog
+  //    bar rides over the live scene. Wait for it (or the DOM-card fallback),
+  //    tap one page onward to prove paging works, then Skip to keep the run
+  //    fast. Then skip Mimi's Check at its groep page.
+  await page.waitForFunction(() => {
+    const c = document.getElementById('cutscene-ui');
+    return (c && !c.classList.contains('hidden')) || !!document.querySelector('#story-next');
+  }, { timeout: 20000 });
+  if (await evalp(`!!${sh('#cutscene-ui:not(.hidden)')}`)) {
+    // wait for the first prose page, remember it, tap onward, and confirm the
+    // page actually changed before skipping the rest of the scene
+    await waitSel('#cutscene-dialog:not(.hidden)', 15000);
+    const page1 = await evalp(`${sh('#cutscene-text')}.textContent`);
+    await pause(400); // the arm delay protects fresh pages from double-taps
+    await click('#cutscene-ui');
+    await page.waitForFunction((p1) => {
+      const d = document.getElementById('cutscene-dialog');
+      return d && !d.classList.contains('hidden')
+        && d.querySelector('#cutscene-text')?.textContent !== p1;
+    }, page1, { timeout: 15000 });
+    assert.ok(await present('#cutscene-skip'), 'cutscene skip button is offered');
+    await click('#cutscene-skip');
+  } else {
+    // fallback path (cutscene chunk unavailable): the eager DOM story cards
+    for (let i = 0; i < 15 && await present('#story-next'); i++) { await click('#story-next'); await pause(250); }
+  }
+  await page.waitForFunction(() => !document.getElementById('cutscene-ui')
+    || document.getElementById('cutscene-ui').classList.contains('hidden'), null, { timeout: 10000 });
   await pause(800);
-  for (let i = 0; i < 15 && await present('#story-next'); i++) { await click('#story-next'); await pause(250); }
   if (await present('#checkup-skip')) { await click('#checkup-skip'); }
   await pause(1500);
 

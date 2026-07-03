@@ -263,6 +263,44 @@ html, body {
   bottom: max(196px, calc(env(safe-area-inset-bottom) + 184px));
 }
 
+/* ---------- story cutscene overlay (src/cutscene/) ---------- */
+/* the whole screen is the "next page" button; only Skip opts out of that */
+#cutscene-ui {
+  position: absolute; inset: 0; z-index: 40; pointer-events: auto;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+  cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#cutscene-ui.hidden { display: none; }
+#cutscene-skip {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right));
+  opacity: .85;
+}
+#cutscene-dialog {
+  position: relative;
+  display: flex; align-items: center; gap: 12px;
+  width: max-content; max-width: min(92vw, 560px);
+  margin-bottom: max(30px, calc(env(safe-area-inset-bottom) + 22px));
+  background: #fff; border: 4px solid var(--pink); border-radius: var(--radius);
+  box-shadow: 0 6px 14px var(--shadow); padding: 14px 30px 16px 18px;
+  animation: cutscene-page-in .35s cubic-bezier(.34,1.56,.64,1);
+}
+#cutscene-dialog.hidden { display: none; }
+@keyframes cutscene-page-in { 0% { transform: translateY(26px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+#cutscene-face { font-size: calc(38px * var(--text-scale)); filter: drop-shadow(0 2px 2px var(--shadow)); }
+#cutscene-name {
+  display: block; font-size: calc(13px * var(--text-scale)); font-weight: 900;
+  color: var(--leaf-deep); opacity: .75; letter-spacing: .04em; text-transform: uppercase;
+}
+#cutscene-name.hidden { display: none; }
+#cutscene-text { font-size: calc(18px * var(--text-scale)); font-weight: 700; line-height: 1.4; }
+#cutscene-text b { color: var(--leaf-deep); }
+#cutscene-next {
+  position: absolute; right: 9px; bottom: 6px; font-size: calc(14px * var(--text-scale)); color: var(--pink);
+  animation: next-bounce 0.9s ease-in-out infinite;
+}
+html.reduce-motion #cutscene-dialog,
+html.reduce-motion #cutscene-next { animation: none; }
+
 /* ---------- toasts ---------- */
 #toasts { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; align-items: center; width: max-content; max-width: 92vw; }
 .toast {

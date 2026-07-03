@@ -81,6 +81,7 @@ export const nl = {
   'ui.ok': 'OK',
   'ui.delete': 'Verwijderen',
   'ui.confirm_delete': 'Deze ontdekker voorgoed verwijderen?',
+  'cutscene.skip': 'Overslaan',
 
   'story.1': 'O nee! De <b>Krabbenkoning</b> heeft alle getallen van ons eiland gejat…',
   'story.2': 'Zonder getallen werd het bos <b>grijs</b>. We weten niet meer hoe je plant, deelt en bakt!',

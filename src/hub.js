@@ -598,11 +598,14 @@ export class HubController {
       this.celebrateBuild(def);
     };
     if (def.finale && !g.profile.flags.festivalDone) {
-      // the Crab King interrupts: apology, and he pays half from his hoard
-      screens.showFinale(() => {
+      // the Crab King interrupts: apology, and he pays half from his hoard —
+      // played as a directed scene on the live island (DOM cards as fallback)
+      const afterConfession = () => {
         hud.toast(t('island.crab_pays', { n: def.contribution }));
         doFund();
-      });
+      };
+      screens.closeScreen();
+      g.playCutscene('finale', afterConfession, () => screens.showFinale(afterConfession));
     } else {
       doFund();
     }
