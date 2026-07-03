@@ -627,6 +627,30 @@ html, body {
   font-family: inherit;
 }
 
+/* Mimi's Check (docs/05): groep picker, notebook progress, answer numpad */
+.checkup-groep-grid { grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); }
+.checkup-groep .t-icon { font-size: calc(28px * var(--text-scale)); }
+.checkup-notebook {
+  display: flex; gap: 5px; justify-content: center; align-items: center;
+  min-height: 26px; margin-bottom: 8px; font-size: calc(17px * var(--text-scale));
+  color: var(--leaf); letter-spacing: 2px;
+}
+.checkup-notebook .checkup-now { animation: checkup-bud 1.6s ease-in-out infinite; }
+@keyframes checkup-bud { 50% { transform: scale(1.25); } }
+.numpad-display {
+  min-height: 1.35em; margin: 0 auto 12px; padding: 4px 14px; width: min(240px, 70vw);
+  background: #fff; border: 3px solid var(--cream-2); border-radius: 14px;
+  font-size: clamp(26px, 5.4vw, 40px); font-weight: 950; letter-spacing: 2px;
+}
+.checkup-numpad {
+  display: grid; grid-template-columns: repeat(3, minmax(64px, 88px));
+  gap: 8px; justify-content: center;
+}
+.checkup-numpad .numpad-key {
+  min-height: 52px; padding: 8px 0;
+  font-size: calc(22px * var(--text-scale)); font-weight: 950;
+}
+
 /* gem tree */
 #gem-grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 3px; width: min(94vw, 520px); }
 .gem-cell {

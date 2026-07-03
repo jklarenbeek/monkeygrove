@@ -45,15 +45,26 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
   (4-13) or birthday. For the shipped `NL_PO` curriculum pack, current age
   estimates a Dutch primary stage (`grade_1`...`grade_8` internally, shown to
   parents as Grade 1...8).
-- A short warm-up after the intro story gives Mimi a few tiny number quests
-  before the hub. It adjusts the placement band (`below`, `on_track`, `ahead`)
-  without putting a permanent label on the child.
-- The current-age-estimated stage is the default lower bound. Warm-up can open
-  the upper side of the window, but it may not send a child below the
-  age/curriculum floor.
+- **Mimi's Check** (docs/05-mimi-check.md) after the intro story: Mimi asks
+  which school group (groep) the child is in — the honest exposure prior; ~1 in
+  4 Dutch children is not in the groep their age predicts — then runs a short
+  adaptive probe (~12 confirm items, ~5 min): a band staircase that starts one
+  band below expectation (the first item is a near-guaranteed win), then a
+  bisection that pins the frontier step. Response time separates "can do" from
+  "fluent"; a miss earns one retry with the model visible before it counts as a
+  gap; three fast-wrong answers end the check gently with the streak discarded.
+- The measured frontier drives the practice window. It may sit *below* the
+  age/groep floor — that is the point for the children who need extra attention
+  — while story access never shrinks; upward it is capped at groep + 2. Groep
+  1-2 is never probed (observation through play instead, per Dutch practice).
+- The check is child-invocable forever after: Mimi offers it on a new school
+  year, after long breaks, on sustained cruising/grinding, or a parent request,
+  and the child can simply ask her. A fresh check earns a warm deflection
+  instead of a redo. Completing a check is rewarded identically whatever the
+  outcome — the result is a story beat, never a score.
 - Children age quickly, so birthday-based profiles re-check the automatic floor
   on later sessions. When the child reaches a higher age band, the automatic
-  lower bound may promote upward and the warm-up can run again for the new band.
+  lower bound may promote upward — and Mimi offers a fresh check for the new band.
 - Parent-selected stage/group is the explicit override. If a parent chooses a
   different group, that confirmed stage becomes the lower bound for play.
   Parent overrides are not silently raised by birthdays; the suggested stage can
@@ -136,10 +147,12 @@ overlay (crisp, localizable, ≥48px touch targets). EN/NL, auto-detect Dutch.
 - The parent screen explains the pedagogy and now shows the active profile's
   country, learning path, stage, domain coverage, and objective pills before the
   existing skill overview.
-- Parents can change curriculum pack, stage/group, and targeting strictness.
-  Changing the pack recalculates the age estimate for that pack and resets
-  warm-up placement so old probes from a different curriculum do not leak into
-  the new path.
+- Parents can change curriculum pack, stage/group, and targeting strictness,
+  see the child-said groep, the measured functioneringsniveau, the last check
+  date and its misconception watch-outs, and queue a new check with Mimi.
+  Changing the pack recalculates the age estimate for that pack and resets the
+  measured placement so old probes from a different curriculum do not leak into
+  the new path (the child's stated groep survives — it is a fact about the child).
 - Parents can also edit the birthday. That affects the automatic suggested
   stage immediately, while any parent-confirmed stage/group remains the override.
 - Coverage is objective-based: covered, started, ready to play, or planned.
@@ -345,7 +358,7 @@ the islet). The egg nest is a tappable spot that opens the pets screen.
 audio → 3. Math engine + distractors + Elo → 4. Array verb + Garden world →
 5. Save/streak/i18n → 6. Number line + Share verbs, Vines/Stump/Tide worlds →
 7. Gem tree, pets, shop, hub island → 8. Echo Doors, duel → 9. `NL_PO`
-curriculum spine, age-first Explorer placement, warm-up, curriculum-aware
+curriculum spine, groep-first Explorer placement, Mimi's Check, curriculum-aware
 chambers, and parent coverage → 10. Bakery/pizzeria shop simulation with
 helper customers, stock, upgrades, payment/change, recipe prep, and parent
 curriculum coverage from business-mode progress.

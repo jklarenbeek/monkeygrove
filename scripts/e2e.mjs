@@ -78,10 +78,10 @@ try {
   await waitSel('#new-go');
   await click('#new-go');
 
-  // 4. through the intro story, then the warm-up
+  // 4. through the intro story, then skip Mimi's Check at its groep page
   await pause(800);
   for (let i = 0; i < 15 && await present('#story-next'); i++) { await click('#story-next'); await pause(250); }
-  if (await present('#warmup-skip')) { await click('#warmup-skip'); }
+  if (await present('#checkup-skip')) { await click('#checkup-skip'); }
   await pause(1500);
 
   // 5. landed in the hub (no screen open, HUD live)

@@ -32,7 +32,8 @@ src/
   main.js               slim Game orchestrator: boot, RAF loop tick, mode switching,
                         and wiring the collaborators below together (composition, not a
                         framework; each is `new XxxController(this)` and reaches back via
-                        `this.game`). Also keeps the title/warm-up flow and shared HUD wiring.
+                        `this.game`). Also keeps the title flow, Mimi's Check sessions
+                        (onboarding + hub-invoked), and shared HUD wiring.
   input.js              InputController: keyboard/touch/camera gestures -> semantic intents
                         (step/tap/action/hint), pinch/pan zoom, retained zoom, gesture hint
   hub.js                HubController: island hub build + attract diorama, living-gate growth,
@@ -59,8 +60,11 @@ src/
                         curriculum-constrained selection via allowedSkills
   curriculum/
     nl_po.js            first curriculum pack: Dutch primary arithmetic objectives
-    placement.js        age-to-stage estimate, pack retargeting, warm-up scoring,
-                        eligible skill lower-bound window
+    placement.js        age-to-stage estimate, groep prior, pack retargeting, checkup
+                        result/eligibility, functioneringsniveau, 64-step ladder placement
+    checkup.js          Mimi's Check probe state machine (docs/05): band staircase +
+                        frontier bisection, ERWD retry, rush guard — pure, evidence-driven
+    ladder.js           the 64-step mastery ladder data (8 bands × 8 levels of thinking)
     index.js            pack registry/listing, objective filtering, coverage summaries
   business/
     data.js             helper customers, recipes, ingredients, upgrades, business modes
@@ -107,7 +111,8 @@ src/
                         screens.js); shared spine + emoji maps in screens/core.js
     core.js             render/backBtn/flash/esc/closeScreen host + emoji lookup tables
     intro.js            attract loop, title / player-select, story, Crab King finale
-    warmup.js           placement warm-up quiz
+    checkup.js          Mimi's Check overlay: groep/birthday pages, probe items
+                        (numpad or tiles), notebook progress, kleuter + done pages
     settings.js         language, audio, comfort/accessibility toggles, DEV panel
     cosmetics.js        shop (hats/furs/trails), pets/egg, hatch, island worktable
     gems.js             Banyan Gem Tree times-table mosaic + skill progress
@@ -118,7 +123,7 @@ src/
   duel.js               hot-seat duel mode + seeded challenge codes
   devtools.js           DEV-only debug hooks (window.__game); gated out of prod builds
   rng.js                seeded PRNG (mulberry32)
-tests/                  vitest: mathengine, curriculum, state migration, warm-up and
+tests/                  vitest: mathengine, curriculum, state migration, Mimi's Check and
                         parent wiring, chambers, island, mimi, models, portal stages
 scripts/
   e2e.mjs               browser smoke test: self-hosted Vite + Playwright drive of
@@ -344,26 +349,44 @@ currentCurriculumAge(curriculum, onDate) -> birthday age or captured age + elaps
 refreshCurriculumForDate(curriculum, onDate) -> promote automatic floor if current age advanced
 retargetCurriculumPack(curriculum, packId) -> state for a newly selected pack
 scoreWarmup(results) -> { band: 'below'|'on_track'|'ahead', correct, total, rate }
-applyWarmupResult(curriculum, results, opts?) -> updated curriculum state
-eligibleSkillIds(curriculum) -> skill ids for the curriculum lower-bound window
+applyWarmupResult(curriculum, results, opts?) -> updated curriculum state (legacy)
+setCurriculumGroep(curriculum, groep, opts?) -> stores the child-said school group
+checkupTarget(curriculum) -> { targetBand, ageBand, kleuter } for a check session
+applyCheckupResult(curriculum, result, opts?) -> stores the measured placement
+functioneringsniveau(curriculum) -> { label: 'M5'|'E7+'|…, grade, top } | null
+eligibleSkillIds(curriculum) -> skill ids for the practice window (frontier-driven
+                                after a completed check; stage window before)
 ```
+
+Mimi's Check itself (docs/05-mimi-check.md) lives in `curriculum/checkup.js`:
+`createCheckup({ targetBand, ageBand })` makes a serializable machine;
+`checkupNext` emits item requests (band staircase, then frontier bisection, with
+one model-visible ERWD retry per failing point and unscored warm-in/bookend
+items); `checkupRecord` takes `{ correct, ms, tag, difficulty }`; `checkupResult`
+derives the conclusion from the evidence trail. The machine is evidence-driven —
+every step recomputes from the answers — so a persisted draft resumes exactly,
+and the fast-wrong rush guard can drop a streak without corrupting state.
+main.js batches `recordCalibration` (uncertainty-boosted Elo K) from the accepted
+trail at settle, so rushed or unscored answers never write ratings.
 
 `NL_PO` is the only real registered pack for now. Each pack owns its country
 metadata, stage age bands, objectives, playable skill mappings, and translated
 labels. Stage and domain IDs stay English internally (`grade_5`, `operations`,
 `measurement_geometry`); Dutch and English labels live in `i18n.js`.
 
-The current-age-estimated stage is the default lower bound for play. Warm-up
-placement can open the upper side of the soft window, but cannot move eligibility
-below that lower bound. Birthday-based profiles refresh that estimate when the
-profile is loaded for play; age-only profiles use `ageCapturedOn` to advance by
-elapsed years. Automatic progression only moves the lower bound upward, and a
-promotion resets warm-up so Mimi can probe the new band. Parent-selected
-stage/group is the override: once the parent confirms a different stage, that
-confirmed stage becomes the lower bound. The suggested stage can still advance
-in the background, but the confirmed stage remains the floor until the parent
-changes it. Strict targeting keeps eligibility at the current lower-bound/
-placement center instead of including the next stage.
+Before a completed check, the child-said groep (or, failing that, the
+current-age-estimated stage) is the lower bound for play. After a completed
+check, the measured frontier drives the practice window directly: it hugs the
+frontier stage (frontier..frontier+1), may sit BELOW the age/groep floor for a
+struggling child (story access never shrinks — only practice moves), and is
+hard-capped at groep + 2 stages upward. Birthday-based profiles refresh the age
+estimate when the profile is loaded for play; age-only profiles use
+`ageCapturedOn` to advance by elapsed years. Automatic progression only moves
+the floor upward; recalibration goes through Mimi's offers (new school year,
+staleness, sustained cruising/grinding, a parent request, or the child simply
+asking her). Parent-selected stage/group is the override: once the parent
+confirms a different stage, that confirmed stage wins. Strict targeting keeps
+eligibility at the single center stage instead of including the next one.
 
 Business-mode progress can also contribute to objective coverage for mapped
 money, measurement, fraction, ratio, percentage, profit, and data objectives.
@@ -399,7 +422,13 @@ monkeygrove.save = {
       lastPromotionCheck, lastPromotion,
       placementBand,                        // unknown | below | on_track | ahead
       strictness,                           // soft by default
-      warmup: { completed, results, skillIds, scored? },
+      warmup: { completed, results, skillIds, scored? },   // legacy 3-item probe
+      groep, groepCapturedOn, groepSource,  // child-said school group (docs/05 §3.2)
+      checkup: { completed, on, mode,       // mode: probe | kleuter | skipped
+                 frontier, allClear, targetBand, ceilingBand,
+                 bands, notFluent, supported, misconceptions,
+                 itemsAsked, flags },       // the measured placement (docs/05 §3.6)
+      checkupDraft,                         // resumable mid-check machine snapshot | null
     },
     business: {
       level, shopCoins, stock, stockLimit, upgrades,
@@ -546,11 +575,13 @@ guardrails, recorded post-lazy-fonts + code-split-business (2026-06-18):
 - **No always-loaded webfont** — the 235 KB OpenDyslexic woff2 are registered at
   runtime via the FontFace API (`src/a11y.js`), kept out of the precache and never
   `@font-face`'d into the always-loaded CSS. The check fails if a woff2 lands in either.
-- **PWA precache ≤ 1300 KiB** — 25 entries / ~1296 KiB on 2026-07-02 (1150→1200 for the
-  procedural "liveliness" layers; 1200→1235 for selective bloom + DoF; **1235→1300 on
-  2026-07-01** for the new always-lazy `stage-*` minigame chunk, precached for offline
-  play). Headroom is now only ~4 KiB — the next feature that grows any precached chunk
-  will need a deliberate bump here and in `scripts/check-budget.mjs`.
+- **PWA precache ≤ 1340 KiB** — 25 entries / ~1319 KiB on 2026-07-03 (1150→1200 for the
+  procedural "liveliness" layers; 1200→1235 for selective bloom + DoF; 1235→1300 on
+  2026-07-01 for the always-lazy `stage-*` minigame chunk; **1300→1340 on 2026-07-03**
+  for Mimi's Check — the adaptive placement probe machine, overlay, engine probes,
+  Mimi offers, parent readout, and EN/NL strings, all eager by design since the check
+  runs at onboarding). Headroom ~21 KiB — the next feature that grows any precached
+  chunk needs a deliberate bump here and in `scripts/check-budget.mjs`.
 - **The `business-*` and `stage-*` chunks stay lazy** — the check fails if either folds
   back into `index` or the entry static-imports it (Vite would module-preload it into
   `index.html`). The music stage mirrors the bakery sim: heavy scene lazy, pure data eager.

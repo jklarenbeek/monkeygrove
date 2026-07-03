@@ -106,6 +106,14 @@ function expectedFor(rating, difficulty) {
   return 1 / (1 + 10 ** ((difficulty - rating) / 400));
 }
 
+// Elo offset that yields expected success p against a rating: an item at
+// rating − offsetForSuccess(p) is solved with probability p by that rating.
+// Confirm probes (Mimi's Check) anchor at MASTERY_RATING − offsetForSuccess(0.87)
+// ≈ 520 — an item a child who mastered the skill breezes (docs/04 §2, docs/05 §3.3).
+function offsetForSuccess(p) {
+  return 400 * Math.log10(p / (1 - p));
+}
+
 export function expectedSuccess(math, problem) {
   return expectedFor(math.skills[problem.skillId].r, problem.difficulty);
 }
@@ -1060,6 +1068,13 @@ const KINDS_SUPPORTED = {
   frac_magnitude: ['numberline'], frac_compare: ['fetch'], frac_equiv: ['fetch'], frac_of_n: ['fetch'],
 };
 
+// Whether a skill can generate the given interaction kind. Mimi's Check uses
+// this to probe only skills the DOM overlay can present (fetch): frac_magnitude
+// is numberline-only — its 3D vine lives in the chambers, not in an overlay.
+export function skillSupportsKind(skillId, kind) {
+  return KINDS_SUPPORTED[skillId]?.includes(kind) ?? false;
+}
+
 function chooseKind(skillId, s, forced, rng) {
   const supported = KINDS_SUPPORTED[skillId];
   if (forced) return supported.includes(forced) ? forced : NATURAL_KIND[skillId];
@@ -1223,9 +1238,21 @@ export function nextProblem(math, opts = {}) {
   // *effective* rating, so a returning child eases back in instead of being met
   // at the wall they last touched two months ago.
   const effR = effectiveRating(math, skillId, now);
-  const scaffold = scaffoldFor(effR);
+  // Confirm probes (opts.probe — Mimi's Check, docs/05 §3.3): difficulty anchors to
+  // the SKILL's mastery bar, not the child's current rating, so the item asks "is
+  // this step solid?" at the confirm target (~87% for a master) instead of adapting
+  // to ability. probe.scaffold overrides for the ERWD drop-a-representation retry.
+  const probe = opts.probe || null;
+  const probeTarget = probe
+    ? MASTERY_RATING - offsetForSuccess(probe.targetSuccess ?? 0.87)
+    : 0;
+  const scaffold = probe
+    ? (probe.scaffold ?? scaffoldFor(probeTarget))
+    : scaffoldFor(effR);
   const kind = chooseKind(skillId, s, opts.kind, rng);
-  const target = targetDifficulty(s, rng, effR);
+  const target = probe
+    ? probeTarget + (rng.float() - 0.5) * 40
+    : targetDifficulty(s, rng, effR);
   let inner = GEN[skillId](target, rng, kind, scaffold);
   if (skillId === 'frac_magnitude') {
     inner = spreadFractionMagnitude(inner, math, rng, target, kind, scaffold, s);
@@ -1275,7 +1302,8 @@ function updateFacts(math, problem, correct) {
 
 // `now` is the caller-supplied timestamp stamped into the practice log; the
 // engine never reads the clock, so the log replays byte-identically from inputs.
-export function recordResult(math, problem, res, { now = 0 } = {}) {
+// `kFactor` overrides the default K (recordCalibration passes a boosted one).
+export function recordResult(math, problem, res, { now = 0, kFactor = null } = {}) {
   const s = math.skills[problem.skillId];
   // Bake in any forgetting since this skill was last practiced *before* scoring,
   // so a returning child is graded from their current (rusty) rating and the Elo
@@ -1284,7 +1312,7 @@ export function recordResult(math, problem, res, { now = 0 } = {}) {
   s.r = decayedRating(s.r, daysSincePractice(math, problem.skillId, now));
   const wasMastered = isMastered(s);
   const expected = expectedFor(s.r, problem.difficulty);
-  const K = s.n < 20 ? 32 : 16;
+  const K = kFactor ?? (s.n < 20 ? 32 : 16);
   const score = res.correct ? (res.usedHint ? 0.7 : 1) : 0;
   const delta = K * (score - expected);
   s.r += delta;
@@ -1307,6 +1335,19 @@ export function recordResult(math, problem, res, { now = 0 } = {}) {
   const newGems = updateFacts(math, problem, !!res.correct);
   const masteredSkill = !wasMastered && isMastered(s) ? problem.skillId : null;
   return { delta, rating: s.r, masteredSkill, newGems };
+}
+
+// Calibration recording (Mimi's Check, docs/05 §3.6): the same Elo update with an
+// uncertainty-boosted K, Klinkenberg-style (Rekentuin's K·(1+4U)) — a brand-new or
+// long-rested skill moves up to ~4× faster, so a 12-item placement can do the work
+// practice normally spreads over dozens of answers. Uncertainty blends inexperience
+// (few attempts) with staleness (days since practice), both capped so K stays bounded.
+export function recordCalibration(math, problem, res, { now = 0 } = {}) {
+  const s = math.skills[problem.skillId];
+  if (!s) return null;
+  const staleness = Math.min(1, daysSincePractice(math, problem.skillId, now) / 180);
+  const uncertainty = Math.min(1, 1 / (1 + 0.05 * s.n) + staleness / 2);
+  return recordResult(math, problem, res, { now, kFactor: 32 * (1 + 3 * uncertainty) });
 }
 
 // A lightweight external mastery signal: reinforce a real skill from a minigame (the

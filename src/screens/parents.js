@@ -4,6 +4,7 @@
 import { render, backBtn, esc, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { coverageForReport, getPack, listPacks } from '../curriculum/index.js';
+import { functioneringsniveau } from '../curriculum/placement.js';
 import { money, businessModeLabel } from './business.js';
 import { STAGE_MODES } from '../stage/data.js';
 import { parentWonders } from '../story/wonders.js';
@@ -40,8 +41,8 @@ export function showParentProfileSelect({ profiles = [], onChoose, onBack }) {
           ${profiles.map((profile) => {
             const petId = profile.avatar?.pet || profile.pets?.[0] || 'bunny';
             const pet = PET_EMOJI[petId] || '🐵';
-            const stage = profile.curriculum?.confirmedStage || profile.curriculum?.estimatedStage;
             const pack = profile.curriculum?.packId ? getPack(profile.curriculum.packId) : null;
+            const stage = pack ? displayStage(pack, profile.curriculum) : null;
             const stageText = pack && stage ? stageLabel(pack, stage) : '';
             return `
               <button class="tile parent-profile-tile" data-parent-profile="${esc(profile.id)}">
@@ -65,13 +66,23 @@ function stageLabel(pack, stageId) {
   return stage ? t(stage.labelKey) : t(pack.fallbackStagePrefixKey || 'curriculum.stage', { n: '?' });
 }
 
+// The stage to display: parent/age stage when known, else the child-said groep
+// (an unsure-trail profile has no age estimate, but after Mimi's Check it does
+// have a groep — better than "Stage ?").
+function displayStage(pack, curriculum) {
+  return curriculum.confirmedStage || curriculum.estimatedStage
+    || pack.stages.find((s) => s.order === curriculum.groep)?.id || null;
+}
+
 function curriculumCoverageHtml(profile, report, businessReport = null, stageReport = null, showControls = false) {
   if (!profile?.curriculum || !report) return '';
   const pack = getPack(profile.curriculum.packId);
   const packs = listPacks();
   const coverage = coverageForReport(pack.id, report, { business: businessReport, stage: stageReport });
-  const stage = profile.curriculum.confirmedStage || profile.curriculum.estimatedStage;
+  const stage = displayStage(pack, profile.curriculum);
   const strictness = profile.curriculum.strictness || 'soft';
+  const checkup = profile.curriculum.checkup;
+  const level = functioneringsniveau(profile.curriculum);
   return `
     <div class="card">
       <h3>${esc(t('parents.curriculum'))}</h3>
@@ -80,7 +91,15 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
         <div class="chip">${esc(t('parents.curriculum_pack'))}: ${esc(t(pack.titleKey))}</div>
         ${profile.curriculum.birthDate ? `<div class="chip">${esc(t('parents.birthday'))}: ${esc(profile.curriculum.birthDate)}</div>` : ''}
         <div class="chip">${esc(t('parents.stage'))}: ${esc(stageLabel(pack, stage))}</div>
+        ${profile.curriculum.groep ? `<div class="chip">${esc(t('parents.groep'))}: ${esc(t('checkup.groep_n', { n: profile.curriculum.groep }))}</div>` : ''}
+        ${level ? `<div class="chip">${esc(t('parents.level'))}: ≈ ${esc(level.label)}</div>` : ''}
+        ${checkup?.completed && checkup.on ? `<div class="chip">${esc(t('parents.last_check'))}: ${esc(checkup.on)}</div>` : ''}
       </div>
+      ${checkup?.misconceptions?.length ? `
+      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:6px">${esc(t('parents.misconceptions'))}</div>
+      <div class="curriculum-objectives" style="margin-bottom:10px">
+        ${checkup.misconceptions.map((tag) => `<span class="curriculum-pill partial">${esc(t(`misconception.${tag}`))}</span>`).join('')}
+      </div>` : ''}
       ${showControls ? `<div class="curriculum-controls">
         <label>
           <span>${esc(t('parents.curriculum_pack'))}</span>
@@ -105,6 +124,11 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
             <option value="strict" ${strictness === 'strict' ? 'selected' : ''}>${esc(t('parents.strictness_strict'))}</option>
           </select>
         </label>
+      </div>
+      <div class="menu-row" style="justify-content:flex-start;margin-bottom:10px">
+        ${profile.flags?.checkupRequested
+          ? `<div class="chip">✓ ${esc(t('parents.check_requested'))}</div>`
+          : `<button class="btn soft" data-request-checkup>${esc(t('parents.request_check'))}</button>`}
       </div>` : ''}
       <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:8px">${esc(t('parents.coverage'))}</div>
       ${Object.values(coverage.domains).filter((d) => d.total > 0).map((d) => `
@@ -172,7 +196,7 @@ function parentStageHtml(stageReport) {
     </div>`;
 }
 
-export function showParents({ report, profile, businessReport = null, stageReport = null, onClose, onCurriculumChange }) {
+export function showParents({ report, profile, businessReport = null, stageReport = null, onClose, onCurriculumChange, onRequestCheckup = null }) {
   const el = render(`
     ${backBtn()}
     <h2>${t('parents.title')}</h2>
@@ -206,5 +230,8 @@ export function showParents({ report, profile, businessReport = null, stageRepor
   });
   el.querySelector('[data-strictness]')?.addEventListener('change', (e) => {
     onCurriculumChange?.({ strictness: e.target.value });
+  });
+  el.querySelector('[data-request-checkup]')?.addEventListener('click', () => {
+    onRequestCheckup?.();
   });
 }

@@ -123,6 +123,16 @@ test('createCurriculumState stores estimate with soft targeting', () => {
     placementBand: 'unknown',
     strictness: 'soft',
     warmup: { completed: false, results: [], skillIds: [] },
+    groep: null,
+    groepCapturedOn: null,
+    groepSource: null,
+    checkup: {
+      completed: false, on: null, mode: null,
+      frontier: null, allClear: false, targetBand: null, ceilingBand: null,
+      bands: {}, notFluent: [], supported: [], misconceptions: [],
+      itemsAsked: 0, flags: {},
+    },
+    checkupDraft: null,
   });
 });
 

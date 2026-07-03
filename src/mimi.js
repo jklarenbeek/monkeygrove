@@ -33,7 +33,64 @@ export function advanceMimiPhase(profile) {
   return profile.story.mimiPhase ?? 0;
 }
 
-export function mimiLines(profile, report, status) {
+// ---------- Mimi's Check offers (docs/05 §3.1) ----------
+
+const DAY_MS = 86400000;
+
+function daysSinceYmd(ymd, now) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return null;
+  const then = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+  return Math.max(0, (now - then) / DAY_MS);
+}
+
+// Dutch school years roll over in August: September means "zit je nu in een
+// nieuwe groep?" — the groep prior needs re-asking, never auto-incrementing
+// (zittenblijven is exactly the case auto-increment would get wrong).
+function schoolYearRolled(ymd, now) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ''));
+  if (!m) return false;
+  const yearOf = (y, month) => (month >= 8 ? y : y - 1);
+  const d = new Date(now);
+  return yearOf(d.getFullYear(), d.getMonth() + 1) > yearOf(Number(m[1]), Number(m[2]));
+}
+
+// Why Mimi would *offer* a check right now (docs/05 §3.1.3) — or null. Offers are
+// one line in her ladder, always dismissible, never a gate.
+export function checkupSuggestion(profile, now = Date.now()) {
+  const cur = profile?.curriculum;
+  if (!cur) return null;
+  if (profile.flags?.checkupRequested) return 'requested';
+  const ck = cur.checkup;
+  if (!ck?.completed) return 'first';
+  const days = daysSinceYmd(ck.on, now);
+  if (days == null) return null;
+  if (schoolYearRolled(ck.on, now)) return 'new_year';
+  if (days > 90) return 'stale';
+  if (days >= 7) {
+    // Flow mismatch over the recent practice stream: cruising reads as bored,
+    // grinding as frustrated — both are recalibration signals, not judgments.
+    const log = profile.math?.log || [];
+    if (log.length >= 20) {
+      const last = log.slice(-20);
+      const rate = last.filter((e) => e.ok).length / last.length;
+      if (rate >= 0.85) return 'bored';
+      if (rate <= 0.45) return 'frustrated';
+    }
+  }
+  return null;
+}
+
+// Soft cooldown (docs/05 §3.1.2): a check under a week old and no reason to redo
+// it — Mimi deflects warmly instead of re-testing.
+export function checkupFresh(profile, now = Date.now()) {
+  const ck = profile?.curriculum?.checkup;
+  if (!ck?.completed) return false;
+  const days = daysSinceYmd(ck.on, now);
+  return days != null && days < 7;
+}
+
+export function mimiLines(profile, report, status, { now = Date.now() } = {}) {
   const lines = [];
   // Her tone for this visit — the stored monotonic phase, or computed for a pre-arc save.
   const mimiPhase = Math.max(0, Math.min(2, profile.story?.mimiPhase ?? mimiPhaseFor(profile)));
@@ -51,6 +108,11 @@ export function mimiLines(profile, report, status) {
       vars: { n: unlocked[0].playerCost - profile.bananas },
     });
   }
+
+  // Mimi's Check: a timely offer rides high in the ladder (right under the
+  // blueprint news); the child-invocable ask is always reachable further down.
+  const suggestion = checkupSuggestion(profile, now);
+  if (suggestion) lines.push({ key: 'mimi.checkup_offer' });
 
   // The quest guide: point at the sleepiest world — that's where practice
   // blooms the island AND brings the next blueprint closer.
@@ -73,6 +135,12 @@ export function mimiLines(profile, report, status) {
     lines.push({ key: 'mimi.streak', vars: { n: profile.streak.count } });
   }
   if (profile.flags?.festivalDone) lines.push({ key: 'mimi.festival' });
+
+  // The always-available ask ("kijk eens wat ik al kan!") — deflected warmly
+  // while a fresh check makes a redo pointless (docs/05 §3.1.2).
+  if (!suggestion) {
+    lines.push({ key: checkupFresh(profile, now) ? 'mimi.checkup_fresh' : 'mimi.checkup_ask' });
+  }
 
   // Her self-talk shifts with the arc — anxious, then opening, then whole. This is tone,
   // not advice: it rides alongside the quest lines above, which never change by phase.

@@ -5,7 +5,7 @@
 export { closeScreen, esc, PET_EMOJI, HAT_EMOJI, WORLD_EMOJI } from './screens/core.js';
 export { showAttract, showTitle, showStory, showFinale } from './screens/intro.js';
 export { showLineCeremony, showStoryBeat, showAltar, storyHexagram } from './screens/story.js';
-export { showWarmup } from './screens/warmup.js';
+export { showCheckup } from './screens/checkup.js';
 export { showSettings } from './screens/settings.js';
 export { showShop, showPets, showHatch, showIsland } from './screens/cosmetics.js';
 export { showGems } from './screens/gems.js';

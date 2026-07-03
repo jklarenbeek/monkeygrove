@@ -113,6 +113,23 @@ export function createCurriculumState({
     placementBand: 'unknown',
     strictness: 'soft',
     warmup: { completed: false, results: [], skillIds: [] },
+    // Mimi's Check (docs/05): the child-said school group (a better exposure
+    // prior than age — ~1 in 4 Dutch children is not in the groep their birth
+    // date predicts), and the last completed adaptive placement probe.
+    groep: null,
+    groepCapturedOn: null,
+    groepSource: null,
+    checkup: emptyCheckup(),
+    checkupDraft: null,
+  };
+}
+
+function emptyCheckup() {
+  return {
+    completed: false, on: null, mode: null,
+    frontier: null, allClear: false, targetBand: null, ceilingBand: null,
+    bands: {}, notFluent: [], supported: [], misconceptions: [],
+    itemsAsked: 0, flags: {},
   };
 }
 
@@ -127,6 +144,11 @@ export function retargetCurriculumPack(curriculum = {}, packId = DEFAULT_PACK) {
     ...curriculum,
     ...base,
     strictness: curriculum.strictness || base.strictness,
+    // A pack change invalidates the measured placement (base resets checkup),
+    // but the child's stated groep survives — it's a fact about the child.
+    groep: curriculum.groep ?? null,
+    groepCapturedOn: curriculum.groepCapturedOn ?? null,
+    groepSource: curriculum.groepSource ?? null,
   };
 }
 
@@ -173,6 +195,110 @@ export function refreshCurriculumForDate(curriculum = {}, onDate = todayString()
   };
 }
 
+// ---------- Mimi's Check: groep prior, target bands, result (docs/05) ----------
+
+// The child-said school group. Groep measures curriculum *exposure* directly;
+// age only predicts it — and mispredicts it for the zittenblijvers and
+// herfstkinderen this game cares most about (docs/05 §2.3).
+export function setCurriculumGroep(curriculum = {}, groep, { on = todayString() } = {}) {
+  const pack = getPack(curriculum.packId || DEFAULT_PACK);
+  const n = Number(groep);
+  const valid = Number.isInteger(n) && n >= 1 && n <= pack.stages.length;
+  return {
+    ...curriculum,
+    groep: valid ? n : null,
+    groepCapturedOn: valid ? (ymdString(on) || todayString()) : null,
+    groepSource: valid ? 'child' : null,
+  };
+}
+
+function groepOrder(pack, groep) {
+  return pack.stages.some((s) => s.order === groep) ? groep : null;
+}
+
+// Where a check should aim: parent override > child-said groep > age estimate.
+// Bands are ladder bands (grade − 1, clamped to the probeable 1..7 — band 0 is
+// observational). `kleuter` marks the never-probe rule (docs/05 §2.5): groep 1-2,
+// or age ≤ 5 with no groep, plays instead of testing.
+export function checkupTarget(curriculum = {}) {
+  const pack = getPack(curriculum.packId || DEFAULT_PACK);
+  const parentStage = curriculum.stageSource === 'parent' ? curriculum.confirmedStage : null;
+  const groep = groepOrder(pack, curriculum.groep);
+  const stageOrderOf = parentStage ? stageOrder(pack, parentStage)
+    : groep ?? stageOrder(pack, curriculum.confirmedStage || curriculum.estimatedStage);
+  const age = currentCurriculumAge(curriculum);
+  const ageOrder = stageOrder(pack, estimateStageFromAge(pack.id, age));
+  // No prior at all (unsure trail, no groep, no age): start mid-primary and let
+  // the staircase walk both ways — better than defaulting to either end.
+  const order = stageOrderOf ?? ageOrder ?? 4;
+  return {
+    targetBand: Math.max(1, Math.min(7, order - 1)),
+    ageBand: ageOrder != null ? ageOrder - 1 : null,
+    kleuter: (groep != null && groep <= 2) || (groep == null && age != null && age <= 5),
+  };
+}
+
+// Store a finished check. mode 'probe' carries a measured frontier; 'kleuter'
+// and 'skipped' just mark the check handled so onboarding never re-forces it
+// (Mimi's offers remain the recalibration path). Marks the legacy warmup
+// complete too, so pre-checkup saves and the old flow agree.
+export function applyCheckupResult(curriculum = {}, result = null, { on = todayString(), mode = 'probe' } = {}) {
+  const day = ymdString(on) || todayString();
+  const legacyWarmup = {
+    ...(curriculum.warmup || {}),
+    completed: true,
+    results: curriculum.warmup?.results || [],
+    skillIds: curriculum.warmup?.skillIds || [],
+  };
+  if (mode !== 'probe' || !result) {
+    return {
+      ...curriculum,
+      checkupDraft: null,
+      checkup: { ...emptyCheckup(), completed: true, on: day, mode: mode === 'probe' ? 'skipped' : mode },
+      warmup: legacyWarmup,
+    };
+  }
+  const frontierBand = result.frontier == null ? null : result.frontier >> 3;
+  const placementBand = frontierBand == null || frontierBand > result.targetBand ? 'ahead'
+    : frontierBand === result.targetBand ? 'on_track' : 'below';
+  return {
+    ...curriculum,
+    placementBand,
+    checkupDraft: null,
+    checkup: {
+      completed: true,
+      on: day,
+      mode,
+      frontier: result.frontier ?? null,
+      allClear: !!result.allClear,
+      targetBand: result.targetBand ?? null,
+      ceilingBand: result.ceilingBand ?? null,
+      bands: result.bands || {},
+      notFluent: result.notFluent || [],
+      supported: result.supported || [],
+      misconceptions: result.misconceptions || [],
+      itemsAsked: result.itemsAsked ?? 0,
+      flags: result.flags || {},
+    },
+    warmup: legacyWarmup,
+  };
+}
+
+// The Dutch-native readout (docs/05 §2.3): the frontier translated to a
+// functioneringsniveau — M = midden, E = eind of the frontier's grade,
+// independent of the enrolled groep. Solid to the ceiling reads as E{grade}+.
+export function functioneringsniveau(curriculum = null) {
+  const ck = curriculum?.checkup;
+  if (!ck?.completed || ck.mode !== 'probe') return null;
+  if (ck.frontier == null) {
+    const grade = (ck.ceilingBand ?? 7) + 1;
+    return { label: `E${grade}+`, grade, top: true };
+  }
+  const grade = (ck.frontier >> 3) + 1;
+  const half = (ck.frontier & 7) < 4 ? 'M' : 'E';
+  return { label: `${half}${grade}`, grade, top: false };
+}
+
 export function scoreWarmup(results = []) {
   const answered = results.filter((r) => typeof r.correct === 'boolean');
   const correct = answered.filter((r) => r.correct).length;
@@ -193,12 +319,34 @@ function resolveLowerBoundOrder(pack, curriculum) {
   if (confirmed != null && (estimated == null || parentOverride)) {
     return confirmed;
   }
-  return estimated ?? confirmed;
+  // The child-said groep beats the age estimate (docs/05 §3.2): a zittenblijver
+  // who picked groep 4 gets a groep-4 floor, not the age-derived one.
+  return groepOrder(pack, curriculum.groep) ?? estimated ?? confirmed;
 }
 
 export function eligibleObjectives(curriculum = null) {
   if (!curriculum?.packId) return [];
   const pack = getPack(curriculum.packId);
+
+  // A measured placement (docs/05 §3.7) beats the stage heuristics: the practice
+  // window hugs the frontier — it may sit BELOW the age/groep floor (that is the
+  // point for the struggling tail; story access never shrinks, only practice
+  // moves) — and the ceiling stays hard at groep + 2 stages.
+  const ck = curriculum.checkup;
+  if (ck?.completed && ck.mode === 'probe') {
+    const ceil = Math.min(pack.stages.length, (ck.ceilingBand ?? 7) + 1);
+    const frontierStage = ck.frontier == null
+      ? ceil
+      : Math.max(1, Math.min(ceil, (ck.frontier >> 3) + 1));
+    const loStage = ck.frontier == null ? Math.max(1, ceil - 1) : frontierStage;
+    const hiStage = ck.frontier == null ? ceil : Math.min(ceil, frontierStage + 1);
+    const allowed = new Set(curriculum.strictness === 'strict'
+      ? [frontierStage]
+      : Array.from({ length: hiStage - loStage + 1 }, (_, i) => loStage + i));
+    return listObjectives(pack.id, { status: 'playable' })
+      .filter((o) => allowed.has(stageOrder(pack, o.stage)));
+  }
+
   const lowerBound = resolveLowerBoundOrder(pack, curriculum);
   if (!lowerBound) return listObjectives(pack.id, { status: 'playable' });
 

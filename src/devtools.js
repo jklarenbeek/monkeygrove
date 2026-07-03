@@ -225,6 +225,10 @@ function setWorldMasteryPercent(math, world, percent) {
 
 function ensureBasics(profile, stage = profile.curriculum?.confirmedStage || 'grade_5') {
   if (!profile.curriculum) profile.curriculum = createCurriculumState({ age: 8 });
+  // A completed synthetic checkup (frontier mid-target-band) so presets skip the
+  // onboarding check and eligibility windows to stage..stage+1 like before.
+  const order = Number(String(stage).split('_')[1]) || 5;
+  const targetBand = Math.max(1, Math.min(7, order - 1));
   profile.curriculum = {
     ...profile.curriculum,
     estimatedStage: stage,
@@ -235,6 +239,22 @@ function ensureBasics(profile, stage = profile.curriculum?.confirmedStage || 'gr
       ...(profile.curriculum.warmup || {}),
       completed: true,
       scored: profile.curriculum.warmup?.scored || { band: 'on_track' },
+    },
+    checkupDraft: null,
+    checkup: {
+      completed: true,
+      on: new Date().toISOString().slice(0, 10),
+      mode: 'probe',
+      frontier: targetBand * 8 + 3,
+      allClear: false,
+      targetBand,
+      ceilingBand: Math.min(7, targetBand + 2),
+      bands: {},
+      notFluent: [],
+      supported: [],
+      misconceptions: [],
+      itemsAsked: 0,
+      flags: {},
     },
   };
   profile.flags = profile.flags || {};

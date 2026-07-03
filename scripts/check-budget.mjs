@@ -56,8 +56,17 @@ import { join } from 'node:path';
 // First-load raised to 300 at the author's request (comfortable headroom for cheap
 // Android / school Wi-Fi); precache raised to clear the new chunk with jitter room.
 // Bumped DELIBERATELY — the caps stay real guardrails.
+// 2026-07-03: precache 1300 -> 1340 for Mimi's Check (docs/05) — the adaptive
+// placement probe: the pure state machine (curriculum/checkup.js), the overlay
+// with groep picker + numpad (screens/checkup.js), confirm-target probes and
+// uncertainty-boosted calibration in the engine, Mimi's offer logic, the parent
+// functioneringsniveau readout, and the EN/NL strings. All of it is eager by
+// design (it runs at onboarding, before anything lazy loads) and code-splitting
+// would not shrink the precache anyway — lazy chunks are precached too. Real
+// first-load functionality (~19 KiB raw), bumped DELIBERATELY with jitter room;
+// the cap stays a real guardrail. index gzip stays well under its own cap.
 const INDEX_JS_GZIP_BUDGET_KB = 300;   // decimal kB (÷1000), matches Vite's report
-const PRECACHE_BUDGET_KIB = 1300;      // binary KiB (÷1024), matches workbox's report
+const PRECACHE_BUDGET_KIB = 1340;      // binary KiB (÷1024), matches workbox's report
 
 const DIST = 'dist';
 const ASSETS = join(DIST, 'assets');

@@ -3,14 +3,19 @@ import * as THREE from 'three';
 import { World } from './world.js';
 import { Particles } from './entities.js';
 import { PETS } from './models.js';
-import { nextProblem, recordResult, masteryReport } from './mathengine.js';
+import { nextProblem, recordCalibration, masteryReport } from './mathengine.js';
 import {
   loadSave, settings, profiles, activeProfile, selectProfile,
-  hatchEgg, persist, persistNow, todayString,
+  hatchEgg, persist, persistNow, todayString, addBananas,
 } from './state.js';
 import {
-  applyWarmupResult, eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
+  applyCheckupResult, checkupTarget, setCurriculumGroep, CONFIRM_TARGET,
+  eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
 } from './curriculum/placement.js';
+import {
+  createCheckup, checkupNext, checkupRecord, checkupAbort, checkupResult,
+} from './curriculum/checkup.js';
+import { ladderStep } from './curriculum/ladder.js';
 // ensureShop resolves one shop's healed state eagerly; aggregateBusinessReport merges
 // both shops for the parent dashboard. The heavy bakery/pizzeria sim (BusinessPlace +
 // BusinessController) is lazy-loaded in startBusiness(), so it ships in its own
@@ -193,12 +198,19 @@ class Game {
         persistNow();
         this.showParents(p.id, onClose);
       },
+      // Queues Mimi's offer for the child's next hub visit (docs/05 §3.1.4).
+      onRequestCheckup: p ? () => {
+        p.flags = p.flags || {};
+        p.flags.checkupRequested = true;
+        persistNow();
+        this.showParents(p.id, onClose);
+      } : null,
       onClose,
     });
   }
 
   // Player picker / new-explorer form: new or intro-unseen profiles go through
-  // the story, then warm-up if their curriculum needs placing, then the hub.
+  // the story, then Mimi's Check if their curriculum needs placing, then the hub.
   showPlayerSelect() {
     screens.showTitle({
       onLangChange: () => this.place?.refreshLanguage?.(),
@@ -208,11 +220,11 @@ class Game {
         const continueFromIntro = () => {
           this.profile.flags.introSeen = true;
           persist();
-          if (this.needsWarmup()) this.startWarmupThenHub();
+          if (this.needsCheckup()) this.startCheckupThenHub();
           else this.startHub();
         };
         if (isNew || !this.profile.flags.introSeen) screens.showStory(continueFromIntro);
-        else if (this.needsWarmup()) this.startWarmupThenHub();
+        else if (this.needsCheckup()) this.startCheckupThenHub();
         else this.startHub();
       },
       onParents: () => this.showParentSelect(() => this.showPlayerSelect()),
@@ -220,64 +232,174 @@ class Game {
     });
   }
 
-  needsWarmup(profile = this.profile) {
-    if (profile?.curriculum?.warmup?.completed) return false;
-    return !!profile?.flags?.needsPlacementWarmup || profile?.curriculum?.ageAtStart != null;
+  // ---------- Mimi's Check (docs/05): adaptive placement & recalibration ----------
+
+  // Onboarding forces a check exactly once; a completed check (or a legacy
+  // completed warm-up) is never re-forced — recalibration goes through Mimi's
+  // offers in the hub instead.
+  needsCheckup(profile = this.profile) {
+    const cur = profile?.curriculum;
+    if (cur?.checkup?.completed || cur?.warmup?.completed) return false;
+    return !!profile?.flags?.needsPlacementWarmup || cur?.ageAtStart != null;
   }
 
-  startWarmupThenHub() {
+  startCheckupThenHub() {
+    this.runCheckup({ onDone: () => this.startHub() });
+  }
+
+  // Invoked from Mimi's talk ladder in the hub (hub.js) or a parent request.
+  startCheckupFromHub() {
+    this.runCheckup({ onDone: () => this.startHub() });
+  }
+
+  // One check session: groep (always re-asked on a fresh run — it's one tap and
+  // September changes it), birthday (once, optional), then the probe loop driven
+  // by the pure state machine. Every answer persists into a resumable draft;
+  // Elo calibration is batched at settle so a rushed streak or an unscored
+  // bookend never writes ratings (docs/05 §3.4).
+  runCheckup({ onDone }) {
+    const profile = this.profile;
+    let machine = null;
     let settled = false;
-    const finishWarmup = (fn) => {
+    const settleOnce = (fn) => {
       if (settled) return;
       settled = true;
       fn?.();
     };
-    const savedWarmup = this.profile.curriculum?.warmup || {};
-    const savedSkills = Array.isArray(savedWarmup.skillIds) ? savedWarmup.skillIds.slice(0, 3) : [];
-    const probeSkills = savedSkills.length
-      ? savedSkills
-      : eligibleSkillIds(this.profile.curriculum).slice(0, 3);
-    const skillIds = probeSkills.length ? probeSkills : ['add_20', 'sub_20', 'tables_a'];
-    const results = Array.isArray(savedWarmup.results)
-      ? savedWarmup.results.slice(0, skillIds.length)
-      : [];
-    if (results.length >= skillIds.length) {
-      this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
-      persist();
-      finishWarmup(() => this.startHub());
-      return;
-    }
-    const problems = skillIds.map((skill, i) => nextProblem(this.profile.math, {
-      skill,
-      kind: 'fetch',
-      rng: new Rng(`warmup:${this.profile.id}:${skill}:${i}`),
-      now: Date.now(),
-    })).slice(results.length);
 
-    screens.showWarmup({
-      problems,
-      onAnswer: ({ problem, correct }) => {
-        results.push({ skill: problem.skillId, correct });
-        recordResult(this.profile.math, problem, { correct, ms: 0, usedHint: false }, { now: Date.now() });
-        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, {
-          completed: false,
-          skillIds,
-        });
+    const screen = screens.showCheckup({
+      onSkip: () => settleOnce(() => {
+        // Skipped at the setup pages: mark the check handled (Mimi keeps
+        // offering later), exactly like the old warm-up skip.
+        profile.curriculum = applyCheckupResult(profile.curriculum, null, { mode: 'skipped' });
+        if (profile.flags) profile.flags.needsPlacementWarmup = false;
         persist();
-      },
-      onDone: () => {
-        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
-        if (this.profile.flags) this.profile.flags.needsPlacementWarmup = false;
-        persist();
-        finishWarmup(() => this.startHub());
-      },
-      onSkip: () => {
-        this.profile.curriculum = applyWarmupResult(this.profile.curriculum, results, { skillIds });
-        if (this.profile.flags) this.profile.flags.needsPlacementWarmup = false;
-        persist();
-        finishWarmup(() => this.startHub());
+        onDone();
+      }),
+      onStop: () => {
+        if (!machine || settled) return;
+        checkupAbort(machine);
+        settleOnce(() => this.settleCheckup(machine, screen, onDone, { quit: true }));
       },
     });
+
+    const stepLoop = () => {
+      if (settled) return;
+      const req = checkupNext(machine);
+      if (req.type !== 'item') {
+        settleOnce(() => this.settleCheckup(machine, screen, onDone, {}));
+        return;
+      }
+      const problem = nextProblem(profile.math, {
+        skill: req.skillId,
+        kind: 'fetch',
+        probe: { targetSuccess: CONFIRM_TARGET, scaffold: req.scaffold ?? undefined },
+        rng: new Rng(`checkup:${profile.id}:${machine.runId}:${machine.answers.length}:${req.stepId}`),
+        now: Date.now(),
+      });
+      const count = machine.answers.filter((a) => !a.unscored).length;
+      screen.presentItem(problem, { count }, ({ correct, ms, tag }) => {
+        checkupRecord(machine, { correct, ms, tag, difficulty: problem.difficulty });
+        profile.curriculum = { ...profile.curriculum, checkupDraft: { ...machine, on: todayString() } };
+        persist();
+        setTimeout(stepLoop, 600); // let the praise flash land before the next card
+      });
+    };
+
+    const beginProbe = () => {
+      if (settled) return;
+      const { targetBand, ageBand, kleuter } = checkupTarget(profile.curriculum);
+      // Groep 1-2 / age ≤ 5 is never probed (docs/05 §2.5) — Mimi just plays.
+      if (kleuter) {
+        screen.showKleuter(() => settleOnce(() => {
+          profile.curriculum = applyCheckupResult(profile.curriculum, null, { mode: 'kleuter' });
+          if (profile.flags) profile.flags.needsPlacementWarmup = false;
+          persist();
+          onDone();
+        }));
+        return;
+      }
+      const draft = profile.curriculum.checkupDraft;
+      machine = draft?.v === 1 && draft.targetBand === targetBand
+        ? draft
+        : Object.assign(createCheckup({ targetBand, ageBand }), { runId: Date.now().toString(36) });
+      stepLoop();
+    };
+
+    const askBirthdayThen = () => {
+      if (settled) return;
+      if (profile.curriculum.birthDate || profile.curriculum.checkup?.completed) {
+        beginProbe();
+        return;
+      }
+      screen.askBirthday({
+        onPick: (ymd) => {
+          if (ymd) {
+            profile.curriculum = refreshCurriculumForDate({ ...profile.curriculum, birthDate: ymd }, todayString());
+            persist();
+          }
+          beginProbe();
+        },
+      });
+    };
+
+    // A pending draft resumes straight into the probe; a fresh run re-asks groep.
+    if (profile.curriculum.checkupDraft?.v === 1) {
+      beginProbe();
+      return;
+    }
+    screen.askGroep({
+      onPick: (groep) => {
+        profile.curriculum = setCurriculumGroep(profile.curriculum, groep, { on: todayString() });
+        persist();
+        askBirthdayThen();
+      },
+    });
+  }
+
+  // Conclude a check: batch the Elo calibration from the accepted evidence, then
+  // either apply the measured placement (complete) or keep the draft (interrupted).
+  settleCheckup(machine, screen, onDone, { quit = false } = {}) {
+    const profile = this.profile;
+    const result = checkupResult(machine);
+    const now = Date.now();
+    const from = machine.calibratedUpTo || 0;
+    for (const a of machine.answers.slice(from)) {
+      if (a.unscored || a.rushed || a.difficulty == null) continue;
+      recordCalibration(
+        profile.math,
+        { skillId: a.skillId, difficulty: a.difficulty, answer: null, meta: {} },
+        { correct: a.correct, ms: a.ms ?? 0 },
+        { now },
+      );
+    }
+    machine.calibratedUpTo = machine.answers.length;
+
+    if (result.complete) {
+      profile.curriculum = applyCheckupResult(profile.curriculum, result, { mode: 'probe' });
+      if (profile.flags) {
+        profile.flags.needsPlacementWarmup = false;
+        profile.flags.checkupRequested = false;
+      }
+      addBananas(profile, 10); // completion reward — identical whatever the frontier
+      persist();
+      if (quit || result.flags.rushed) {
+        onDone();
+        return;
+      }
+      const world = result.frontier != null ? ladderStep(result.frontier)?.world : null;
+      const worldEmoji = { ...screens.WORLD_EMOJI, business: '🥐', hub: '🌴' }[world] || '🌈';
+      screen.showDone({ reward: 10, worldEmoji }, () => onDone());
+      return;
+    }
+    // Interrupted before the frontier was bracketed: partial evidence is already
+    // calibrated; the draft resumes next time (a rushed run starts over fresh).
+    profile.curriculum = {
+      ...profile.curriculum,
+      checkupDraft: result.flags.rushed ? null : { ...machine, on: todayString() },
+    };
+    persist();
+    onDone();
   }
 
   // ---------- chamber run (owned by ChamberFlow) ----------

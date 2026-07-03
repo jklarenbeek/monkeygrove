@@ -97,7 +97,7 @@ try {
         if (await present(page, '#new-go')) await click(page, '#new-go');
         await pause(page, 800);
         for (let i = 0; i < 15 && await present(page, '#story-next'); i++) { await click(page, '#story-next'); await pause(page, 200); }
-        if (await present(page, '#warmup-skip')) await click(page, '#warmup-skip');
+        if (await present(page, '#checkup-skip')) await click(page, '#checkup-skip');
         await pause(page, 1500);
       }
       await captureScene(page, `${base}-hub`);

@@ -457,11 +457,15 @@ export class HubController {
       const line = this.mimiNext();
       const tok = g.flowToken;
       // "enough bananas for X!" walks you to the worktable the moment you
-      // confirm her line — like a villager leading you to the counter
+      // confirm her line — like a villager leading you to the counter; her
+      // check offer/ask opens the check the same way (docs/05 §3.1).
+      const launchesCheckup = line.key === 'mimi.checkup_offer' || line.key === 'mimi.checkup_ask';
       hud.say(line.html, {
         onDone: line.key === 'mimi.build_ready'
           ? () => { if (tok === g.flowToken && g.mode === 'hub') this.openIsland(); }
-          : null,
+          : launchesCheckup
+            ? () => { if (tok === g.flowToken && g.mode === 'hub') g.startCheckupFromHub(); }
+            : null,
       });
     } else {
       const npc = target.npc;
@@ -497,7 +501,7 @@ export class HubController {
     // Use the age-aware build report so Mimi's advice (next build, banana gap,
     // weakest world) matches what the worktable actually offers an older child.
     const { buildReport, finaleReady } = this.islandGatingInputs();
-    const lines = mimiLines(g.profile, buildReport, islandStatus(g.profile, buildReport, { finaleReady }));
+    const lines = mimiLines(g.profile, buildReport, islandStatus(g.profile, buildReport, { finaleReady }), { now: Date.now() });
     const line = lines[g.mimiChat % lines.length];
     if (consume) g.mimiChat++;
     if (!g.profile.flags.mimiMet) { g.profile.flags.mimiMet = true; persist(); }
