@@ -1,34 +1,23 @@
-// Monkey Grove — game controller: boot, loop, flow, input, juice.
-import * as THREE from 'three';
+// Monkey Grove — the Game shell: boot, the frame loop, scene switching, and the
+// shared state every collaborator reaches through (profile, place, player, …).
+// The flows live beside it: appflow.js (title/parents/settings screens),
+// checkupflow.js (Mimi's Check), story/flow.js (hub-entry ceremonies), and the
+// controllers it constructs (hub, chamber, input, avatar, rewards).
 import { World } from './world.js';
 import { Particles } from './entities.js';
-import { PETS } from './models.js';
-import { nextProblem, recordCalibration, masteryReport } from './mathengine.js';
 import {
-  loadSave, settings, profiles, activeProfile, selectProfile,
-  hatchEgg, persist, persistNow, todayString, addBananas,
+  loadSave, settings, persist, persistNow,
 } from './state.js';
-import {
-  applyCheckupResult, checkupTarget, setCurriculumGroep, CONFIRM_TARGET,
-  eligibleSkillIds, refreshCurriculumForDate, retargetCurriculumPack,
-} from './curriculum/placement.js';
-import {
-  createCheckup, checkupNext, checkupRecord, checkupAbort, checkupResult,
-} from './curriculum/checkup.js';
-import { ladderStep } from './curriculum/ladder.js';
-// ensureShop resolves one shop's healed state eagerly; aggregateBusinessReport merges
-// both shops for the parent dashboard. The heavy bakery/pizzeria sim (BusinessPlace +
-// BusinessController) is lazy-loaded in startBusiness(), so it ships in its own
-// `business-*` chunk the title/hub never download.
-import { aggregateBusinessReport, ensureShop } from './business/engine.js';
-import { stageReport } from './stage/engine.js';
+// ensureShop resolves one shop's healed state eagerly. The heavy bakery/pizzeria
+// sim (BusinessPlace + BusinessController) is lazy-loaded in startBusiness(), so
+// it ships in its own `business-*` chunk the title/hub never download.
+import { ensureShop } from './business/engine.js';
 import { isBuilt } from './island.js';
-import { ensureStory, refreshStoryLines, worldBands, drawNarrativeLine, markBeat } from './story/engine.js';
-import { advanceMimiPhase } from './mimi.js';
-import { lineCeremonies, dueNarrativeBeat, dueSightingBeat, NARRATIVE_BEATS } from './story/chapters.js';
+import { enterHub } from './story/flow.js';
+import { runCheckup } from './checkupflow.js';
+import * as appflow from './appflow.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
-import { t } from './i18n.js';
 import { audio } from './audio.js';
 import { applyComfortSettings } from './a11y.js';
 import { updateTweens } from './anim.js';
@@ -39,8 +28,6 @@ import { RewardService } from './rewards.js';
 import { HubController } from './hub.js';
 import { ChamberFlow } from './chamberflow.js';
 import { runSceneTransition } from './scene-transition.js';
-
-const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
 
 class Game {
   constructor() {
@@ -72,7 +59,6 @@ class Game {
     this.usedHint = false;
     this.rng = new Rng((Math.random() * 2 ** 31) >>> 0);
     this.chamberRng = this.rng;   // seeded per-chamber in duels for fairness
-    this.trailT = 0;
     this.sessionStart = performance.now();
     this.duel = null;   // set by duel mode
     this.pickups = [];  // scattered banana pickups (crab yoinks are recoverable)
@@ -140,268 +126,56 @@ class Game {
     window.addEventListener('beforeunload', () => persistNow());
   }
 
-  // ---------- screens & flow ----------
+  // ---------- screens & flows (owned by appflow / checkupflow / story/flow) ----------
 
-  showTitle() {
-    this.mode = 'title';
-    this.flowToken++;
-    this.hubWelcomed = false;
-    hud.showHud(false);
-    this.clearPlace();
-    this.player = null;
-    this.pet = null;
-    audio.music(null);
-    // the island itself is the title screen: a fully bloomed grove, alive
-    // behind the logo — the game advertising the game
-    this.hub.buildAttractIsland();
-    screens.showAttract({
-      onStart: () => this.showPlayerSelect(),
-      onParents: () => this.showParentSelect(),
-      onDuel: () => this.startDuelSetup(),
-      onLangChange: () => this.place?.refreshLanguage?.(),
-    });
+  showTitle() { appflow.showTitle(this); }
+
+  openSettings(devOpen = false) { return appflow.openSettings(this, devOpen); }
+
+  // Onboarding (appflow) forces a check exactly once; Mimi's talk ladder in the
+  // hub (hub.js) and a parent request re-offer it later.
+  startCheckupThenHub() { runCheckup(this, { onDone: () => this.startHub() }); }
+
+  startCheckupFromHub() { runCheckup(this, { onDone: () => this.startHub() }); }
+
+  // Hub entry routes through the story flow: newly earned hexagram lines play
+  // their ceremonies (and the one-shot narrative beats) before the hub builds.
+  startHub() { enterHub(this); }
+
+  afterLanguageChange() {
+    hud.refreshLabels();
+    this.refreshHudCounts();
+    if (this.mode === 'chamber') {
+      this.chamber.refreshLanguage();
+    } else if (this.mode === 'business') {
+      this.business?.refreshLanguage?.();
+    } else if (this.mode === 'stage') {
+      this.stage?.refreshLanguage?.();
+    } else if (this.mode === 'hub') {
+      this.place?.refreshLanguage?.();
+    }
   }
 
-  showParentSelect(onBack = () => this.showTitle()) {
-    screens.showParentProfileSelect({
-      profiles: profiles(),
-      onChoose: (profileId) => this.showParents(profileId, () => this.showParentSelect(onBack)),
-      onBack,
-    });
-  }
-
-  // Parent dashboard: mastery + curriculum coverage, and the controls that edit
-  // birthday / pack / stage / strictness (each re-renders this screen).
-  showParents(profileId = null, onClose = () => this.showTitle()) {
-    const p = profileId
-      ? profiles().find((profile) => profile.id === profileId) || null
-      : activeProfile();
-    screens.showParents({
-      report: p ? masteryReport(p.math, { now: Date.now() }) : null,
-      profile: p,
-      businessReport: p?.business ? aggregateBusinessReport(p) : null,
-      stageReport: p?.stage ? stageReport(p.stage) : null,
-      onCurriculumChange: (patch) => {
-        if (!p) return;
-        const { birthDate, packId, ...rest } = patch;
-        const currentPack = p.curriculum?.packId;
-        let base = packId && packId !== currentPack
-          ? retargetCurriculumPack(p.curriculum, packId)
-          : p.curriculum;
-        if (birthDate !== undefined) {
-          base = refreshCurriculumForDate({ ...base, birthDate: birthDate || null }, todayString());
-        }
-        if (patch.confirmedStage !== undefined) {
-          rest.stageSource = patch.confirmedStage === p.curriculum?.estimatedStage ? 'auto' : 'parent';
-        }
-        p.curriculum = { ...base, ...rest };
-        persistNow();
-        this.showParents(p.id, onClose);
-      },
-      // Queues Mimi's offer for the child's next hub visit (docs/05 §3.1.4).
-      onRequestCheckup: p ? () => {
-        p.flags = p.flags || {};
-        p.flags.checkupRequested = true;
-        persistNow();
-        this.showParents(p.id, onClose);
-      } : null,
-      onClose,
-    });
-  }
-
-  // Player picker / new-explorer form: new or intro-unseen profiles go through
-  // the story, then Mimi's Check if their curriculum needs placing, then the hub.
-  showPlayerSelect() {
-    screens.showTitle({
-      onLangChange: () => this.place?.refreshLanguage?.(),
-      onPlay: (pid, isNew) => {
-        this.profile = selectProfile(pid);
-        if (!this.profile) return;
-        const continueFromIntro = () => {
-          this.profile.flags.introSeen = true;
-          persist();
-          if (this.needsCheckup()) this.startCheckupThenHub();
-          else this.startHub();
-        };
-        if (isNew || !this.profile.flags.introSeen) {
-          // the theft, played by the engine itself (DOM cards as fallback)
-          this.playCutscene('intro', continueFromIntro, () => screens.showStory(continueFromIntro));
-        } else if (this.needsCheckup()) this.startCheckupThenHub();
-        else this.startHub();
-      },
-      onParents: () => this.showParentSelect(() => this.showPlayerSelect()),
-      onDuel: () => this.startDuelSetup(),
-    });
-  }
-
-  // ---------- Mimi's Check (docs/05): adaptive placement & recalibration ----------
-
-  // Onboarding forces a check exactly once; a completed check (or a legacy
-  // completed warm-up) is never re-forced — recalibration goes through Mimi's
-  // offers in the hub instead.
-  needsCheckup(profile = this.profile) {
-    const cur = profile?.curriculum;
-    if (cur?.checkup?.completed || cur?.warmup?.completed) return false;
-    return !!profile?.flags?.needsPlacementWarmup || cur?.ageAtStart != null;
-  }
-
-  startCheckupThenHub() {
-    this.runCheckup({ onDone: () => this.startHub() });
-  }
-
-  // Invoked from Mimi's talk ladder in the hub (hub.js) or a parent request.
-  startCheckupFromHub() {
-    this.runCheckup({ onDone: () => this.startHub() });
-  }
-
-  // One check session: groep (always re-asked on a fresh run — it's one tap and
-  // September changes it), birthday (once, optional), then the probe loop driven
-  // by the pure state machine. Every answer persists into a resumable draft;
-  // Elo calibration is batched at settle so a rushed streak or an unscored
-  // bookend never writes ratings (docs/05 §3.4).
-  runCheckup({ onDone }) {
-    const profile = this.profile;
-    let machine = null;
-    let settled = false;
-    const settleOnce = (fn) => {
-      if (settled) return;
-      settled = true;
-      fn?.();
-    };
-
-    const screen = screens.showCheckup({
-      onSkip: () => settleOnce(() => {
-        // Skipped at the setup pages: mark the check handled (Mimi keeps
-        // offering later), exactly like the old warm-up skip.
-        profile.curriculum = applyCheckupResult(profile.curriculum, null, { mode: 'skipped' });
-        if (profile.flags) profile.flags.needsPlacementWarmup = false;
-        persist();
-        onDone();
-      }),
-      onStop: () => {
-        if (!machine || settled) return;
-        checkupAbort(machine);
-        settleOnce(() => this.settleCheckup(machine, screen, onDone, { quit: true }));
-      },
-    });
-
-    const stepLoop = () => {
-      if (settled) return;
-      const req = checkupNext(machine);
-      if (req.type !== 'item') {
-        settleOnce(() => this.settleCheckup(machine, screen, onDone, {}));
-        return;
-      }
-      const problem = nextProblem(profile.math, {
-        skill: req.skillId,
-        kind: 'fetch',
-        probe: { targetSuccess: CONFIRM_TARGET, scaffold: req.scaffold ?? undefined },
-        rng: new Rng(`checkup:${profile.id}:${machine.runId}:${machine.answers.length}:${req.stepId}`),
-        now: Date.now(),
-      });
-      const count = machine.answers.filter((a) => !a.unscored).length;
-      screen.presentItem(problem, { count }, ({ correct, ms, tag }) => {
-        checkupRecord(machine, { correct, ms, tag, difficulty: problem.difficulty });
-        profile.curriculum = { ...profile.curriculum, checkupDraft: { ...machine, on: todayString() } };
-        persist();
-        setTimeout(stepLoop, 600); // let the praise flash land before the next card
-      });
-    };
-
-    const beginProbe = () => {
-      if (settled) return;
-      const { targetBand, ageBand, kleuter } = checkupTarget(profile.curriculum);
-      // Groep 1-2 / age ≤ 5 is never probed (docs/05 §2.5) — Mimi just plays.
-      if (kleuter) {
-        screen.showKleuter(() => settleOnce(() => {
-          profile.curriculum = applyCheckupResult(profile.curriculum, null, { mode: 'kleuter' });
-          if (profile.flags) profile.flags.needsPlacementWarmup = false;
-          persist();
-          onDone();
-        }));
-        return;
-      }
-      const draft = profile.curriculum.checkupDraft;
-      machine = draft?.v === 1 && draft.targetBand === targetBand
-        ? draft
-        : Object.assign(createCheckup({ targetBand, ageBand }), { runId: Date.now().toString(36) });
-      stepLoop();
-    };
-
-    const askBirthdayThen = () => {
-      if (settled) return;
-      if (profile.curriculum.birthDate || profile.curriculum.checkup?.completed) {
-        beginProbe();
-        return;
-      }
-      screen.askBirthday({
-        onPick: (ymd) => {
-          if (ymd) {
-            profile.curriculum = refreshCurriculumForDate({ ...profile.curriculum, birthDate: ymd }, todayString());
-            persist();
-          }
-          beginProbe();
-        },
-      });
-    };
-
-    // A pending draft resumes straight into the probe; a fresh run re-asks groep.
-    if (profile.curriculum.checkupDraft?.v === 1) {
-      beginProbe();
+  confirmHome() {
+    if (this.duel) {
+      // abandoning a duel goes back to the title, not into the other
+      // player's hub with the wrong profile active
+      this.duel = null;
+      this.verb?.destroy();
+      this.verb = null;
+      this.showTitle();
       return;
     }
-    screen.askGroep({
-      onPick: (groep) => {
-        profile.curriculum = setCurriculumGroep(profile.curriculum, groep, { on: todayString() });
-        persist();
-        askBirthdayThen();
-      },
-    });
+    if (this.mode === 'hub') { this.showTitle(); return; }
+    this.verb?.destroy();
+    this.verb = null;
+    this.transitionTo(() => this.startHub(), { kind: 'portal' });
   }
 
-  // Conclude a check: batch the Elo calibration from the accepted evidence, then
-  // either apply the measured placement (complete) or keep the draft (interrupted).
-  settleCheckup(machine, screen, onDone, { quit = false } = {}) {
-    const profile = this.profile;
-    const result = checkupResult(machine);
-    const now = Date.now();
-    const from = machine.calibratedUpTo || 0;
-    for (const a of machine.answers.slice(from)) {
-      if (a.unscored || a.rushed || a.difficulty == null) continue;
-      recordCalibration(
-        profile.math,
-        { skillId: a.skillId, difficulty: a.difficulty, answer: null, meta: {} },
-        { correct: a.correct, ms: a.ms ?? 0 },
-        { now },
-      );
-    }
-    machine.calibratedUpTo = machine.answers.length;
-
-    if (result.complete) {
-      profile.curriculum = applyCheckupResult(profile.curriculum, result, { mode: 'probe' });
-      if (profile.flags) {
-        profile.flags.needsPlacementWarmup = false;
-        profile.flags.checkupRequested = false;
-      }
-      addBananas(profile, 10); // completion reward — identical whatever the frontier
-      persist();
-      if (quit || result.flags.rushed) {
-        onDone();
-        return;
-      }
-      const world = result.frontier != null ? ladderStep(result.frontier)?.world : null;
-      const worldEmoji = { ...screens.WORLD_EMOJI, business: '🥐', hub: '🌴' }[world] || '🌈';
-      screen.showDone({ reward: 10, worldEmoji }, () => onDone());
-      return;
-    }
-    // Interrupted before the frontier was bracketed: partial evidence is already
-    // calibrated; the draft resumes next time (a rushed run starts over fresh).
-    profile.curriculum = {
-      ...profile.curriculum,
-      checkupDraft: result.flags.rushed ? null : { ...machine, on: todayString() },
-    };
-    persist();
-    onDone();
+  refreshHudCounts() {
+    hud.setBananas(this.profile.bananas);
+    hud.setStreak(this.profile.streak.count);
+    hud.setEgg(this.profile.egg.points, this.profile.egg.goal);
   }
 
   // ---------- chamber run (owned by ChamberFlow) ----------
@@ -441,197 +215,7 @@ class Game {
   // Debug/test surface (window.__game.debugChamber): force a skill/kind chamber.
   debugChamber(skill, kind) { return this.chamber.debugChamber(skill, kind); }
 
-  afterResult(then) {
-    const p = this.profile;
-    if (p.egg.points >= p.egg.goal) {
-      const pet = hatchEgg(p, PETS);
-      screens.showHatch(pet, () => {
-        if (pet && !p.avatar.pet) p.avatar.pet = pet.id;
-        this.refreshHudCounts();
-        then();
-      });
-    } else {
-      then();
-    }
-  }
-
-  async openSettings(devOpen = false) {
-    hud.hideBubble();
-    let devTools = null;
-    if (import.meta.env.DEV) {
-      const mod = await import('./devtools.js');
-      const summary = mod.describeDevState(this.profile, this.profile ? masteryReport(this.profile.math, { now: Date.now() }) : null);
-      devTools = {
-        open: devOpen,
-        ...mod.renderDevTools({ summary, presets: mod.DEV_PRESETS, open: devOpen }),
-        onToggle: (open) => this.openSettings(open),
-        onApply: (id) => {
-          const preset = mod.applyDevPreset(this.profile, id);
-          if (!preset) return;
-          persistNow();
-          this.afterDevPresetApplied(preset);
-          this.openSettings(true);
-        },
-        onManual: (values) => {
-          const result = mod.applyManualDevState(this.profile, values);
-          if (!result) return;
-          persistNow();
-          this.afterDevPresetApplied(result);
-          this.openSettings(true);
-        },
-      };
-    }
-    screens.showSettings({
-      onClose: () => screens.closeScreen(),
-      onSwitchPlayer: () => this.showTitle(),
-      onLangChange: () => this.afterLanguageChange(),
-      devTools,
-    });
-  }
-
-  afterLanguageChange() {
-    hud.refreshLabels();
-    this.refreshHudCounts();
-    if (this.mode === 'chamber') {
-      this.chamber.refreshLanguage();
-    } else if (this.mode === 'business') {
-      this.business?.refreshLanguage?.();
-    } else if (this.mode === 'stage') {
-      this.stage?.refreshLanguage?.();
-    } else if (this.mode === 'hub') {
-      this.place?.refreshLanguage?.();
-    }
-  }
-
-  afterDevPresetApplied(preset) {
-    hud.toast(`Dev preset: ${preset.label}`);
-    if (this.mode === 'hub') {
-      this.hub.buildHub();
-      hud.showHud(true);
-      this.refreshHudCounts();
-      return;
-    }
-    if (this.mode !== 'title') this.startHub();
-  }
-
-  confirmHome() {
-    if (this.duel) {
-      // abandoning a duel goes back to the title, not into the other
-      // player's hub with the wrong profile active
-      this.duel = null;
-      this.verb?.destroy();
-      this.verb = null;
-      this.showTitle();
-      return;
-    }
-    if (this.mode === 'hub') { this.showTitle(); return; }
-    this.verb?.destroy();
-    this.verb = null;
-    this.transitionTo(() => this.startHub(), { kind: 'portal' });
-  }
-
-  // Mode entry points the collaborators (and duel/business) call through the
-  // Game shell, which routes them to the owning controller.
-  //
-  // Before the hub builds, draw any founding-hexagram lines the player just
-  // earned (story mode). On a real transition into the hub — returning from a
-  // chamber/business — play their line-draw ceremony first; on the first
-  // title->hub bootstrap the lines are drawn silently (a remembered older-child
-  // batch shouldn't front-load a pile of pop-ups before the kid even arrives).
-  startHub() {
-    // 'cutscene' counts as bootstrap: the only cutscene->hub path is the intro
-    // (via Mimi's Check), and the first arrival must stay pop-up-free.
-    const ceremonial = this.mode !== 'title' && this.mode !== 'hub' && this.mode !== 'cutscene';
-    const queue = this.advanceStory(ceremonial);
-    if (queue.length) { this.runStoryQueue(queue, () => this.hub.startHub()); return; }
-    this.hub.startHub();
-  }
-
-  // Latch any story lines the player just earned (world mastery) and the auto
-  // narrative reveal, persisting as it goes. With `withCeremony`, returns an
-  // ordered queue of screen thunks (line-draw ceremony, then the reveal beat) to
-  // play before the hub builds; without it, the lines are drawn silently (the
-  // first title->hub bootstrap shouldn't front-load a pile of pop-ups). Pure
-  // failures must never block hub entry, so the whole thing is defensive.
-  advanceStory(withCeremony) {
-    const queue = [];
-    try {
-      if (!this.profile) return queue;
-      const report = masteryReport(this.profile.math, { now: Date.now() });
-      const eligible = eligibleSkillIds(this.profile.curriculum);
-      const story = ensureStory(this.profile);
-      let changed = false;
-
-      const newly = refreshStoryLines(story, report, eligible);
-      // Mimi's healing arc tracks the returning friends (monotonic; never relapses).
-      // Side-effect latch; it persists with the line-draw that triggered it.
-      advanceMimiPhase(this.profile);
-      if (newly.length) {
-        changed = true;
-        if (withCeremony) {
-          const bands = worldBands(report, eligible);
-          const kindByWorld = {};
-          for (const [world, info] of Object.entries(bands)) {
-            kindByWorld[world] = info.band === 'below' ? 'remembered' : 'earned';
-          }
-          const events = lineCeremonies(newly, kindByWorld);
-          if (events.length) queue.push((done) => screens.showLineCeremony(events, { story }, done));
-        }
-      }
-
-      // The Four-Directions reveal draws the second line once the first shore is
-      // home — but ONLY ever through its ceremony. The beat is keyed off the line
-      // state (dueNarrativeBeat), so latching the line silently on the title->hub
-      // bootstrap would consume the beat and the child would never see it. On the
-      // silent bootstrap we leave it pending; the next real hub transition (after a
-      // chamber/business) plays it with the honest "2 of 6".
-      if (withCeremony && dueNarrativeBeat(story) === 'reveal') {
-        const revealIdx = NARRATIVE_BEATS.reveal.lineIndex;
-        queue.push((done) => {
-          drawNarrativeLine(story, revealIdx);
-          persist();
-          this.playCutscene('reveal', done, () => screens.showStoryBeat('reveal', { story }, done));
-        });
-      }
-
-      // The Crab King sighting — the mid-game mystery drip. Once the garden line
-      // (Ch03, the Eight Friends) is home, someone with big pincers starts
-      // watching from the gray shore. One-shot, ceremony-gated like the reveal
-      // (a silent bootstrap leaves it pending so the child never misses it),
-      // and marked only when it actually shows.
-      if (withCeremony && dueSightingBeat(story)) {
-        queue.push((done) => {
-          markBeat(story, 'crab_sighting');
-          persist();
-          this.playCutscene('sighting', done, () => screens.showStoryBeat('sighting', { story }, done));
-        });
-      }
-
-      if (changed) persist();
-    } catch (e) {
-      // Story must never block hub entry (anti-anxiety), but a silent swallow hides
-      // real regressions — surface it in dev/test so a broken spine is visible.
-      if (import.meta.env.DEV) console.error('[story] advanceStory failed (hub entry continues):', e);
-      return [];
-    }
-    return queue;
-  }
-
-  // Play a sequence of story-screen thunks (each calls its callback when done),
-  // then the final continuation.
-  runStoryQueue(queue, done) {
-    const step = (i) => {
-      if (i >= queue.length) { done(); return; }
-      queue[i](() => step(i + 1));
-    };
-    step(0);
-  }
-
-  refreshHudCounts() {
-    hud.setBananas(this.profile.bananas);
-    hud.setStreak(this.profile.streak.count);
-    hud.setEgg(this.profile.egg.points, this.profile.egg.goal);
-  }
+  afterResult(then) { this.rewards.afterResult(then); }
 
   // ---------- business ----------
 
@@ -726,69 +310,23 @@ class Game {
   // ---------- story cutscenes ----------
 
   // Play a story beat as a directed 3D scene (lazy `cutscene-*` chunk, like the
-  // shop/stage). The cutscene layer must NEVER block story flow (anti-anxiety):
-  // if the chunk can't load or the scene is unknown, `fallback` (the eager DOM
-  // card version, which calls the continuation itself) plays instead; a play
-  // failure mid-scene still reaches `onDone`. Skip and finish both land here.
+  // shop/stage; the runners live in the chunk too). The cutscene layer must
+  // NEVER block story flow (anti-anxiety): if the chunk can't load or the scene
+  // is unknown, `fallback` (the eager DOM card version, which calls the
+  // continuation itself) plays instead; a play failure mid-scene still reaches
+  // `onDone`. Skip and finish both land here.
   async playCutscene(id, onDone, fallback = null) {
-    let mod = null;
+    let mod;
     try { mod = await import('./cutscene.js'); } catch { mod = null; }
     const scene = mod?.CUTSCENES?.[id];
     if (!scene) { (fallback || onDone)(); return; }
     try {
-      if (scene.staged) await this._playStagedCutscene(mod, scene);
-      else await this._playPlacedCutscene(mod, scene);
+      if (scene.staged) await mod.playStaged(this, scene);
+      else await mod.playPlaced(this, scene);
     } catch (e) {
       if (import.meta.env.DEV) console.error('[cutscene] play failed:', e);
     }
     onDone();
-  }
-
-  // A cutscene with its own diorama: swap the current place out (behind the
-  // portal transition), play, and leave the diorama standing — the caller's
-  // continuation (hub build, checkup screen) replaces or covers it.
-  async _playPlacedCutscene(mod, scene) {
-    this.mode = 'cutscene';
-    const token = ++this.flowToken;
-    let director = null;
-    await runSceneTransition(() => {
-      if (token !== this.flowToken) return;
-      screens.closeScreen();
-      hud.showHud(false);
-      hud.hideBubble();
-      this.clearPlace();
-      this.player = null;
-      this.pet = null;
-      this.place = new mod.CutscenePlace(this.world, scene.place);
-      this.particles = new Particles(this.place.group);
-      this.place.fx = this.particles;
-      director = new mod.CutsceneDirector(this, scene, { place: this.place });
-    }, { kind: 'soft' });
-    if (!director) return;
-    try { await director.play(); } finally { director.dispose(); }
-  }
-
-  // A cutscene staged on the LIVE place (the finale on the hub): freeze the
-  // player, dim the HUD, play, then hand the camera and controls back.
-  async _playStagedCutscene(mod, scene) {
-    const world = this.world;
-    const prev = { mode: this.mode, followObj: world.followObj, followMode: world.followMode, span: world.span };
-    this.mode = 'cutscene';
-    hud.showHud(false);
-    hud.hideBubble();
-    if (this.player) { this.player.stop(); this.player.locked = true; }
-    const director = new mod.CutsceneDirector(this, scene, { place: this.place });
-    try {
-      await director.play();
-    } finally {
-      director.dispose();
-      this.mode = prev.mode;
-      if (this.player) this.player.locked = false;
-      world.followObj = prev.followObj;
-      world.followMode = prev.followMode;
-      world.setSpan(prev.span);
-      hud.showHud(true);
-    }
   }
 
   // ---------- duel ----------
@@ -825,58 +363,6 @@ class Game {
     this.player?.pathTo(cell.x, cell.z);
   }
 
-  previewTapCell(cell) {
-    if (!cell || !this.player || !this.place) return;
-    this.showPathPreview(cell, 1800);
-  }
-
-  clearPathPreview() {
-    const cells = this.controlTintedCells || [];
-    for (const c of cells) this.place?.resetCellTint?.(c.x, c.z);
-    this.controlTintedCells = [];
-    this.controlPreviewT = 0;
-  }
-
-  showPathPreview(cell, ttlMs = 1200) {
-    if (!this.player || !this.place) return;
-    this.clearPathPreview();
-    const seen = new Set();
-    const tint = (c, hex) => {
-      const key = `${c.x},${c.z}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        this.controlTintedCells.push({ x: c.x, z: c.z });
-      }
-      this.place.tintCell?.(c.x, c.z, hex);
-    };
-    for (const c of this.player.reachableCells?.(3) || []) tint(c, 0xfff3b8);
-    const path = this.player.previewPathTo?.(cell.x, cell.z);
-    if (path) for (const c of path) tint(c, 0xc9a6ff);
-    this.controlPreviewT = ttlMs;
-  }
-
-  refreshControlPrompt() {
-    if (!this.player || !this.place || this.mode === 'title') return;
-    if (document.querySelector('#screens .screen')) return;
-    if (this.mode === 'hub') {
-      const near = this.hub.hubNpcNear();
-      if (near) {
-        hud.setAction('💬', { label: t('controls.talk'), ready: true, visibleWhenIdle: true });
-        hud.setProximityPrompt(t('controls.talk'));
-      } else {
-        hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
-        hud.setProximityPrompt(null);
-      }
-      return;
-    }
-    if (hud.hasActionContext?.()) {
-      hud.setProximityPrompt(t('hud.action'));
-    } else {
-      hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
-      hud.setProximityPrompt(null);
-    }
-  }
-
   // ---------- frame update ----------
 
   update(dt) {
@@ -887,10 +373,6 @@ class Game {
     this.pet?.update(dt);
     this.particles?.update(dt);
     this.verb?.update?.(dt);
-    if (this.controlPreviewT > 0) {
-      this.controlPreviewT -= dt;
-      if (this.controlPreviewT <= 0) this.clearPathPreview();
-    }
     // AC-style talk prompt: the action button becomes 💬 beside a friend
     // (checked on a beat — Mimi wanders, so adjacency changes on its own)
     if (this.mode === 'hub' && this.player) {
@@ -901,20 +383,12 @@ class Game {
         if (want !== this.talkBtn) this.talkBtn = want;
       }
     }
-    this.refreshControlPrompt();
+    // path-preview expiry + contextual prompt/action button (input.js)
+    this.input?.updateUX(dt);
     // crab bumps (chamber-only; the controller self-guards on mode/player)
     this.chamber.updateChamber(dt);
-    // cosmetic trail while hopping
-    const trailId = this.profile?.avatar.trail;
-    if (trailId && this.player?.hopping && this.particles) {
-      this.trailT += dt;
-      if (this.trailT > 70) {
-        this.trailT = 0;
-        this.particles.emit(this.player.mesh.position.clone().add(new THREE.Vector3(0, 0.3, 0)), 2, {
-          colors: [TRAIL_COLORS[trailId] || 0xffd966], speed: 0.4, up: 0.8, life: 500, spread: 0.1,
-        });
-      }
-    }
+    // cosmetic trail while hopping (avatar.js)
+    this.avatar.updateTrail(dt);
   }
 
   clearPlace() {
@@ -928,7 +402,7 @@ class Game {
     this.problem = null;
     this.crabs = [];
     this.pickups = [];
-    this.clearPathPreview();
+    this.input.clearPathPreview();
     this.helper = null;
     this.helpKind = null;
     if (this.place) { this.place.dispose(); this.place = null; }

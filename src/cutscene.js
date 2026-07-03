@@ -7,3 +7,4 @@
 export { CutscenePlace } from './cutscene/place.js';
 export { CutsceneDirector } from './cutscene/director.js';
 export { CUTSCENES } from './cutscene/scenes.js';
+export { playPlaced, playStaged } from './cutscene/run.js';

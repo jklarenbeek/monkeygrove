@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
 const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+// The settings flow (and with it the devtools loader) moved into appflow.js.
+const appflowSource = readFileSync(new URL('../src/appflow.js', import.meta.url), 'utf8');
 // Screens were split into src/screens/*.js (TODO_16); read the barrel + every family
 // module so these structural assertions stay location-agnostic.
 const screensSource = [
@@ -13,8 +15,9 @@ const screensSource = [
 
 test('developer tools are dynamically loaded only in Vite dev mode', () => {
   assert.doesNotMatch(mainSource, /import .*['"]\.\/devtools\.js['"]/);
-  assert.match(mainSource, /if \(import\.meta\.env\.DEV\)/);
-  assert.match(mainSource, /import\(['"]\.\/devtools\.js['"]\)/);
+  assert.doesNotMatch(appflowSource, /import .*['"]\.\/devtools\.js['"]/);
+  assert.match(appflowSource, /if \(import\.meta\.env\.DEV\)/);
+  assert.match(appflowSource, /import\(['"]\.\/devtools\.js['"]\)/);
 });
 
 test('settings screen gates developer tools behind an explicit reveal button', () => {

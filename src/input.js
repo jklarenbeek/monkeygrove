@@ -62,6 +62,8 @@ export class InputController {
     this.userZoom = null;        // player's retained pinch/wheel zoom (null = comfort default)
     this.gestureHintDone = false; // pinch/pan hint shows at most once per session
     this.joystick = { active: false, pointerId: null, origin: null, vector: null };
+    this.tintedCells = [];       // cells tinted by the tap preview, reset on expiry
+    this.previewT = 0;           // remaining ms of the current path preview
   }
 
   bind() {
@@ -185,7 +187,7 @@ export class InputController {
       state.orbitDrag = null;
       if (game.mode !== 'title' && !document.querySelector('#screens .screen')) {
         const cell = this.pickCell(e.clientX, e.clientY);
-        if (cell) game.previewTapCell?.(cell);
+        if (cell) this.previewTapCell(cell);
       }
     } else if (state.pointers.size === 2) {
       const c = this._pointerCentroid(state);
@@ -248,7 +250,7 @@ export class InputController {
     if (!wasDrag) {
       const cell = this.pickCell(e.clientX, e.clientY);
       if (!cell) return;
-      this.game.previewTapCell?.(cell);
+      this.previewTapCell(cell);
       this.game.inputTapCell(cell);
     } else {
       this._finishSwipe(e, start);
@@ -275,6 +277,75 @@ export class InputController {
 
   update(dtMs) {
     this.game.player?.updateMoveIntent?.(dtMs);
+  }
+
+  // Per-frame touch-feedback pass: expire the path preview, refresh the
+  // contextual prompt. Called by the Game after the movers have updated, so
+  // the prompt reflects where the player actually stands this frame.
+  updateUX(dtMs) {
+    if (this.previewT > 0) {
+      this.previewT -= dtMs;
+      if (this.previewT <= 0) this.clearPathPreview();
+    }
+    this.refreshControlPrompt();
+  }
+
+  // A pressed-down (not yet released) tap: glow the reachable cells and the
+  // path the hop would take, so the child sees what the tap will do.
+  previewTapCell(cell) {
+    const game = this.game;
+    if (!cell || !game.player || !game.place) return;
+    this.showPathPreview(cell, 1800);
+  }
+
+  clearPathPreview() {
+    for (const c of this.tintedCells) this.game.place?.resetCellTint?.(c.x, c.z);
+    this.tintedCells = [];
+    this.previewT = 0;
+  }
+
+  showPathPreview(cell, ttlMs = 1200) {
+    const game = this.game;
+    if (!game.player || !game.place) return;
+    this.clearPathPreview();
+    const seen = new Set();
+    const tint = (c, hex) => {
+      const key = `${c.x},${c.z}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        this.tintedCells.push({ x: c.x, z: c.z });
+      }
+      game.place.tintCell?.(c.x, c.z, hex);
+    };
+    for (const c of game.player.reachableCells?.(3) || []) tint(c, 0xfff3b8);
+    const path = game.player.previewPathTo?.(cell.x, cell.z);
+    if (path) for (const c of path) tint(c, 0xc9a6ff);
+    this.previewT = ttlMs;
+  }
+
+  // The contextual action button + proximity prompt (AC-style 💬 beside a
+  // friend in the hub, the verb's act prompt in a chamber).
+  refreshControlPrompt() {
+    const game = this.game;
+    if (!game.player || !game.place || game.mode === 'title') return;
+    if (document.querySelector('#screens .screen')) return;
+    if (game.mode === 'hub') {
+      const near = game.hub.hubNpcNear();
+      if (near) {
+        hud.setAction('💬', { label: t('controls.talk'), ready: true, visibleWhenIdle: true });
+        hud.setProximityPrompt(t('controls.talk'));
+      } else {
+        hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
+        hud.setProximityPrompt(null);
+      }
+      return;
+    }
+    if (hud.hasActionContext?.()) {
+      hud.setProximityPrompt(t('hud.action'));
+    } else {
+      hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
+      hud.setProximityPrompt(null);
+    }
   }
 
   // One-time nudge so touch players discover the camera gestures.

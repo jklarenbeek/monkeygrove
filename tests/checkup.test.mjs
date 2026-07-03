@@ -345,6 +345,10 @@ const screens = [
     .map((f) => readFileSync(new URL(`../src/screens/${f}`, import.meta.url), 'utf8')),
 ].join('\n');
 const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+// The check session flow moved out of main.js into checkupflow.js; the
+// onboarding branch that invokes it lives in appflow.js (player select).
+const checkupflow = readFileSync(new URL('../src/checkupflow.js', import.meta.url), 'utf8');
+const appflow = readFileSync(new URL('../src/appflow.js', import.meta.url), 'utf8');
 const hub = readFileSync(new URL('../src/hub.js', import.meta.url), 'utf8');
 const i18n = ['en', 'nl']
   .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
@@ -355,12 +359,12 @@ test('checkup wiring exists across screens, main, and hub', () => {
   assert.match(screens, /id="checkup-skip"/);  // e2e + baseline skip anchor
   assert.match(screens, /data-groep/);
   assert.match(screens, /data-request-checkup/);
-  assert.match(main, /needsCheckup\(profile = this\.profile\)/);
+  assert.match(checkupflow, /export function needsCheckup\(profile\)/);
   assert.match(main, /startCheckupThenHub\(\)/);
   assert.match(main, /startCheckupFromHub\(\)/);
-  assert.match(main, /recordCalibration/);
-  assert.match(main, /applyCheckupResult/);
-  assert.match(main, /else if \(this\.needsCheckup\(\)\)/);
+  assert.match(checkupflow, /recordCalibration/);
+  assert.match(checkupflow, /applyCheckupResult/);
+  assert.match(appflow, /else if \(needsCheckup\(game\.profile\)\)/);
   assert.match(hub, /mimi\.checkup_offer/);
   assert.match(hub, /startCheckupFromHub/);
 });

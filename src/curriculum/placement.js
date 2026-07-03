@@ -216,6 +216,25 @@ function groepOrder(pack, groep) {
   return pack.stages.some((s) => s.order === groep) ? groep : null;
 }
 
+// A parent-dashboard edit (birthday / pack / stage / strictness) applied as one
+// pure patch. Retargeting the pack remaps the stage; a birthday change re-runs
+// the date refresh; confirming a stage that matches the estimate stays 'auto'
+// so the automatic floor keeps promoting, while a real override is 'parent'
+// and stays in control until the parent changes it again.
+export function applyParentPatch(curriculum = {}, patch = {}, { on = todayString() } = {}) {
+  const { birthDate, packId, ...rest } = patch;
+  let base = packId && packId !== curriculum?.packId
+    ? retargetCurriculumPack(curriculum, packId)
+    : curriculum;
+  if (birthDate !== undefined) {
+    base = refreshCurriculumForDate({ ...base, birthDate: birthDate || null }, on);
+  }
+  if (patch.confirmedStage !== undefined) {
+    rest.stageSource = patch.confirmedStage === curriculum?.estimatedStage ? 'auto' : 'parent';
+  }
+  return { ...base, ...rest };
+}
+
 // Where a check should aim: parent override > child-said groep > age estimate.
 // Bands are ladder bands (grade − 1, clamped to the probeable 1..7 — band 0 is
 // observational). `kleuter` marks the never-probe rule (docs/05 §2.5): groep 1-2,

@@ -4,14 +4,33 @@
 // it in place when the shop changes it, and spawns or respawns the follower pet
 // beside the player. It reaches the Game for the active scene
 // (player/pet/place/profile).
+import * as THREE from 'three';
 import { Player, PetFollower } from './player.js';
 import { makeCharacter } from './entities.js';
 import { HATS, FURS, MONKEY_HAT_Y, getCreature, DEFAULT_CREATURE_ID } from './models.js';
 import { buildVoxelMesh } from './voxel.js';
 
+const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
+
 export class AvatarRig {
   constructor(game) {
     this.game = game;
+    this.trailT = 0; // ms since the last cosmetic-trail puff while hopping
+  }
+
+  // The equipped cosmetic trail: a small colored puff behind the player while
+  // they hop. Called every frame; cheap no-op when no trail is equipped.
+  updateTrail(dt) {
+    const game = this.game;
+    const trailId = game.profile?.avatar.trail;
+    if (!trailId || !game.player?.hopping || !game.particles) return;
+    this.trailT += dt;
+    if (this.trailT > 70) {
+      this.trailT = 0;
+      game.particles.emit(game.player.mesh.position.clone().add(new THREE.Vector3(0, 0.3, 0)), 2, {
+        colors: [TRAIL_COLORS[trailId] || 0xffd966], speed: 0.4, up: 0.8, life: 500, spread: 0.1,
+      });
+    }
   }
 
   spawnAvatar() {

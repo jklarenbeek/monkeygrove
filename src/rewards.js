@@ -5,17 +5,34 @@
 // the emoji flights. It reaches the Game for profile/world/player/particles/rng.
 import * as THREE from 'three';
 import { flyEmojiToHud } from './entities.js';
-import { HATS } from './models.js';
+import { HATS, PETS } from './models.js';
 import { t, pickCorrectLine } from './i18n.js';
 import * as hud from './hud.js';
 import * as screens from './screens.js';
 import { audio } from './audio.js';
-import { addBananas, addEggPoints } from './state.js';
+import { addBananas, addEggPoints, hatchEgg } from './state.js';
 import { BALANCE } from './config.js';
 
 export class RewardService {
   constructor(game) {
     this.game = game;
+  }
+
+  // After a result screen: if the egg meter just filled, hatch and celebrate
+  // the new pet before continuing (equipping it if no pet is chosen yet).
+  afterResult(then) {
+    const g = this.game;
+    const p = g.profile;
+    if (p.egg.points >= p.egg.goal) {
+      const pet = hatchEgg(p, PETS);
+      screens.showHatch(pet, () => {
+        if (pet && !p.avatar.pet) p.avatar.pet = pet.id;
+        g.refreshHudCounts();
+        then();
+      });
+    } else {
+      then();
+    }
   }
 
   // A solved problem: confetti over the player, a banana fountain that scales

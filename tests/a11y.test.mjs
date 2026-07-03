@@ -129,6 +129,7 @@ test('settings screen exposes the comfort toggles, localized in both languages',
 
 test('settings language changes repaint the active game screen immediately', () => {
   const main = read('main.js');
+  const appflow = read('appflow.js'); // settings/title flows moved out of main.js
   const chamber = read('chamberflow.js');
   const business = read('business/controller.js');
   const businessScene = read('business/scene.js');
@@ -137,12 +138,12 @@ test('settings language changes repaint the active game screen immediately', () 
   const entities = read('entities.js');
   const screens = readScreens();
 
-  assert.match(main, /onLangChange:\s*\(\)\s*=>\s*this\.afterLanguageChange\(\)/, 'settings calls the live language refresh hook');
+  assert.match(appflow, /onLangChange:\s*\(\)\s*=>\s*game\.afterLanguageChange\(\)/, 'settings calls the live language refresh hook');
   assert.match(main, /afterLanguageChange\(\)[\s\S]*hud\.refreshLabels\(\)/, 'HUD accessible labels are refreshed');
   assert.match(main, /this\.chamber\.refreshLanguage\(\)/, 'chambers refresh without restarting the problem');
   assert.match(main, /this\.business\?\.refreshLanguage\?\.\(\)/, 'business scenes refresh when open');
   assert.match(main, /this\.place\?\.refreshLanguage\?\.\(\)/, 'hub place labels refresh when open');
-  assert.match(main, /showAttract\(\{[\s\S]*onLangChange:\s*\(\)\s*=>\s*this\.place\?\.refreshLanguage\?\.\(\)/, 'title attract gate labels refresh when the language buttons are used');
+  assert.match(appflow, /showAttract\(\{[\s\S]*onLangChange:\s*\(\)\s*=>\s*game\.place\?\.refreshLanguage\?\.\(\)/, 'title attract gate labels refresh when the language buttons are used');
   assert.match(screens, /showAttract\(\{[^{]*onLangChange[\s\S]*onLangChange\?\.\(\)/, 'title language buttons notify the 3D attract island');
   assert.match(hubPlace, /refreshLanguage\(\)[\s\S]*gate\.updateLabel/, 'hub gate labels are rebuilt for the new locale');
   assert.match(entities, /labelText\s*=\s*opts\.label/, 'living gate tracks the current label text');

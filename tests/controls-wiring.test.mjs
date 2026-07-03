@@ -8,13 +8,14 @@ test('game wiring previews paths, refreshes prompts, and updates held joystick m
   const main = root('src/main.js');
   const input = root('src/input.js');
 
-  assert.match(input, /previewTapCell\?\.\(cell\)/, 'input previews a picked cell before tap release');
+  assert.match(input, /this\.previewTapCell\(cell\)/, 'input previews a picked cell before tap release');
   assert.match(input, /softVibrate\(12\)/, 'joystick direction changes can give a tiny haptic tick');
   assert.match(input, /hint\.controls/, 'touch onboarding names the kid-friendly controls');
-  assert.match(main, /previewTapCell\(cell\)/, 'game exposes a previewTapCell handler');
-  assert.match(main, /showPathPreview\(cell/, 'game tints reachable and path cells');
-  assert.match(main, /refreshControlPrompt\(\)/, 'game refreshes contextual prompt/action state');
+  assert.match(input, /previewTapCell\(cell\)/, 'input owns the tap preview handler');
+  assert.match(input, /showPathPreview\(cell/, 'input tints reachable and path cells');
+  assert.match(input, /refreshControlPrompt\(\)/, 'input refreshes contextual prompt/action state');
   assert.match(main, /this\.input\?\.update\(dt\)/, 'game updates held joystick movement each frame');
+  assert.match(main, /this\.input\?\.updateUX\(dt\)/, 'game drives the preview expiry + prompt refresh each frame');
 });
 
 test('control CSS exposes touch joystick and proximity prompt without stealing pointer events', () => {

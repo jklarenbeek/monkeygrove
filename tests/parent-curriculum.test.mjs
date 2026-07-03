@@ -12,7 +12,10 @@ const screensSource = [
 const i18nSource = ['en', 'nl']
   .map((l) => readFileSync(new URL(`../src/i18n/${l}.js`, import.meta.url), 'utf8'))
   .join('\n');
-const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+// The parent-facing flows moved out of main.js into appflow.js; the pure patch
+// logic lives beside the other curriculum transforms in placement.js.
+const appflowSource = readFileSync(new URL('../src/appflow.js', import.meta.url), 'utf8');
+const placementSource = readFileSync(new URL('../src/curriculum/placement.js', import.meta.url), 'utf8');
 
 function mockStorage() {
   const data = new Map();
@@ -37,8 +40,8 @@ test('task 8 parent business reporting is wired and translated', () => {
   assert.match(screensSource, /businessReport/);
   assert.match(screensSource, /parentBusinessHtml/);
   assert.match(screensSource, /parentBusinessHtml\(businessReport\)/);
-  assert.match(mainSource, /aggregateBusinessReport/);
-  assert.match(mainSource, /businessReport:\s*p\?\.business\s*\?\s*aggregateBusinessReport\(p\)\s*:\s*null/);
+  assert.match(appflowSource, /aggregateBusinessReport/);
+  assert.match(appflowSource, /businessReport:\s*p\?\.business\s*\?\s*aggregateBusinessReport\(p\)\s*:\s*null/);
 
   for (const key of [
     'parents.business',
@@ -52,10 +55,10 @@ test('parent entry asks which child to view before opening results', () => {
   assert.match(screensSource, /showParentProfileSelect/);
   assert.match(screensSource, /parents\.choose_child/);
   assert.match(screensSource, /data-parent-profile/);
-  assert.match(mainSource, /showParentSelect\(/);
-  assert.match(mainSource, /onParents:\s*\(\) => this\.showParentSelect/);
-  assert.match(mainSource, /showParents\(profileId = null, onClose/);
-  assert.match(mainSource, /profiles\(\)\.find\(\(profile\) => profile\.id === profileId\)/);
+  assert.match(appflowSource, /showParentSelect\(/);
+  assert.match(appflowSource, /onParents:\s*\(\) => showParentSelect\(game/);
+  assert.match(appflowSource, /showParents\(game, profileId = null, onClose/);
+  assert.match(appflowSource, /profiles\(\)\.find\(\(profile\) => profile\.id === profileId\)/);
 });
 
 test('task 7 i18n keys exist in english and dutch', () => {
@@ -89,7 +92,8 @@ test('parent curriculum controls expose stage and strictness change wiring', () 
   assert.match(screensSource, /data-stage/);
   assert.match(screensSource, /data-strictness/);
   assert.match(screensSource, /onCurriculumChange/);
-  assert.match(mainSource, /rest\.stageSource\s*=\s*patch\.confirmedStage === p\.curriculum\?\.estimatedStage\s*\?\s*'auto'\s*:\s*'parent'/);
+  assert.match(appflowSource, /applyParentPatch\(p\.curriculum, patch/);
+  assert.match(placementSource, /rest\.stageSource\s*=\s*patch\.confirmedStage === curriculum\?\.estimatedStage\s*\?\s*'auto'\s*:\s*'parent'/);
 });
 
 test('new explorer wizard sends trail placement and default curriculum pack into profile creation', () => {
