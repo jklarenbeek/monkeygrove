@@ -123,10 +123,11 @@ try {
   await waitSel('[data-settings-preset="festival_complete"]');
   await click('[data-settings-preset="festival_complete"]');
   await pause(1500);
-  // startBusiness() is async now (it lazy-loads the business-* chunk); await the
-  // promise so the assertion is real and this.business exists before we use it.
-  await evalp('(() => { window.__game.pendingShopId = "bakery"; })()');
-  assert.equal(await evalp('window.__game.startBusiness()'), true, 'business mode starts (bakery is built)');
+  // switchTo() is async (it plays the portal transition and lazy-loads the
+  // business-* chunk); await the promise so the assertion is real and
+  // this.business exists before we use it.
+  assert.equal(await evalp('window.__game.switchTo("business", { buildId: "bakery" })'), true,
+    'business mode starts (bakery is built)');
   await pause(1200);
 
   // 7. the order panel works and shows the bake status; the bakery serves ONLY bakery goods
@@ -141,8 +142,8 @@ try {
   // 7b. the pizzeria is its OWN shop, own footprint, and serves only pizza
   await evalp('window.__game.startHub()');
   await pause(500);
-  await evalp('(() => { window.__game.pendingShopId = "pizzeria"; })()');
-  assert.equal(await evalp('window.__game.startBusiness()'), true, 'business mode starts (pizzeria is built)');
+  assert.equal(await evalp('window.__game.switchTo("business", { buildId: "pizzeria" })'), true,
+    'business mode starts (pizzeria is built)');
   await pause(1000);
   assert.equal(await evalp('window.__game.business.shopId'), 'pizzeria', 'the pizzeria controller is the pizzeria');
   assert.equal(await evalp('window.__game.place.shopId'), 'pizzeria', 'the pizzeria scene is the pizzeria');
@@ -155,7 +156,7 @@ try {
   // 7c. the music stage plays and grades a song (progress recorded)
   await evalp('window.__game.startHub()');
   await pause(500);
-  assert.equal(await evalp('window.__game.startStage()'), true, 'music stage starts (stage is built)');
+  assert.equal(await evalp('window.__game.switchTo("stage")'), true, 'music stage starts (stage is built)');
   await pause(1000);
   // play the Echo song and grade its exact sequence — a correct round bumps progress
   await evalp('window.__game.stage.playSong("echo")');

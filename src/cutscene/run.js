@@ -13,6 +13,7 @@ import { CutsceneDirector } from './director.js';
 // continuation (hub build, checkup screen) replaces or covers it.
 export async function playPlaced(game, scene) {
   game.mode = 'cutscene';
+  game.setScene(null); // dialog owns the input; the continuation re-registers
   const token = ++game.flowToken;
   let director = null;
   await runSceneTransition(() => {

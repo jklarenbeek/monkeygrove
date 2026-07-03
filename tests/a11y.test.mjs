@@ -138,11 +138,13 @@ test('settings language changes repaint the active game screen immediately', () 
   const entities = read('entities.js');
   const screens = readScreens();
 
+  const hub = read('hub.js');
   assert.match(appflow, /onLangChange:\s*\(\)\s*=>\s*game\.afterLanguageChange\(\)/, 'settings calls the live language refresh hook');
   assert.match(main, /afterLanguageChange\(\)[\s\S]*hud\.refreshLabels\(\)/, 'HUD accessible labels are refreshed');
-  assert.match(main, /this\.chamber\.refreshLanguage\(\)/, 'chambers refresh without restarting the problem');
-  assert.match(main, /this\.business\?\.refreshLanguage\?\.\(\)/, 'business scenes refresh when open');
-  assert.match(main, /this\.place\?\.refreshLanguage\?\.\(\)/, 'hub place labels refresh when open');
+  assert.match(main, /this\.scene\?\.refreshLanguage\?\.\(\)/, 'the active scene refreshes without restarting');
+  assert.match(chamber, /refreshLanguage\(\)/, 'chambers refresh without restarting the problem');
+  assert.match(business, /refreshLanguage\(\)/, 'business scenes refresh when open');
+  assert.match(hub, /refreshLanguage\(\)\s*\{\s*this\.game\.place\?\.refreshLanguage\?\.\(\)/, 'hub place labels refresh when open');
   assert.match(appflow, /showAttract\(\{[\s\S]*onLangChange:\s*\(\)\s*=>\s*game\.place\?\.refreshLanguage\?\.\(\)/, 'title attract gate labels refresh when the language buttons are used');
   assert.match(screens, /showAttract\(\{[^{]*onLangChange[\s\S]*onLangChange\?\.\(\)/, 'title language buttons notify the 3D attract island');
   assert.match(hubPlace, /refreshLanguage\(\)[\s\S]*gate\.updateLabel/, 'hub gate labels are rebuilt for the new locale');

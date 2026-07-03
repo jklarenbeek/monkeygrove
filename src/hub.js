@@ -147,6 +147,7 @@ export class HubController {
   startHub() {
     const g = this.game;
     g.mode = 'hub';
+    g.setScene(this);
     g.flowToken++;
     g.isEcho = false;
     g.duel = null;
@@ -396,15 +397,14 @@ export class HubController {
     // build plots: unlocked opens the worktable, finished ones react playfully
     const build = this.buildAt(x, z);
     if (build) {
-      // The bakery and the pizzeria are separate shops now — each plot opens its own.
-      if ((build.id === 'bakery' || build.id === 'pizzeria') && isBuilt(g.profile, build.id)) {
-        hud.toast(t('business.open'));
-        g.startBusinessFromHub(build.id);
-        return true;
-      }
-      // The music stage is a minigame: tapping the built stage opens Kiki's songs.
-      if (build.id === 'stage' && isBuilt(g.profile, 'stage')) {
-        g.startStageFromHub();
+      // A built plot that hosts its own activity (shops, the music stage, and
+      // whatever the island grows next) opens it: island.js names the scene,
+      // the registry lazy-loads it — no per-build special cases here.
+      const def = buildById(build.id);
+      if (def?.scene && isBuilt(g.profile, build.id)) {
+        if (def.openToast) hud.toast(t(def.openToast));
+        g.lastHubEntry = { type: 'build', id: build.id };
+        g.switchTo(def.scene, { buildId: build.id });
         return true;
       }
       if (build.state === 'unlocked') { this.openIsland(); return true; }
@@ -479,6 +479,51 @@ export class HubController {
   hubAction() {
     const near = this.hubNpcNear();
     if (near) this.hubTalk(near);
+  }
+
+  // ---------- scene contract (Game dispatch) ----------
+  // Every hook self-guards on the mode: a staged cutscene borrows the mode
+  // ('cutscene') while the hub place stays live, and taps must go quiet then.
+
+  onTap(x, z) {
+    if (this.game.mode !== 'hub') return false;
+    return this.hubTap(x, z);
+  }
+
+  onAction() {
+    if (this.game.mode !== 'hub') return false;
+    this.hubAction();
+    return true;
+  }
+
+  onHome() {
+    if (this.game.mode !== 'hub') return false;
+    this.game.showTitle();
+    return true;
+  }
+
+  // AC-style talk prompt: the action button becomes 💬 beside a friend
+  // (checked on a beat — Mimi wanders, so adjacency changes on its own).
+  update(dt) {
+    const g = this.game;
+    if (g.mode !== 'hub' || !g.player) return;
+    this.talkBtnT = (this.talkBtnT || 0) + dt;
+    if (this.talkBtnT > 140) {
+      this.talkBtnT = 0;
+      const want = this.hubNpcNear() ? '💬' : null;
+      if (want !== g.talkBtn) g.talkBtn = want;
+    }
+  }
+
+  // The contextual action button: 💬 beside a friend, idle otherwise.
+  controlPrompt() {
+    if (this.game.mode !== 'hub') return undefined;
+    const near = this.hubNpcNear();
+    return near ? { icon: '💬', label: t('controls.talk') } : null;
+  }
+
+  refreshLanguage() {
+    this.game.place?.refreshLanguage?.();
   }
 
   // Walking straight into a friend also talks — the zero-tutorial way in.

@@ -11,8 +11,10 @@
 
 // Each build: a plot char in the hub template (chamber.js), a banana cost,
 // a points threshold, and optionally an NPC who moves in and a daily perk.
-// The finale (plaza) additionally needs the bridge and the Crab King pays
-// half from his returned hoard (`contribution`).
+// A build with a `scene` hosts its own activity once built: tapping the plot
+// switches to that scene (scenes/registry.js names the module; `openToast`
+// is the localized loading beat). The finale (plaza) additionally needs the
+// bridge and the Crab King pays half from his returned hoard (`contribution`).
 export const BUILDS = [
   { id: 'lanterns', char: 'l', cost: 30, points: 0.25, emoji: '🏮' },
   {
@@ -24,11 +26,13 @@ export const BUILDS = [
   {
     id: 'stage', char: 'h', cost: 120, points: 1.8, emoji: '🎵',
     npc: { pet: 'kitten', face: '🐱' },
+    scene: 'stage',
   },
   {
     id: 'bakery', char: 'k', cost: 150, points: 2.4, emoji: '🥐',
     npc: { pet: 'piglet', face: '🐷' },
     perk: { kind: 'egg', n: 3 },
+    scene: 'business', openToast: 'business.open',
   },
   {
     // Balance: the pizzeria clusters right after the bakery (points 2.4 -> 2.6) so the
@@ -37,6 +41,7 @@ export const BUILDS = [
     // bakery (150) — it's the richer, four-ingredient shop.
     id: 'pizzeria', char: 'z', cost: 180, points: 2.6, emoji: '🍕',
     npc: { pet: 'owl', face: '🦉' },
+    scene: 'business', openToast: 'business.open',
   },
   { id: 'bridge', char: 'b', cost: 200, points: 3.0, emoji: '🌉' },
   {

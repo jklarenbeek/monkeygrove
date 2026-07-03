@@ -4,20 +4,14 @@
 // checkupflow.js (Mimi's Check), story/flow.js (hub-entry ceremonies), and the
 // controllers it constructs (hub, chamber, input, avatar, rewards).
 import { World } from './world.js';
-import { Particles } from './entities.js';
 import {
   loadSave, settings, persist, persistNow,
 } from './state.js';
-// ensureShop resolves one shop's healed state eagerly. The heavy bakery/pizzeria
-// sim (BusinessPlace + BusinessController) is lazy-loaded in startBusiness(), so
-// it ships in its own `business-*` chunk the title/hub never download.
-import { ensureShop } from './business/engine.js';
-import { isBuilt } from './island.js';
+import { SCENES } from './scenes/registry.js';
 import { enterHub } from './story/flow.js';
 import { runCheckup } from './checkupflow.js';
 import * as appflow from './appflow.js';
 import * as hud from './hud.js';
-import * as screens from './screens.js';
 import { audio } from './audio.js';
 import { applyComfortSettings } from './a11y.js';
 import { updateTweens } from './anim.js';
@@ -41,6 +35,7 @@ class Game {
     }
     this.profile = null;
     this.mode = 'title';
+    this.scene = null; // the active scene controller (registry contract); null on title/cutscene
     this.place = null;
     this.player = null;
     this.pet = null;
@@ -67,8 +62,8 @@ class Game {
     this.talkCooldown = 0; // debounces bump-to-talk while keys are held
     this.hubWelcomed = false; // the hub greeting page shows once per session
     this.talkBtn = null;   // current hub action-button icon ('💬' | null)
-    this.business = null; // BusinessController, created when entering a shop
-    this.stage = null; // StageController, created when entering the music stage
+    this.business = null; // BusinessController; set by its enter() (debug/e2e surface)
+    this.stage = null; // StageController; set by its enter() (debug/e2e surface)
     this.lastHubEntry = null; // portal/build anchor used when returning from a scene
     this.transitioning = false; // blocks repeated gate/shop entry during transition
     this.avatar = new AvatarRig(this); // player monkey + pet mesh lifecycle (shared by scenes)
@@ -84,8 +79,8 @@ class Game {
     loadSave();
     applyComfortSettings();
     hud.initHud({
-      onHint: () => this.chamber.useHint(),
-      onAction: () => (this.mode === 'hub' ? this.hub.hubAction() : this.verb?.onAction()),
+      onHint: () => this.inputHint(),
+      onAction: () => this.inputAction(),
       onHome: () => this.confirmHome(),
       onSettings: () => this.openSettings(),
       onResetCamera: () => this.world.resetCamera(),
@@ -145,15 +140,7 @@ class Game {
   afterLanguageChange() {
     hud.refreshLabels();
     this.refreshHudCounts();
-    if (this.mode === 'chamber') {
-      this.chamber.refreshLanguage();
-    } else if (this.mode === 'business') {
-      this.business?.refreshLanguage?.();
-    } else if (this.mode === 'stage') {
-      this.stage?.refreshLanguage?.();
-    } else if (this.mode === 'hub') {
-      this.place?.refreshLanguage?.();
-    }
+    this.scene?.refreshLanguage?.();
   }
 
   confirmHome() {
@@ -166,10 +153,38 @@ class Game {
       this.showTitle();
       return;
     }
-    if (this.mode === 'hub') { this.showTitle(); return; }
+    if (this.scene?.onHome?.()) return; // the hub's home is the title
     this.verb?.destroy();
     this.verb = null;
     this.transitionTo(() => this.startHub(), { kind: 'portal' });
+  }
+
+  // ---------- scene switching (scenes/registry.js) ----------
+
+  // The active scene controller. Entries that bypass switchTo (the hub's
+  // ceremony gate, the chamber flow, the title) register through here so the
+  // dispatch below always has one current scene (or null).
+  setScene(scene) {
+    if (this.scene && this.scene !== scene) this.scene.exit?.();
+    this.scene = scene;
+  }
+
+  // Switch to a registered activity scene behind the portal transition. The
+  // guard/mode/token/lazy-load choreography mirrors what the shop entry always
+  // did: guard first (mode untouched when refused), then flip the mode, then
+  // fetch the chunk — bailing if the child navigated away mid-load.
+  switchTo(id, params = {}, { kind = 'portal' } = {}) {
+    return this.transitionTo(() => this._enterScene(SCENES[id], id, params), { kind });
+  }
+
+  async _enterScene(entry, id, params) {
+    if (entry.canEnter && !entry.canEnter(this, params)) return false;
+    this.mode = id;
+    const token = ++this.flowToken;
+    const mod = entry.load ? await entry.load() : null;
+    if (token !== this.flowToken) return false;
+    this.setScene(entry.make(mod, this, params));
+    return this.scene.enter();
   }
 
   refreshHudCounts() {
@@ -196,8 +211,9 @@ class Game {
     this.player?.stop();
     if (this.player) this.player.locked = true;
     try {
-      await runSceneTransition(fn, opts);
-      return true;
+      let result = true;
+      await runSceneTransition(async () => { result = await fn(); }, opts);
+      return result !== false;
     } finally {
       this.transitioning = false;
       if (this.player) this.player.locked = false;
@@ -216,96 +232,6 @@ class Game {
   debugChamber(skill, kind) { return this.chamber.debugChamber(skill, kind); }
 
   afterResult(then) { this.rewards.afterResult(then); }
-
-  // ---------- business ----------
-
-  startBusinessFromHub(shopId = 'bakery') {
-    this.lastHubEntry = { type: 'build', id: shopId };
-    this.pendingShopId = shopId;
-    return this.transitionTo(() => this.startBusiness(), { kind: 'portal' });
-  }
-
-  async startBusiness() {
-    // Which shop the child walked into (bakery / pizzeria) — set by startBusinessFromHub.
-    const shopId = this.pendingShopId || 'bakery';
-    if (!isBuilt(this.profile, shopId)) return false;
-    this.mode = 'business';
-    const token = ++this.flowToken;
-    // The shop sim lives in a lazily-fetched `business-*` chunk. The caller's
-    // "Open shop" toast is the loading beat; on a slow connection the kid sees it
-    // until the scene + controller arrive. If they navigate away mid-load (a newer
-    // flow bumps flowToken), bail before touching any scene state.
-    const { BusinessPlace, BusinessController } = await import('./business.js');
-    if (token !== this.flowToken) return false;
-    this.business = new BusinessController(this, shopId);
-    screens.closeScreen();
-    this.clearPlace();
-    this.place = new BusinessPlace(this.world, { seed: 606, shopId });
-    this.particles = new Particles(this.place.group);
-    this.place.fx = this.particles;
-    this.avatar.spawnAvatar();
-    // Each shop has its own footprint, so it names its own spawn cell; fall back to the
-    // generic bottom-left only if a scene ever omits one.
-    const spawn = this.place.spawn || { x: 2, z: Math.max(1, this.place.size.d - 3) };
-    this.player.setPlace(this.place, spawn.x, spawn.z);
-    this.avatar.spawnPet(spawn);
-    this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);
-    this.player.onBump = (x, z) => this.business.businessTap(x, z);
-    this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
-    this.world.defaultZoom = this.input.sceneZoom('hub');
-    this.world.frameBoard(this.place.center(), this.place.size.w, this.place.size.d, this.player.mesh);
-    hud.showHud(true);
-    hud.hideBanner();
-    hud.setAction(null);
-    hud.setVerbPanel(null);
-    hud.showHintButton(false);
-    this.refreshHudCounts();
-    audio.music('island');
-    const business = ensureShop(this.profile, shopId);
-    if (business.activeOrder?.tasks?.length) this.business.resumeBusinessOrder(business);
-    else this.business.startNextBusinessOrder();
-    return true;
-  }
-
-  // ---------- music stage ----------
-
-  startStageFromHub() {
-    this.lastHubEntry = { type: 'build', id: 'stage' };
-    return this.transitionTo(() => this.startStage(), { kind: 'portal' });
-  }
-
-  async startStage() {
-    if (!isBuilt(this.profile, 'stage')) return false;
-    this.mode = 'stage';
-    const token = ++this.flowToken;
-    // The stage sim lives in its own lazily-fetched `stage-*` chunk (like the shop).
-    const { StagePlace, StageController } = await import('./stage.js');
-    if (token !== this.flowToken) return false;
-    this.stage = new StageController(this);
-    screens.closeScreen();
-    this.clearPlace();
-    this.place = new StagePlace(this.world, { seed: 808 });
-    this.particles = new Particles(this.place.group);
-    this.place.fx = this.particles;
-    this.avatar.spawnAvatar();
-    const spawn = { x: 6, z: Math.max(1, this.place.size.d - 2) };
-    this.player.setPlace(this.place, spawn.x, spawn.z);
-    this.avatar.spawnPet(spawn);
-    this.player.onArrive = (x, z) => this.pet?.notePlayerAt(x, z);
-    this.player.onBump = (x, z) => this.stage.stageTap(x, z);
-    this.place.playerAt = () => (this.player ? { x: this.player.x, z: this.player.z } : null);
-    this.world.defaultZoom = this.input.sceneZoom('hub');
-    this.world.frameBoard(this.place.center(), this.place.size.w, this.place.size.d, this.player.mesh);
-    hud.showHud(true);
-    hud.hideBanner();
-    hud.setAction(null);
-    hud.setVerbPanel(null);
-    hud.showHintButton(false);
-    this.refreshHudCounts();
-    audio.music('island');
-    this.stage.open();
-    return true;
-  }
 
   // ---------- story cutscenes ----------
 
@@ -337,28 +263,25 @@ class Game {
   }
 
   // ---------- input intents (from InputController) ----------
+  // Each intent asks the active scene first; what it leaves falls through to
+  // the shared machinery (the verb, walking). New scenes never edit these.
 
-  // Space/Enter (or the action button): talk in the hub, otherwise the verb acts.
+  // Space/Enter (or the action button).
   inputAction() {
-    if (this.mode === 'hub') this.hub.hubAction();
-    else this.verb?.onAction();
+    if (this.scene?.onAction?.()) return;
+    this.verb?.onAction();
   }
 
-  // E key (or the hint button).
+  // E key (or the hint button). The chamber fallback keeps the key harmlessly
+  // inert outside chambers (useHint self-guards on verb/problem).
   inputHint() {
+    if (this.scene?.onHint?.()) return;
     this.chamber.useHint();
   }
 
-  // A tap landed on grid cell — dispatch by mode: hub plots/NPCs, business
-  // stations, the chamber helper, the active verb, else walk there.
+  // A tap landed on a grid cell: scene first, then the active verb, else walk there.
   inputTapCell(cell) {
-    if (this.mode === 'hub' && this.hub.hubTap(cell.x, cell.z)) return;
-    if (this.mode === 'business' && this.business?.businessTap(cell.x, cell.z)) return;
-    if (this.mode === 'stage' && this.stage?.stageTap(cell.x, cell.z)) return;
-    if (this.helper && cell.x === this.helper.x && cell.z === this.helper.z) {
-      this.chamber.helperTap();
-      return;
-    }
+    if (this.scene?.onTap?.(cell.x, cell.z)) return;
     if (this.verb?.onCellTap(cell.x, cell.z, false)) return;
     this.player?.pathTo(cell.x, cell.z);
   }
@@ -373,20 +296,10 @@ class Game {
     this.pet?.update(dt);
     this.particles?.update(dt);
     this.verb?.update?.(dt);
-    // AC-style talk prompt: the action button becomes 💬 beside a friend
-    // (checked on a beat — Mimi wanders, so adjacency changes on its own)
-    if (this.mode === 'hub' && this.player) {
-      this.talkBtnT = (this.talkBtnT || 0) + dt;
-      if (this.talkBtnT > 140) {
-        this.talkBtnT = 0;
-        const want = this.hub.hubNpcNear() ? '💬' : null;
-        if (want !== this.talkBtn) this.talkBtn = want;
-      }
-    }
+    // scene frame work: the hub's talk-prompt beat, the chamber's crab bumps
+    this.scene?.update?.(dt);
     // path-preview expiry + contextual prompt/action button (input.js)
     this.input?.updateUX(dt);
-    // crab bumps (chamber-only; the controller self-guards on mode/player)
-    this.chamber.updateChamber(dt);
     // cosmetic trail while hopping (avatar.js)
     this.avatar.updateTrail(dt);
   }

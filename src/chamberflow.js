@@ -65,6 +65,7 @@ export class ChamberFlow {
   _enterChamber() {
     const g = this.game;
     g.mode = 'chamber';
+    g.setScene(this);
     g.flowToken++;
     screens.closeScreen();
     g.solvedInChamber = 0;
@@ -566,6 +567,29 @@ export class ChamberFlow {
     });
   }
 
+  // ---------- scene contract (Game dispatch) ----------
+
+  // Tapping the helper's cell asks for encouragement; anything else falls
+  // through to the verb, then to walk-there. (helper is chamber-only state,
+  // cleared by clearPlace, so no mode guard is needed.)
+  onTap(x, z) {
+    const g = this.game;
+    if (g.helper && x === g.helper.x && z === g.helper.z) {
+      this.helperTap();
+      return true;
+    }
+    return false;
+  }
+
+  onHint() {
+    this.useHint();
+    return true;
+  }
+
+  update(dt) {
+    this.updateChamber(dt);
+  }
+
   useHint() {
     const g = this.game;
     if (!g.verb || !g.problem) return;
@@ -586,6 +610,7 @@ export class ChamberFlow {
     );
     g.currentWorld = p.world;
     g.mode = 'chamber';
+    g.setScene(this);
     screens.closeScreen();
     g.solvedInChamber = 0;
     this.buildChamber(p);

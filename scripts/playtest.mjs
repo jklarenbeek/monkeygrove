@@ -7,7 +7,7 @@
 // Actions:
 //   click:<sel>        JS-click a selector (overlays intercept real pointer events)
 //   fill:<sel>=<val>   set an input's value + dispatch input/change
-//   eval:<js>          run JS in the page (e.g. eval:window.__game.startBusiness())
+//   eval:<js>          run JS in the page (e.g. eval:window.__game.switchTo("business"))
 //   press:<key>        keyboard press
 //   tap:<x>,<y>        real mouse click at viewport coords (for canvas grid taps)
 //   wait:<ms>          pause

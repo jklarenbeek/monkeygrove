@@ -1,7 +1,8 @@
 // StageController — owns Kiki's music-stage flow: everything between tapping the gong and
-// leaving the stage. The Game shell sets up the scene in Game.startStage(), then hands
-// control here. Like the BusinessController it reaches the Game only through a small
-// surface: profile, place, rng, mode, startHub(), afterResult(), and refreshHudCounts().
+// leaving the stage. It is the 'stage' scene controller (scenes/registry.js): enter()
+// mounts the stage via mountPlace, then the songs run. Like the BusinessController it
+// reaches the Game only through a small surface: profile, place, rng, mode, startHub(),
+// afterResult(), and refreshHudCounts().
 import { t } from '../i18n.js';
 import * as hud from '../hud.js';
 import * as screens from '../screens.js';
@@ -12,6 +13,8 @@ import { BALANCE } from '../config.js';
 import { reinforceSkill } from '../mathengine.js';
 import { nextWonderFor } from '../story/wonders.js';
 import { STAGE_MODES } from './data.js';
+import { StagePlace } from './scene.js';
+import { mountPlace } from '../scenes/mount.js';
 import {
   ensureStageState,
   gradeStageRound,
@@ -36,7 +39,26 @@ export class StageController {
     return t('curriculum.nl_po.stage.' + stageId);
   }
 
-  // Entry point (Game.startStage calls this once the scene is built).
+  // ---------- scene contract (Game.switchTo dispatch) ----------
+
+  // Mount Kiki's stage and open the song list. The shell has already set
+  // game.mode and loaded this chunk.
+  enter() {
+    const g = this.game;
+    g.stage = this; // debug/e2e surface, like g.business
+    mountPlace(g, () => new StagePlace(g.world, { seed: 808 }), {
+      spawn: (place) => ({ x: 6, z: Math.max(1, place.size.d - 2) }),
+      onBump: (x, z) => this.stageTap(x, z),
+    });
+    this.open();
+    return true;
+  }
+
+  onTap(x, z) {
+    if (this.game.mode !== 'stage') return false;
+    return this.stageTap(x, z);
+  }
+
   open() {
     this.showSongs();
   }

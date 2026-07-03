@@ -265,7 +265,11 @@ vite.config.js      Vite, Vitest, PWA, and GitHub Pages base path
 eslint.config.js    ESLint flat config: size + correctness guardrails
 
 src/
-  main.js           slim game orchestrator: boot, loop tick, mode switching, wiring
+  main.js           slim game shell: boot, loop tick, scene switching, shared state
+  scenes/           scene registry + contract (one entry per activity, lazy chunks)
+                    and the shared scene mounting helper
+  appflow.js        title/player-picker/parents/settings screen flows
+  checkupflow.js    Mimi's Check session flow (screens + probe machine)
   input.js          keyboard/touch/camera gestures -> semantic intents
   hub.js            island hub build, NPC talk, gate growth, hub menus
   chamberflow.js    one math chamber: pick problem, build, present, score, complete

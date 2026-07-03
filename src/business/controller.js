@@ -1,8 +1,8 @@
 // BusinessController — owns the Pizzeria & Bakery order flow: everything between
-// entering the shop and leaving it. The Game shell does the scene setup in
-// Game.startBusiness(), then hands control here. The controller reaches back to
-// the Game only through a small surface: profile, place, rng, mode, startHub(),
-// and refreshHudCounts().
+// entering the shop and leaving it. It is the 'business' scene controller
+// (scenes/registry.js): enter() mounts the shop via mountPlace, then the order
+// flow runs. It reaches back to the Game only through a small surface: profile,
+// place, rng, mode, startHub(), and refreshHudCounts().
 import { t } from '../i18n.js';
 import * as hud from '../hud.js';
 import * as screens from '../screens.js';
@@ -11,6 +11,8 @@ import { persist, persistNow, addBananas } from '../state.js';
 import { Rng } from '../rng.js';
 import { BALANCE } from '../config.js';
 import { BUSINESS_CUSTOMERS, shopById } from './data.js';
+import { BusinessPlace } from './scene.js';
+import { mountPlace } from '../scenes/mount.js';
 import { nextWonderFor } from '../story/wonders.js';
 import {
   applyPaymentAction,
@@ -45,6 +47,31 @@ export class BusinessController {
   // This controller's shop state (its own coins/stock/upgrades/day/progress).
   shop() {
     return ensureShop(this.game.profile, this.shopId);
+  }
+
+  // ---------- scene contract (Game.switchTo dispatch) ----------
+
+  // Mount the shop and start (or resume) the order flow. The shell has already
+  // set game.mode and loaded this chunk; resuming before generating keeps an
+  // unfinished saved order alive across sessions.
+  enter() {
+    const g = this.game;
+    g.business = this; // debug/e2e surface, like g.stage
+    mountPlace(g, () => new BusinessPlace(g.world, { seed: 606, shopId: this.shopId }), {
+      // Each shop has its own footprint, so it names its own spawn cell; fall back
+      // to the generic bottom-left only if a scene ever omits one.
+      spawn: (place) => place.spawn || { x: 2, z: Math.max(1, place.size.d - 3) },
+      onBump: (x, z) => this.businessTap(x, z),
+    });
+    const business = this.shop();
+    if (business.activeOrder?.tasks?.length) this.resumeBusinessOrder(business);
+    else this.startNextBusinessOrder();
+    return true;
+  }
+
+  onTap(x, z) {
+    if (this.game.mode !== 'business') return false;
+    return this.businessTap(x, z);
   }
 
   // ---------- oven / bake step ----------

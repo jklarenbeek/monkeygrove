@@ -11,12 +11,18 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 const SCENE_PATH = join(ROOT, 'src', 'business', 'scene.js');
 // Business runtime flow now lives in the BusinessController; the Game shell only
-// sets up the scene, and the hub controller owns the bakery-entry tap. Read them
-// all so wiring assertions are location-agnostic.
+// sets up the scene, and the hub controller owns the bakery-entry tap. The
+// controller is also the 'business' scene (enter() mounts the shop via
+// scenes/mount.js); the hub routes the plot tap through the scene registry and
+// island.js declares which builds host scenes. Read them all so wiring
+// assertions are location-agnostic.
 const MAIN_PATHS = [
   join(ROOT, 'src', 'main.js'),
   join(ROOT, 'src', 'business', 'controller.js'),
   join(ROOT, 'src', 'hub.js'),
+  join(ROOT, 'src', 'scenes', 'registry.js'),
+  join(ROOT, 'src', 'scenes', 'mount.js'),
+  join(ROOT, 'src', 'island.js'),
 ];
 const SCREENS_PATH = join(ROOT, 'src', 'screens.js');
 const I18N_PATHS = [join(ROOT, 'src', 'i18n', 'en.js'), join(ROOT, 'src', 'i18n', 'nl.js')];
@@ -256,26 +262,26 @@ test('clearCustomers disposes transient customer label sprite resources', () => 
   assert.ok(!cleanupSource.includes('customer.mesh.dispose'), 'cached customer voxel meshes are not over-disposed');
 });
 
-test('future main business runtime wiring is declared', () => {
+test('business scene wiring is declared (registry gate, tap route, open toast)', () => {
   const source = mainSource();
 
-  for (const name of ['startBusiness', 'businessTap', 'endBusinessDay']) {
-    assert.ok(source.includes(name), `src/main.js includes ${name}`);
+  for (const name of ['enter() {', 'businessTap', 'endBusinessDay']) {
+    assert.ok(source.includes(name), `business runtime includes ${name}`);
   }
-  assert.ok(source.includes('isBuilt(this.profile, shopId)'), 'shop entry is gated by built island state');
-  assert.ok(source.includes("build.id === 'pizzeria'"), 'the pizzeria is a separate shop entry from the bakery');
+  assert.ok(source.includes("isBuilt(game.profile, params.buildId || 'bakery')"), 'shop entry is gated by built island state');
+  assert.ok(source.includes("id: 'pizzeria'") && source.includes("scene: 'business'"), 'the pizzeria is its own shop build hosting the business scene');
   assert.ok(source.includes("'business.open'"), 'shop entry announces the shop opening');
 });
 
 test('business runtime resumes unfinished active orders before generating a new one', () => {
   const source = mainSource();
-  const startBusiness = source.slice(source.indexOf('async startBusiness()'), source.indexOf('  startNextBusinessOrder()'));
+  const enterScene = source.slice(source.indexOf('  enter() {'), source.indexOf('  startNextBusinessOrder()'));
 
-  assert.match(startBusiness, /business\.activeOrder\?\.tasks\?\.length/, 'startBusiness checks for a resumable active order');
+  assert.match(enterScene, /business\.activeOrder\?\.tasks\?\.length/, 'enter() checks for a resumable active order');
   assert.ok(
-    startBusiness.indexOf('resumeBusinessOrder') >= 0
-      && startBusiness.indexOf('resumeBusinessOrder') < startBusiness.indexOf('startNextBusinessOrder'),
-    'startBusiness resumes the active order before generating a new one',
+    enterScene.indexOf('resumeBusinessOrder') >= 0
+      && enterScene.indexOf('resumeBusinessOrder') < enterScene.indexOf('startNextBusinessOrder()'),
+    'enter() resumes the active order before generating a new one',
   );
   assert.match(source, /resumeBusinessOrder\s*\(\s*business\s*\)/, 'resume helper receives current business state');
   assert.match(source, /this\.businessAttempts\s*=\s*\[\s*\]/, 'resume/new order runtime attempts start empty to avoid replayed persisted attempts');

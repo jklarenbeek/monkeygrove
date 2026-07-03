@@ -29,13 +29,26 @@ index.html              SPA shell: canvas + DOM overlay layers (Vite entry)
 vite.config.js          base '/monkeygrove/', vitest config, vite-plugin-pwa
 eslint.config.js        flat ESLint config: max-lines + correctness guardrails (warn)
 src/
-  main.js               slim Game orchestrator: boot, RAF loop tick, mode switching,
-                        and wiring the collaborators below together (composition, not a
-                        framework; each is `new XxxController(this)` and reaches back via
-                        `this.game`). Also keeps the title flow, Mimi's Check sessions
-                        (onboarding + hub-invoked), and shared HUD wiring.
+  main.js               slim Game shell: boot, RAF loop tick, scene switching
+                        (switchTo -> scenes/registry.js), the shared state blackboard
+                        every collaborator reaches through (profile/place/player/…),
+                        and thin intent dispatchers that ask the active scene first.
+                        Composition, not a framework: each collaborator is
+                        `new XxxController(this)` and reaches back via `this.game`.
+  scenes/
+    registry.js         the scene registry + contract: every switchable activity is
+                        one entry (lazy chunk import, canEnter gate, make). Adding an
+                        activity (garden, memory walk, …) never edits main.js.
+    mount.js            mountPlace(): the shared stand-up choreography for walkable
+                        scenes (place, avatar+pet, camera framing, HUD reset, music)
+  appflow.js            DOM screen flows in front of the 3D game: title/attract,
+                        player picker, parent dashboard, settings (+ lazy devtools)
+  checkupflow.js        Mimi's Check session flow (docs/05): screens + probe machine,
+                        batched Elo calibration at settle; entered from onboarding
+                        (appflow) or Mimi's hub offer
   input.js              InputController: keyboard/touch/camera gestures -> semantic intents
-                        (step/tap/action/hint), pinch/pan zoom, retained zoom, gesture hint
+                        (step/tap/action/hint), pinch/pan zoom, retained zoom, gesture hint,
+                        tap path preview + the contextual action prompt (scene-aware)
   hub.js                HubController: island hub build + attract diorama, living-gate growth,
                         NPC talk, hub taps, and the menus (gems/shop/pets/island worktable)
   chamberflow.js        ChamberFlow: one math chamber from build to clear — pick problem,
@@ -69,7 +82,8 @@ src/
   business/
     data.js             helper customers, recipes, ingredients, upgrades, business modes
     engine.js           pure orders, prep/payment checks, stock, profit, upgrades, reports
-    controller.js       business flow: opens panels, runs orders, reports objective progress
+    controller.js       business flow + the 'business' scene controller: enter() mounts
+                        the shop, then opens panels, runs orders, reports progress
     scene.js            bakery/pizzeria place with helper-customer queue and shop stations
   verbs.js              the four math interactions (fetch / array / number line / share)
   island.js             pure logic: restoration blueprints, mastery gating, funding, perks
@@ -83,6 +97,9 @@ src/
                         — older kids' lower worlds are "remembered", not re-ground),
                         the founding hexagram built line by line, bloom = real
                         yijing_balance/entropy of the restored island
+    flow.js             the ceremony gate on every hub entry: latch earned lines,
+                        queue line-draw ceremonies + one-shot narrative beats, then
+                        hand over to the hub build (Game.startHub routes through it)
     index.js            barrel (constants + engine); chapter UI lands later
   audio.js              procedural WebAudio: pentatonic SFX + music loops, no samples
   voxel.js              ASCII voxel models -> merged BufferGeometry with vertex colors

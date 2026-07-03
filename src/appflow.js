@@ -15,6 +15,7 @@ import { audio } from './audio.js';
 
 export function showTitle(game) {
   game.mode = 'title';
+  game.setScene(null);
   game.flowToken++;
   game.hubWelcomed = false;
   hud.showHud(false);

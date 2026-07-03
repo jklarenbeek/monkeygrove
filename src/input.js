@@ -323,17 +323,18 @@ export class InputController {
     this.previewT = ttlMs;
   }
 
-  // The contextual action button + proximity prompt (AC-style 💬 beside a
-  // friend in the hub, the verb's act prompt in a chamber).
+  // The contextual action button + proximity prompt. The active scene may
+  // offer its own (the hub's 💬 beside a friend); scenes with no opinion get
+  // the default rules (the verb's act prompt in a chamber).
   refreshControlPrompt() {
     const game = this.game;
     if (!game.player || !game.place || game.mode === 'title') return;
     if (document.querySelector('#screens .screen')) return;
-    if (game.mode === 'hub') {
-      const near = game.hub.hubNpcNear();
-      if (near) {
-        hud.setAction('💬', { label: t('controls.talk'), ready: true, visibleWhenIdle: true });
-        hud.setProximityPrompt(t('controls.talk'));
+    const offered = game.scene?.controlPrompt?.();
+    if (offered !== undefined) {
+      if (offered) {
+        hud.setAction(offered.icon, { label: offered.label, ready: true, visibleWhenIdle: true });
+        hud.setProximityPrompt(offered.label);
       } else {
         hud.setAction(null, { label: t('hud.action'), visibleWhenIdle: true });
         hud.setProximityPrompt(null);

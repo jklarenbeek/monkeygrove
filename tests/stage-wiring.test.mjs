@@ -11,19 +11,22 @@ const ROOT = dirname(HERE);
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const countKey = (src, key) => (src.match(new RegExp(`['"]${key.replaceAll('.', '\\.')}['"]`, 'g')) || []).length;
 
-test('the hub opens the stage minigame from the built stage plot', () => {
+test('the hub opens the stage minigame from the built stage plot (via the scene registry)', () => {
   const hub = read('src', 'hub.js');
-  assert.match(hub, /build\.id === 'stage'/);
-  assert.match(hub, /startStageFromHub\(\)/);
+  const island = read('src', 'island.js');
+  assert.match(island, /id: 'stage',[\s\S]*?scene: 'stage'/, 'the stage build names its scene');
+  assert.match(hub, /def\?\.scene && isBuilt\(g\.profile, build\.id\)/, 'built plots with a scene open it');
+  assert.match(hub, /g\.switchTo\(def\.scene, \{ buildId: build\.id \}\)/, 'the hub routes through switchTo');
 });
 
-test('the Game shell starts the stage in its own lazy chunk, gated by the build', () => {
-  const main = read('src', 'main.js');
-  assert.ok(main.includes('startStageFromHub'), 'main exposes the hub entry');
-  assert.ok(main.includes('async startStage()'), 'main has the stage start flow');
-  assert.ok(main.includes("isBuilt(this.profile, 'stage')"), 'stage entry is gated by the built stage');
-  assert.ok(main.includes("import('./stage.js')"), 'the stage scene is a lazily-fetched chunk');
-  assert.ok(main.includes('this.stage.stageTap'), 'taps route to the stage controller');
+test('the stage scene is registered as its own lazy chunk, gated by the build', () => {
+  const registry = read('src', 'scenes', 'registry.js');
+  const controller = read('src', 'stage', 'controller.js');
+  assert.match(registry, /stage:\s*\{/, 'the registry has a stage entry');
+  assert.ok(registry.includes("import('../stage.js')"), 'the stage scene is a lazily-fetched chunk');
+  assert.ok(registry.includes("isBuilt(game.profile, 'stage')"), 'stage entry is gated by the built stage');
+  assert.ok(controller.includes('mountPlace'), 'the controller mounts its own scene');
+  assert.ok(controller.includes('this.stageTap(x, z)'), 'taps route to the stage controller');
 });
 
 test('the lazy barrel exports the stage place and controller', () => {
