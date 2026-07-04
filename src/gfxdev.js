@@ -36,7 +36,7 @@ const STYLE = `
 #gfxdev .gfxdev-perf b{color:#ffd966}
 #gfxdev .gfxdev-min{position:absolute;right:6px;top:6px;background:none;border:0;color:#9fb4cf;flex:0;padding:0 4px}`;
 
-export function createGfxDev(game) {
+export function createGfxDev(game, onClose) {
   if (typeof document === 'undefined') return null;
   const root = document.createElement('div');
   root.id = 'gfxdev';
@@ -121,7 +121,8 @@ export function createGfxDev(game) {
       root.querySelector('#gfxdev-perf')?.classList.toggle('on', perfOn);
     }
   });
-  root.querySelector('.gfxdev-min')?.addEventListener('click', () => root.remove());
+  const dispose = () => { root.remove(); style.remove(); onClose?.(); };
+  root.querySelector('.gfxdev-min')?.addEventListener('click', dispose);
 
   applyLights();
 
@@ -150,5 +151,5 @@ export function createGfxDev(game) {
     set('actors', fmt(actors));
   }
 
-  return { el: root, tick, dispose: () => { root.remove(); style.remove(); } };
+  return { el: root, tick, dispose };
 }

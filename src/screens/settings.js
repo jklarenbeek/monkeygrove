@@ -49,8 +49,7 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   el.querySelector('#scr-back').addEventListener('click', onClose);
   for (const b of el.querySelectorAll('[data-lang]')) {
     b.addEventListener('click', () => {
-      setLang(b.dataset.lang); setActiveProfileLanguage(b.dataset.lang); persistNow(); onLangChange?.();
-      showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
+      setLang(b.dataset.lang); setActiveProfileLanguage(b.dataset.lang); persistNow(); onLangChange?.(); showSettings({ onClose, onSwitchPlayer, onLangChange, devTools });
     });
   }
   el.querySelector('#tg-sfx').addEventListener('click', () => {
@@ -98,6 +97,7 @@ export function showSettings({ onClose, onSwitchPlayer, onLangChange, devTools }
   }
   el.querySelector('#switch-player').addEventListener('click', onSwitchPlayer);
   el.querySelector('#settings-extra-toggle')?.addEventListener('click', () => devTools?.onToggle?.(!devTools.open));
+  el.querySelector('#settings-gfxdev-toggle')?.addEventListener('click', () => devTools?.onGfxDev?.());
   for (const btn of el.querySelectorAll('[data-settings-preset]')) {
     btn.addEventListener('click', () => devTools?.onApply?.(btn.dataset.settingsPreset));
   }

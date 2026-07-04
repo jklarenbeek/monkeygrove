@@ -75,14 +75,14 @@ function displayStage(pack, curriculum) {
     || pack.stages.find((s) => s.order === curriculum.groep)?.id || null;
 }
 
-function curriculumCoverageHtml(profile, report, businessReport = null, stageReport = null, showControls = false) {
+// The read-only "where is this child right now" card: country / path / stage /
+// working level as chips, plus any watch-outs from the last check. Deliberately has
+// NO editable controls — the adjustable knobs live in their own settings card below,
+// so a parent can read the status at a glance without wading through form fields.
+function curriculumStatusHtml(profile, report) {
   if (!profile?.curriculum || !report) return '';
   const pack = getPack(profile.curriculum.packId);
-  const packs = listPacks();
-  const coverage = coverageForReport(pack.id, report, { business: businessReport, stage: stageReport });
   const stage = displayStage(pack, profile.curriculum);
-  const strictness = profile.curriculum.strictness || 'soft';
-  const memoryOn = !!profile.memory?.enabled;
   const checkup = profile.curriculum.checkup;
   const level = functioneringsniveau(profile.curriculum);
   return `
@@ -98,11 +98,56 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
         ${checkup?.completed && checkup.on ? `<div class="chip">${esc(t('parents.last_check'))}: ${esc(checkup.on)}</div>` : ''}
       </div>
       ${checkup?.misconceptions?.length ? `
-      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:6px">${esc(t('parents.misconceptions'))}</div>
-      <div class="curriculum-objectives" style="margin-bottom:10px">
+      <div class="parent-note">${esc(t('parents.misconceptions'))}</div>
+      <div class="curriculum-objectives">
         ${checkup.misconceptions.map((tag) => `<span class="curriculum-pill partial">${esc(t(`misconception.${tag}`))}</span>`).join('')}
       </div>` : ''}
-      ${showControls ? `<div class="curriculum-controls">
+    </div>`;
+}
+
+// The coverage card: one progress bar + objective pills per curriculum domain.
+// Its own card so the "how far along" detail no longer competes with the status
+// chips and the editable controls for space.
+function curriculumCoverageHtml(profile, report, businessReport = null, stageReport = null) {
+  if (!profile?.curriculum || !report) return '';
+  const pack = getPack(profile.curriculum.packId);
+  const coverage = coverageForReport(pack.id, report, { business: businessReport, stage: stageReport });
+  const domains = Object.values(coverage.domains).filter((d) => d.total > 0);
+  if (!domains.length) return '';
+  return `
+    <div class="card">
+      <h3>${esc(t('parents.coverage'))}</h3>
+      <div class="parent-note">${esc(t('parents.coverage_intro'))}</div>
+      ${domains.map((d) => `
+        <div class="curriculum-domain">
+          <div class="skill-row">
+            <div class="s-name">${esc(t(d.labelKey))}</div>
+            <div class="s-bar"><div class="s-fill" style="width:${Math.round((d.covered / Math.max(1, d.total)) * 100)}%"></div></div>
+            <div class="curriculum-count">${d.covered}/${d.total}</div>
+          </div>
+          <div class="curriculum-objectives">
+            ${d.objectives.map((o) => `<span class="curriculum-pill ${o.coverage}">${esc(t(o.titleKey))} · ${esc(t(`parents.${o.coverage}`))}</span>`).join('')}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+// The editable controls, gathered into their own clearly-labelled card so parents
+// know exactly which of the numbers above they can change: pack, birthday, stage,
+// targeting, Memory Grove, and the "ask Mimi for a new check" action.
+function curriculumSettingsHtml(profile) {
+  if (!profile?.curriculum) return '';
+  const pack = getPack(profile.curriculum.packId);
+  const packs = listPacks();
+  const stage = displayStage(pack, profile.curriculum);
+  const strictness = profile.curriculum.strictness || 'soft';
+  const memoryOn = !!profile.memory?.enabled;
+  return `
+    <div class="card">
+      <h3>${esc(t('parents.settings_title'))}</h3>
+      <div class="parent-note">${esc(t('parents.settings_intro'))}</div>
+      <div class="curriculum-controls">
         <label>
           <span>${esc(t('parents.curriculum_pack'))}</span>
           <select data-pack>
@@ -126,7 +171,7 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
             <option value="strict" ${strictness === 'strict' ? 'selected' : ''}>${esc(t('parents.strictness_strict'))}</option>
           </select>
         </label>
-        <label title="${esc(t('parents.memory_hint'))}">
+        <label>
           <span>${esc(t('parents.memory'))}</span>
           <select data-memory>
             <option value="on" ${memoryOn ? 'selected' : ''}>${esc(t('parents.memory_on'))}</option>
@@ -134,25 +179,12 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
           </select>
         </label>
       </div>
-      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:10px">${esc(t('parents.memory_hint'))}</div>
-      <div class="menu-row" style="justify-content:flex-start;margin-bottom:10px">
+      <div class="parent-note">${esc(t('parents.memory_hint'))}</div>
+      <div class="menu-row" style="justify-content:flex-start">
         ${profile.flags?.checkupRequested
           ? `<div class="chip">✓ ${esc(t('parents.check_requested'))}</div>`
           : `<button class="btn soft" data-request-checkup>${esc(t('parents.request_check'))}</button>`}
-      </div>` : ''}
-      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:8px">${esc(t('parents.coverage'))}</div>
-      ${Object.values(coverage.domains).filter((d) => d.total > 0).map((d) => `
-        <div class="curriculum-domain">
-          <div class="skill-row">
-            <div class="s-name">${esc(t(d.labelKey))}</div>
-            <div class="s-bar"><div class="s-fill" style="width:${Math.round((d.covered / Math.max(1, d.total)) * 100)}%"></div></div>
-            <div class="curriculum-count">${d.covered}/${d.total}</div>
-          </div>
-          <div class="curriculum-objectives">
-            ${d.objectives.map((o) => `<span class="curriculum-pill ${o.coverage}">${esc(t(o.titleKey))} · ${esc(t(`parents.${o.coverage}`))}</span>`).join('')}
-          </div>
-        </div>
-      `).join('')}
+      </div>
     </div>`;
 }
 
@@ -249,7 +281,9 @@ export function showParents({ report, profile, businessReport = null, stageRepor
     <h2>${t('parents.title')}</h2>
     <div class="card"><p style="margin:0;font-size:15px;line-height:1.5">${t('parents.body')}</p></div>
     ${profile && report ? `
-    ${curriculumCoverageHtml(profile, report, businessReport, stageReport, !!onCurriculumChange)}
+    ${curriculumStatusHtml(profile, report)}
+    ${curriculumCoverageHtml(profile, report, businessReport, stageReport)}
+    ${onCurriculumChange ? curriculumSettingsHtml(profile) : ''}
     ${parentBusinessHtml(businessReport)}
     ${parentStageHtml(stageReport)}
     ${parentMemoryHtml(profile)}

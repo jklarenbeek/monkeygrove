@@ -113,6 +113,7 @@ export async function openSettings(game, devOpen = false) {
       open: devOpen,
       ...mod.renderDevTools({ summary, presets: mod.DEV_PRESETS, open: devOpen }),
       onToggle: (open) => openSettings(game, open),
+      onGfxDev: () => game.toggleGfxDev(),
       onApply: (id) => {
         const preset = mod.applyDevPreset(game.profile, id);
         if (!preset) return;

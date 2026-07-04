@@ -775,6 +775,18 @@ html.reduce-motion #cutscene-next { animation: none; }
 .curriculum-pill.playable { border-color: #8fd0e8; }
 .curriculum-pill.planned { opacity: .65; }
 
+/* A calm, left-aligned helper line inside the parent cards — replaces the old
+   inline-styled taglines so each section can carry a short plain-language intro. */
+.parent-note {
+  color: var(--ink-soft);
+  font-size: calc(14px * var(--text-scale));
+  line-height: 1.5;
+  text-shadow: none;
+  text-align: left;
+  margin: 0 0 12px;
+}
+.parent-note + .curriculum-objectives { margin-top: 0; }
+
 /* world select cards on hub */
 .world-pill {
   display: flex; align-items: center; gap: 10px; background: var(--cream); border: 3px solid #fff;

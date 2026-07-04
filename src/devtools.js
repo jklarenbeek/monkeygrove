@@ -161,6 +161,8 @@ export function renderDevTools({ summary, presets = DEV_PRESETS, open = false } 
           </button>
         `).join('')}
       </div>
+      <div class="mg-dev-note" style="margin-top:12px">The Graphics dev panel (live light/water sliders + perf overlay) no longer opens on boot — open it here when you need it.</div>
+      <button class="btn soft" id="settings-gfxdev-toggle">🎨 Graphics dev panel</button>
     </div>
     <div class="card mg-devtools-panel">
       <h3>Model viewer</h3>

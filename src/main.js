@@ -27,12 +27,11 @@ class Game {
   constructor() {
     this.canvas = document.getElementById('game-canvas');
     this.world = new World(this.canvas);
-    // Dev-only graphics tuning panel + perf overlay (gfxdev.js). Lazy + DEV-gated so
-    // Vite keeps it out of the production bundle entirely.
+    // Dev-only graphics tuning panel + perf overlay (gfxdev.js). Opt-in: it no longer
+    // auto-mounts on boot (it used to clutter every dev session). Open it on demand
+    // from Settings → Developer tools → "Graphics dev panel" via toggleGfxDev(). Lazy
+    // + DEV-gated so Vite keeps it out of the production bundle entirely.
     this._gfxdev = null;
-    if (import.meta.env.DEV) {
-      import('./gfxdev.js').then((m) => { this._gfxdev = m.createGfxDev(this); }).catch(() => {});
-    }
     this.profile = null;
     this.mode = 'title';
     this.scene = null; // the active scene controller (registry contract); null on title/cutscene
@@ -71,6 +70,21 @@ class Game {
     this.rewards = new RewardService(this); // banana/egg/combo/chest/treat payouts + juice
     this.hub = new HubController(this); // island hub: build, NPC talk, taps, menus
     this.chamber = new ChamberFlow(this); // chamber run: build, present, score, reward, complete
+  }
+
+  // Open or close the dev-only Graphics dev panel on demand (Settings → Developer
+  // tools). Lazy-imported so it stays out of production; returns the new open state.
+  toggleGfxDev() {
+    if (!import.meta.env.DEV) return false;
+    if (this._gfxdev) {
+      this._gfxdev.dispose();
+      this._gfxdev = null;
+      return false;
+    }
+    import('./gfxdev.js')
+      .then((m) => { this._gfxdev = m.createGfxDev(this, () => { this._gfxdev = null; }); })
+      .catch(() => {});
+    return true;
   }
 
   // ---------- boot ----------
