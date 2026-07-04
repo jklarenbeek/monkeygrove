@@ -1,4 +1,4 @@
-import{F as P,b as c,o as f,ak as q,al as p,am as L,P as E,K as x,N as k,Q as $,g as _,m as M,r as w,an as z,ao as C,R as A,ap as B,aq as R,ar as T,as as N,at as W,a1 as m,c as h,Z as G,B as S,a7 as I,au as K,a9 as F,a8 as O,ac as j}from"./index-CHI1JioF.js";import{m as D}from"./mount-D4Uj2jCQ.js";function H({songs:o,gradeLabel:t,onPlay:s,onExit:i}){const n=P(`
+import{F as P,b as c,o as f,ak as q,al as p,am as L,P as E,K as x,N as k,Q as $,g as _,m as M,r as w,an as z,ao as C,R as A,ap as B,aq as R,ar as T,as as N,at as W,a1 as m,c as h,Z as G,B as S,a7 as I,au as K,a9 as F,a8 as O,ac as j}from"./index-OpZJAivp.js";import{m as D}from"./mount-CnJsmSev.js";function H({songs:o,gradeLabel:t,onPlay:s,onExit:i}){const n=P(`
     <div class="business-panel">
       <div class="business-head">
         <h2>${c("stage.songs")}</h2>
