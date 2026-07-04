@@ -85,6 +85,15 @@ src/
     controller.js       business flow + the 'business' scene controller: enter() mounts
                         the shop, then opens panels, runs orders, reports progress
     scene.js            bakery/pizzeria place with helper-customer queue and shop stations
+  memory/               Memory Grove (docs/06): the method of loci, layered over the
+                        fact gems as an optional encoding aid — never a review system
+    data.js             anchor-image catalog (hard-cluster facts -> landmark + story),
+                        loci order, walk step pools, gate constants
+    engine.js           pure: gating, adoption CRUD, wobbly-fact pick, hint dispatch +
+                        A/B, skip-walk builder, challenge codes, recall probe, analytics
+    walkflow.js         the memory-walk controller: borrows hub mode, the child walks
+                        the route, a numpad question at each landmark (no new scene)
+    probeflow.js        the opt-in pre/post recall probe flow (stored on device)
   verbs.js              the four math interactions (fetch / array / number line / share)
   island.js             pure logic: restoration blueprints, mastery gating, funding, perks
   mimi.js               Mimi's conversation ladder (most useful advice first)

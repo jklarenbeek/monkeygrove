@@ -87,6 +87,11 @@ added to the home screen like a native app.
 - **Music stage** (Kiki the Kitten's three songs)
   - Echo Song (sequence memory), Counting Song (skip-counting), Beat Bar (fraction addition)
   - Correct rounds feed the same skill mastery the chambers do
+- **Memory Grove** (method of loci — an optional memory aid, unlocks around group 6 / age 9)
+  - Silly, bilingual anchor images for the hardest table facts, adopted at the Gem Tree
+  - The anchor becomes the first hint next time that fact wobbles (only after it is understood)
+  - Memory walks: skip-count from landmark to landmark; shareable walk challenge codes
+  - An opt-in, on-device recall check; the parents screen compares anchored vs. unanchored facts
 - **Retention without pressure**
   - Daily streak gifts and streak freezes
   - Egg meter, hatchable pets, hats, fur colors, and trails
@@ -132,6 +137,7 @@ npm run dev         # Vite dev server with hot reload
 npm test            # Vitest suites (simulated DOM — no browser needed)
 npm run test:watch  # Vitest in watch mode
 npm run test:e2e    # Headless-browser smoke test: boot -> profile -> hub -> kitchen
+npm run test:e2e:memory # Headless-browser visual test of the Memory Grove (docs/06); saves screenshots
 npm run lint        # ESLint (flat config): size + correctness guardrails
 npm run build       # Production build into dist/
 npm run preview     # Serve the production build locally
@@ -298,6 +304,9 @@ src/
   business/         bakery/pizzeria sim: data, pure engine, controller, scene
   cutscene/         lazy 3D story cutscenes: director, dialog bar, scene scripts,
                     diorama place (DOM story cards remain the fallback)
+  memory/           Memory Grove (docs/06): anchor-image catalog, pure engine
+                    (gating, adoption, walks, codes, hint A/B, recall probe),
+                    plus the hub walk + probe controllers
   verbs.js          fetch, array, number-line, and share interactions
   island.js         restoration blueprints, gating, funding, daily perks
   mimi.js           Mimi's advice ladder

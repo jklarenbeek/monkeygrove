@@ -9,11 +9,16 @@ Peildatum: juli 2026. Companion to `01-learn.md` (pedagogy), `02-adaptive.md`
 probe). The filename says *memoization* — the programmer's pun stays, but the
 technique is **memorization**: the method of loci (memory palace).
 
-> **Status: proposal — not implemented.** Version 2.0, juli 2026. This
-> revision replaces v1.0 after a correctness + feasibility review: the code
-> audit in §3 was re-done against the refactored tree (`src/math/`,
-> `src/verbs/`, `src/chamber/`) and is the source of truth for the design in
-> §4. No memory/loci code exists yet; this is a greenfield module.
+> **Status: implemented (Phases 1–3), juli 2026.** The v2.0 design below shipped
+> as `src/memory/` (`data.js` + pure `engine.js`, plus the `walkflow.js` /
+> `probeflow.js` controllers) and `src/screens/memory.js`, wired through `hub.js`,
+> `chamberflow.js`, `mimi.js`, `screens/gems.js`, and `screens/parents.js`;
+> `profile.memory` heals additively in `state.js` with no version bump. Coverage:
+> `tests/memory.test.mjs` (engine purity, gating, hint dispatch, walks, codes,
+> A/B, probe, state healing) and a visual smoke test in `scripts/e2e-memory.mjs`
+> (with the `memory_grove` devtools preset) that drives every surface. §3 is the
+> original greenfield audit the build followed; §5 records the as-built status of
+> each phase.
 
 ---
 
@@ -321,25 +326,28 @@ recall accuracy on anchored vs unanchored facts (computable from
 
 ## 5. Roadmap
 
-**Phase 1 — MVP (~2–3 weeks solo).** `src/memory/data.js` + `engine.js`
-(pure: eligibility, wobbly-fact pick, anchor CRUD) · ~20 anchors for the
-hard multiplication cluster, EN+NL · Gem Tree adoption flow (extend
-`screens/gems.js` + `hubTap`) · memory-hint branch in `useHint()` · Mimi
-offer, groep-6 gate, parent toggle · `profile.memory` + heal · tests
-(`tests/memory.test.mjs`: engine purity, state healing, hint dispatch,
-gating).
-*Acceptance:* a groep-6 child with lit gems can adopt 7×8 at the Gem Tree,
-see the anchor as their first hint next time 7×8 wobbles, and a parent can
-see and disable it. Old saves load unchanged.
+**Phase 1 — MVP. ✅ Shipped.** `src/memory/data.js` (18 anchors for the hard
+multiplication cluster, EN+NL) + pure `engine.js` (eligibility, wobbly-fact
+pick, anchor CRUD) · Gem Tree adoption flow (`screens/gems.js` + `hubTap`) ·
+memory-hint branch in `useHint()` · Mimi offer, groep-6 gate, parent toggle ·
+`profile.memory` + additive heal.
+*Acceptance (met):* a groep-6 child with lit gems can adopt 7×8 at the Gem
+Tree, sees the anchor as their first hint next time 7×8 wobbles, and a parent
+can see and disable it. Old saves load unchanged.
 
-**Phase 2 — walks & depth (~4–6 weeks).** Memory-walk controller over hub
-landmarks (skip-counting first, then one procedure journey) · fact-level
-echo bias (§4.5) · anchor browser screen · parents block · anchor-themed
-cosmetics through the existing shop/pets economy.
+**Phase 2 — walks & depth. ✅ Shipped** (one deferral). Memory-walk controller
+over hub landmarks — *skip-counting shipped*; the **procedure journey**
+(borrowing / long division / fraction addition, one step per locus) is the one
+deferred item, and the walk engine is shaped to take it as a second `kind` ·
+fact-level echo bias (§4.5, `nextProblem` `targetFact` + table/division
+generators) · anchor browser screen (`src/screens/memory.js`) · parents block ·
+anchor-themed cosmetic (the grove-leaf trail) through the shop economy.
 
-**Phase 3 — sharing & evidence.** Walk challenge codes (`duel.js`/`rng.js`
-pattern) · opt-in anonymous pre/post fact-recall probes (§7) · A/B of
-memory-first vs model-first hints for anchored facts.
+**Phase 3 — sharing & evidence. ✅ Shipped.** Walk challenge codes
+(`makeWalkCode`/`parseWalkCode`, the `duel.js` pattern) · opt-in anonymous
+pre/post fact-recall probes (§7, `probeflow.js`, stored on device) · A/B of
+memory-first vs model-first hints for anchored facts (`pickHintArm` /
+`recordHintArm`, surfaced in the parents block).
 
 ---
 
