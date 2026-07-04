@@ -43,6 +43,33 @@ export function skillSupportsKind(skillId, kind) {
   return KINDS_SUPPORTED[skillId]?.includes(kind) ?? false;
 }
 
+// ---------- fact targeting (docs/06 §4.5, Memory Grove) ----------
+// A specific times-table fact can be re-served on demand ('7x8' → 7 × 8): the
+// Echo Doors use this to bring a wobbly *anchored* fact back around. We route it
+// to the table skill that naturally owns the larger factor (so the Elo nudge
+// lands on the right skill), and hand the exact factors to that generator.
+
+const TABLE_FACT_SKILLS = new Set(['tables_a', 'tables_b', 'tables_c', 'tables_mix']);
+
+export function parseFact(fact) {
+  const m = /^(\d+)x(\d+)$/.exec(String(fact || ''));
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = Number(m[2]);
+  if (a < 1 || a > 10 || b < 1 || b > 10) return null;
+  return { a, b };
+}
+
+// The table skill that owns a fact: by its larger factor's band, so 7×8 → tables_c
+// (the 7/8/9 table), 3×6 → tables_b, 2×5 → tables_a; anything else → tables_mix.
+function factSkillFor(a, b) {
+  const m = Math.max(a, b);
+  if (m === 7 || m === 8 || m === 9) return 'tables_c';
+  if (m === 3 || m === 4 || m === 6) return 'tables_b';
+  if (m === 2 || m === 5 || m === 10) return 'tables_a';
+  return 'tables_mix';
+}
+
 function chooseKind(skillId, s, forced, rng) {
   const supported = KINDS_SUPPORTED[skillId];
   if (forced) return supported.includes(forced) ? forced : NATURAL_KIND[skillId];
@@ -152,9 +179,15 @@ export function nextProblem(math, opts = {}) {
   const rng = opts.rng;
   if (!rng) throw new Error('nextProblem requires opts.rng — the engine sources no entropy of its own.');
   const now = opts.now ?? 0;
+  // A targeted fact (docs/06 §4.5) overrides skill selection but never a hard
+  // opts.skill (tests/duels): route the fact to the table skill that owns it and
+  // hand the exact factors to that generator below.
+  const targetFact = opts.skill ? null : parseFact(opts.targetFact);
   let skillId;
   if (opts.skill && SKILLS[opts.skill]) {
     skillId = opts.skill;
+  } else if (targetFact) {
+    skillId = factSkillFor(targetFact.a, targetFact.b);
   } else if (opts.echo) {
     skillId = echoSkill(math, opts.allowedSkills, now) ?? focusSkill(math, opts.world ?? rng.pick(WORLDS), opts.allowedSkills, now);
   } else {
@@ -199,7 +232,12 @@ export function nextProblem(math, opts = {}) {
   const target = probe
     ? probeTarget + (rng.float() - 0.5) * 40
     : targetDifficulty(s, rng, effR);
-  let inner = GEN[skillId](target, rng, kind, scaffold);
+  // Inject the exact factors only for a table skill serving a targeted fact; every
+  // other generator ignores the 5th arg, so this stays backward-compatible.
+  const genOpts = targetFact && TABLE_FACT_SKILLS.has(skillId)
+    ? { fact: [targetFact.a, targetFact.b] }
+    : null;
+  let inner = GEN[skillId](target, rng, kind, scaffold, genOpts);
   if (skillId === 'frac_magnitude') {
     inner = spreadFractionMagnitude(inner, math, rng, target, kind, scaffold, s);
   }

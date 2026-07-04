@@ -5,6 +5,7 @@
 import { render, backBtn, WORLD_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { audio } from '../audio.js';
+import { LOCI_EMOJI, formatFact } from '../memory/data.js';
 import { YIJING_KINGWEN_SEQUENCE } from '../yijing/yijing.js';
 import { NODES, NODE_IDS, PATHS, CHAPTER_REGIONS } from '../story/tree.js';
 import { CHAPTERS } from '../story/constants.js';
@@ -135,11 +136,79 @@ function treeCard(report, story) {
     </div>`;
 }
 
+// The Memory Grove adoption card (docs/06 §4.3), shown only once the feature is
+// unlocked. `memory` is { adoptable, adopted }: wobbly-first facts the child has
+// mastered and can anchor, plus the anchors they already own. Tapping a fact
+// reveals its silly image story; a "Got it!" confirm saves the anchor — the small
+// generation step the evidence asks for (§2.3). Re-reading an owned anchor just
+// replays the story.
+const factProduct = (fk) => {
+  const m = /^(\d+)x(\d+)$/.exec(String(fk));
+  return m ? Number(m[1]) * Number(m[2]) : '';
+};
+
+function memorySection(memory) {
+  if (!memory) return '';
+  const { adoptable = [], adopted = [] } = memory;
+  const adoptHtml = adoptable.length ? `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px">
+      ${adoptable.map((a) => `<button class="btn soft" data-adopt="${a.factKey}">${a.wobbly ? '✨ ' : ''}${formatFact(a.factKey)}</button>`).join('')}
+    </div>`
+    : `<div class="tagline" style="margin-top:8px">${t('memory.none')}</div>`;
+  const adoptedHtml = adopted.length ? `
+    <div class="tagline" style="margin-top:14px">${t('memory.adopted_title')}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:6px">
+      ${adopted.map((a) => `<button class="chip" data-reread="${a.factKey}" style="cursor:pointer">${LOCI_EMOJI[a.lociId] || '🧠'} ${formatFact(a.factKey)} = ${factProduct(a.factKey)}</button>`).join('')}
+    </div>` : '';
+  const walkBtn = memory.canWalk
+    ? `<button class="btn soft" id="mem-open" style="margin-top:12px">🚶 ${t('memory.open_browser')}</button>`
+    : (adopted.length ? `<button class="btn soft" id="mem-open" style="margin-top:12px">🧠 ${t('memory.open_browser')}</button>` : '');
+  return `
+    <div class="card" style="text-align:center">
+      <h3>${t('memory.adopt_title')}</h3>
+      <div class="tagline" style="margin:4px 0 6px">${t('memory.adopt_sub')}</div>
+      ${adoptHtml}
+      <div class="card hidden" id="mem-story" style="max-width:400px;margin:12px auto 0;text-align:center">
+        <div id="mem-story-text" style="font-size:15px;line-height:1.5"></div>
+        <button class="btn" id="mem-story-confirm" style="margin-top:10px">${t('memory.got_it')}</button>
+      </div>
+      ${adoptedHtml}
+      ${walkBtn}
+    </div>`;
+}
+
+function wireMemory(el, memory, onAdopt) {
+  if (!memory) return;
+  const story = el.querySelector('#mem-story');
+  const storyText = el.querySelector('#mem-story-text');
+  const confirmBtn = el.querySelector('#mem-story-confirm');
+  let pending = null;
+  const showStory = (factKey, canAdopt) => {
+    pending = canAdopt ? factKey : null;
+    storyText.innerHTML = t(`memory.anchor.${factKey}`);
+    story.classList.remove('hidden');
+    confirmBtn.classList.toggle('hidden', !canAdopt);
+  };
+  el.querySelectorAll('[data-adopt]').forEach((b) => b.addEventListener('click', () => {
+    audio.sfx('sparkle');
+    showStory(b.dataset.adopt, true);
+  }));
+  el.querySelectorAll('[data-reread]').forEach((b) => b.addEventListener('click', () => {
+    audio.sfx('click');
+    showStory(b.dataset.reread, false);
+  }));
+  confirmBtn?.addEventListener('click', () => {
+    if (!pending) return;
+    audio.sfx('correct');
+    onAdopt?.(pending);
+  });
+}
+
 // `story` lights the Tree's nodes (optional — undefined renders a fresh tree).
 // `wonder` is the next undiscovered gem_tree card (the DNA reveal, then the
 // doubling branches), offered as an opt-in door exactly like the result screen:
 // tap to open, or just leave — never a nag. `onWonderOpen(id)` marks it seen.
-export function showGems({ report, story, wonder = null, onWonderOpen, onClose }) {
+export function showGems({ report, story, wonder = null, memory = null, onWonderOpen, onAdopt, onOpenMemory, onClose }) {
   const lit = new Set(report.gems.lit);
   let cells = '<div class="gem-cell head">×</div>';
   for (let c = 1; c <= 10; c++) cells += `<div class="gem-cell head">${c}</div>`;
@@ -170,6 +239,7 @@ export function showGems({ report, story, wonder = null, onWonderOpen, onClose }
       <div id="hex-grid">${hexGrid(report)}</div>
       <div class="tagline" style="margin-top:10px">${t('gems.hex_sub')}</div>
     </div>
+    ${memorySection(memory)}
     ${wonderHtml}
     ${treeCard(report, story)}
     <div class="card">
@@ -187,6 +257,8 @@ export function showGems({ report, story, wonder = null, onWonderOpen, onClose }
     </div>
   `);
   el.querySelector('#scr-back').addEventListener('click', onClose);
+  wireMemory(el, memory, onAdopt);
+  el.querySelector('#mem-open')?.addEventListener('click', () => onOpenMemory?.());
   const wonderBtn = el.querySelector('#gems-wonder');
   wonderBtn?.addEventListener('click', () => {
     wonderBtn.classList.add('hidden');

@@ -166,6 +166,9 @@ export const TRAILS = [
   { id: 'petal', nameKey: 'trail.petal', price: 100, color: '#ffb3c6' },
   { id: 'bubble', nameKey: 'trail.bubble', price: 100, color: '#9bd6ff' },
   { id: 'star', nameKey: 'trail.star', price: 200, color: '#c9a6ff' },
+  // Memory Grove cosmetic (docs/06 §5, Phase 2): a grove-green trail of little
+  // leaves, earned with the same bananas as everything else.
+  { id: 'grove', nameKey: 'trail.grove', price: 150, color: '#7ccf7c' },
 ];
 
 // ---------------------------------------------------------------------------

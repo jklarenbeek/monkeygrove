@@ -19,6 +19,11 @@ import {
   grantDailyPerks, BUILDS, isBuilt,
 } from './island.js';
 import { mimiLines, advanceMimiPhase } from './mimi.js';
+import {
+  memoryUnlocked, adoptableFacts, adoptedAnchors, adoptAnchor, setMemoryEnabled,
+  availableLoci, availableWalkSteps, swapAnchorLoci,
+} from './memory/engine.js';
+import { MemoryWalk } from './memory/walkflow.js';
 import { nextWonderFor } from './story/wonders.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import {
@@ -460,12 +465,25 @@ export class HubController {
       // confirm her line — like a villager leading you to the counter; her
       // check offer/ask opens the check the same way (docs/05 §3.1).
       const launchesCheckup = line.key === 'mimi.checkup_offer' || line.key === 'mimi.checkup_ask';
+      const launchesMemory = line.key === 'mimi.memory_offer';
+      const launchesWalk = line.key === 'mimi.memory_walk';
       hud.say(line.html, {
         onDone: line.key === 'mimi.build_ready'
           ? () => { if (tok === g.flowToken && g.mode === 'hub') this.openIsland(); }
           : launchesCheckup
             ? () => { if (tok === g.flowToken && g.mode === 'hub') g.startCheckupFromHub(); }
-            : null,
+            : launchesMemory
+              // Accepting Mimi's offer turns the Grove on and opens the Gem Tree,
+              // so the child can adopt their first anchor right away (docs/06 §4.2).
+              ? () => {
+                if (tok !== g.flowToken || g.mode !== 'hub') return;
+                setMemoryEnabled(g.profile, true);
+                persist();
+                this.openGems();
+              }
+              : launchesWalk
+                ? () => { if (tok === g.flowToken && g.mode === 'hub') this.openMemory(); }
+                : null,
       });
     } else {
       const npc = target.npc;
@@ -565,7 +583,24 @@ export class HubController {
   openGems() {
     const g = this.game;
     audio.sfx('click');
+    // The Memory Grove adoption panel rides on the Gem Tree overlay, but only
+    // once the feature is unlocked (Mimi's offer accepted / parent toggle). When
+    // hidden, showGems renders exactly as before (docs/06 §4.3).
+    const mem = g.profile.memory;
+    const unlocked = memoryUnlocked(g.profile);
+    const memory = unlocked ? {
+      adoptable: adoptableFacts(g.profile.math, mem),
+      adopted: adoptedAnchors(mem),
+      canWalk: availableWalkSteps(g.profile).length > 0,
+    } : null;
     screens.showGems({
+      memory,
+      onAdopt: (factKey) => {
+        adoptAnchor(g.profile.memory, factKey, { now: Date.now() });
+        persist();
+        this.openGems(); // re-render so the fresh anchor shows in "Your anchors"
+      },
+      onOpenMemory: unlocked ? () => this.openMemory() : null,
       // the child's Gem Tree only ever rises (anti-anxiety, same contract as the
       // gate bloom): pass NO clock so a faded skill's 🌟 never reverts to 🌱.
       // Decay stays honest where decisions are made — the parent dashboard and
@@ -584,6 +619,28 @@ export class HubController {
       },
       onClose: () => screens.closeScreen(),
     });
+  }
+
+  // The Memory Grove browser (docs/06 §4.6): review adopted anchors, swap a
+  // landmark, or set off on a memory walk. Reached from the Gem Tree or Mimi.
+  openMemory() {
+    const g = this.game;
+    audio.sfx('click');
+    screens.showMemory({
+      anchors: adoptedAnchors(g.profile.memory),
+      loci: availableLoci(g.profile),
+      walkSteps: availableWalkSteps(g.profile),
+      onSwap: (factKey, lociId) => { swapAnchorLoci(g.profile.memory, factKey, lociId); persist(); },
+      onStartWalk: (step) => this.startMemoryWalk(step),
+      onClose: () => screens.closeScreen(),
+    });
+  }
+
+  // Launch a loci journey on the live hub (docs/06 §4.4). The walk borrows hub
+  // mode and hands back with startHub() when it finishes or the child leaves.
+  startMemoryWalk(step) {
+    screens.closeScreen();
+    new MemoryWalk(this.game).start(step);
   }
 
   openShop() {

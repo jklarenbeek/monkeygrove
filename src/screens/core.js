@@ -17,7 +17,7 @@ export const HAT_EMOJI = {
   cap: '🧢', bow: '🎀', crown: '👑', flowercrown: '🌸',
   beanie: '🧶', wizard: '🧙‍♂️', pirate: '🏴‍☠️', party: '🥳',
 };
-export const TRAIL_EMOJI = { sparkle: '✨', petal: '🌸', bubble: '🫧', star: '⭐' };
+export const TRAIL_EMOJI = { sparkle: '✨', petal: '🌸', bubble: '🫧', star: '⭐', grove: '🍃' };
 export const WORLD_EMOJI = { tide: '🌊', garden: '🌱', stump: '🥥', vines: '🍇' };
 
 export function closeScreen() {

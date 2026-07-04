@@ -45,9 +45,11 @@ function tableProblem(rng, kind, scaffold, a, b, d) {
 }
 
 function tableGen(tiers) {
-  return (target, rng, kind, scaffold) => {
+  return (target, rng, kind, scaffold, opts = null) => {
     const tier = pickTier(tiers, target);
-    const [a, b] = tier.gen(rng);
+    // opts.fact (docs/06 §4.5): serve this exact fact — the Echo Doors re-serving a
+    // wobbly anchored fact — keeping the tier's difficulty for the Elo bookkeeping.
+    const [a, b] = opts?.fact ? opts.fact : tier.gen(rng);
     return tableProblem(rng, kind, scaffold, a, b, tier.d);
   };
 }

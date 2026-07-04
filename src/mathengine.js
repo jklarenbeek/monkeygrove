@@ -28,5 +28,5 @@ export {
 export { expectedSuccess } from './math/rating.js';
 export { skillSupportsKind, nextProblem } from './math/selection.js';
 export {
-  recordResult, recordCalibration, reinforceSkill, masteryReport,
+  recordResult, recordCalibration, reinforceSkill, masteryReport, FACT_SKILLS,
 } from './math/results.js';

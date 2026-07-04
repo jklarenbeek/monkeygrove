@@ -10,7 +10,7 @@ import { makeCharacter } from './entities.js';
 import { HATS, FURS, MONKEY_HAT_Y, getCreature, DEFAULT_CREATURE_ID } from './models.js';
 import { buildVoxelMesh } from './voxel.js';
 
-const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff };
+const TRAIL_COLORS = { sparkle: 0xffd966, petal: 0xffb3c6, bubble: 0x9bd6ff, star: 0xc9a6ff, grove: 0x7ccf7c };
 
 export class AvatarRig {
   constructor(game) {

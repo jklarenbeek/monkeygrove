@@ -9,6 +9,7 @@
 // Lines are {key, vars?, buildId?, worldId?}: buildId/worldId are raw ids the
 // caller translates (t('build.'+id) / t('world.'+id)) so this stays i18n-free.
 import { progressPoints } from './island.js';
+import { memoryOfferReady, availableWalkSteps } from './memory/engine.js';
 
 // Mimi's three-phase healing arc (SUPER_PROMPT Phase 4): the anxious, self-blaming Mimi
 // of the gray dock (the Crab King's theft) slowly opens as the friends return, and is
@@ -113,6 +114,15 @@ export function mimiLines(profile, report, status, { now = Date.now() } = {}) {
   // blueprint news); the child-invocable ask is always reachable further down.
   const suggestion = checkupSuggestion(profile, now);
   if (suggestion) lines.push({ key: 'mimi.checkup_offer' });
+
+  // Memory Grove offer (docs/06 §4.2): once the child is old enough (groep 6 /
+  // age ≈ 9) and has gems worth anchoring, Mimi introduces the anchor-image
+  // trick. Confirming her line enables it and opens the Gem Tree (hub.js), the
+  // same "walk you to the counter" pattern as the check offer.
+  if (memoryOfferReady(profile)) lines.push({ key: 'mimi.memory_offer' });
+  // Once the Grove is on, Mimi can invite the child on a memory walk (docs/06
+  // §4.4) — confirming opens the browser to pick a skip-count route.
+  else if (availableWalkSteps(profile).length) lines.push({ key: 'mimi.memory_walk' });
 
   // The quest guide: point at the sleepiest world — that's where practice
   // blooms the island AND brings the next blueprint closer.

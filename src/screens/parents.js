@@ -5,6 +5,7 @@ import { render, backBtn, esc, PET_EMOJI } from './core.js';
 import { t } from '../i18n.js';
 import { coverageForReport, getPack, listPacks } from '../curriculum/index.js';
 import { functioneringsniveau } from '../curriculum/placement.js';
+import { memoryAnalytics } from '../memory/engine.js';
 import { money, businessModeLabel } from './business.js';
 import { STAGE_MODES } from '../stage/data.js';
 import { parentWonders } from '../story/wonders.js';
@@ -81,6 +82,7 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
   const coverage = coverageForReport(pack.id, report, { business: businessReport, stage: stageReport });
   const stage = displayStage(pack, profile.curriculum);
   const strictness = profile.curriculum.strictness || 'soft';
+  const memoryOn = !!profile.memory?.enabled;
   const checkup = profile.curriculum.checkup;
   const level = functioneringsniveau(profile.curriculum);
   return `
@@ -124,7 +126,15 @@ function curriculumCoverageHtml(profile, report, businessReport = null, stageRep
             <option value="strict" ${strictness === 'strict' ? 'selected' : ''}>${esc(t('parents.strictness_strict'))}</option>
           </select>
         </label>
+        <label title="${esc(t('parents.memory_hint'))}">
+          <span>${esc(t('parents.memory'))}</span>
+          <select data-memory>
+            <option value="on" ${memoryOn ? 'selected' : ''}>${esc(t('parents.memory_on'))}</option>
+            <option value="off" ${!memoryOn ? 'selected' : ''}>${esc(t('parents.memory_off'))}</option>
+          </select>
+        </label>
       </div>
+      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:10px">${esc(t('parents.memory_hint'))}</div>
       <div class="menu-row" style="justify-content:flex-start;margin-bottom:10px">
         ${profile.flags?.checkupRequested
           ? `<div class="chip">✓ ${esc(t('parents.check_requested'))}</div>`
@@ -196,7 +206,34 @@ function parentStageHtml(stageReport) {
     </div>`;
 }
 
-export function showParents({ report, profile, businessReport = null, stageReport = null, onClose, onCurriculumChange, onRequestCheckup = null }) {
+// Memory Grove analytics (docs/06 §4.7/§7): adoption + walk tallies and the key
+// signal — recall accuracy on anchored vs comparable unanchored facts. Hidden
+// until the child has actually used the feature.
+function parentMemoryHtml(profile) {
+  const a = memoryAnalytics(profile);
+  if (!a.anchorsAdopted && !a.walksBuilt) return '';
+  const pct = (r) => (r == null ? '—' : `${Math.round(r * 100)}%`);
+  const rateRow = (labelKey, rate, n) => `
+    <div class="skill-row">
+      <div class="s-name">${esc(t(labelKey))}</div>
+      <div class="s-bar"><div class="s-fill" style="width:${Math.round((rate || 0) * 100)}%"></div></div>
+      <div style="font-size:12px;color:var(--ink-soft);min-width:110px;text-align:right">${pct(rate)} · ${esc(t('parents.attempts', { n }))}</div>
+    </div>`;
+  return `
+    <div class="card">
+      <h3>🧠 ${esc(t('parents.memory'))}</h3>
+      <div class="curriculum-meta">
+        <div class="chip">${esc(t('parents.memory_anchors', { n: a.anchorsAdopted }))}</div>
+        <div class="chip">${esc(t('parents.memory_walks', { n: a.walksBuilt }))}</div>
+        ${a.bestWalkStreak ? `<div class="chip">${esc(t('parents.memory_streak', { n: a.bestWalkStreak }))}</div>` : ''}
+      </div>
+      <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:6px">${esc(t('parents.memory_recall'))}</div>
+      ${rateRow('parents.memory_anchored', a.anchoredRate, a.anchoredN)}
+      ${rateRow('parents.memory_unanchored', a.unanchoredRate, a.unanchoredN)}
+    </div>`;
+}
+
+export function showParents({ report, profile, businessReport = null, stageReport = null, onClose, onCurriculumChange, onRequestCheckup = null, onMemoryToggle = null }) {
   const el = render(`
     ${backBtn()}
     <h2>${t('parents.title')}</h2>
@@ -205,6 +242,7 @@ export function showParents({ report, profile, businessReport = null, stageRepor
     ${curriculumCoverageHtml(profile, report, businessReport, stageReport, !!onCurriculumChange)}
     ${parentBusinessHtml(businessReport)}
     ${parentStageHtml(stageReport)}
+    ${parentMemoryHtml(profile)}
     <div class="card">
       <h3>${t('parents.skills')} — ${esc(profile.name)}</h3>
       ${Object.entries(report.worlds).map(([w, info]) => info.skills.filter((s) => s.n > 0).map((s) => `
@@ -233,5 +271,8 @@ export function showParents({ report, profile, businessReport = null, stageRepor
   });
   el.querySelector('[data-request-checkup]')?.addEventListener('click', () => {
     onRequestCheckup?.();
+  });
+  el.querySelector('[data-memory]')?.addEventListener('change', (e) => {
+    onMemoryToggle?.(e.target.value === 'on');
   });
 }

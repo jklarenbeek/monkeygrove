@@ -53,13 +53,15 @@ function shareProblem(rng, kind, { total, baskets, quotient, remainder, d, meta,
   };
 }
 
-DIV.div_facts = (target, rng, kind) => {
+DIV.div_facts = (target, rng, kind, scaffold, opts = null) => {
   const tier = pickTier([
     { d: 480, gen: () => [rng.pick([2, 5, 10]), rng.int(2, 5)] },
     { d: 600, gen: () => [rng.pick([2, 3, 4, 5, 6, 10]), rng.int(2, 10)] },
     { d: 720, gen: () => [rng.pick([6, 7, 8, 9]), rng.int(3, 10)] },
   ], target);
-  const [a, b] = tier.gen(); // c ÷ a = b, underlying fact a×b
+  // opts.fact (docs/06 §4.5): re-serve this exact fact as its division form
+  // (a×b → c ÷ a = b), so an anchored fact can come back through the Sharing world.
+  const [a, b] = opts?.fact ? opts.fact : tier.gen(); // c ÷ a = b, underlying fact a×b
   const c = a * b;
   return shareProblem(rng, kind, {
     total: c, baskets: a, quotient: b, remainder: 0, d: tier.d,

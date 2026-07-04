@@ -10,7 +10,9 @@ import {
   clamp, acc, decayedRating, daysSincePractice, effectiveRating, isMastered, expectedFor,
 } from './rating.js';
 
-const FACT_SKILLS = new Set(['tables_a', 'tables_b', 'tables_c', 'tables_mix', 'div_facts']);
+// The five skills whose per-fact history (math.facts, keyed "7x8") is tracked for the
+// Banyan Gem Tree — and, downstream, the Memory Grove's anchor images (docs/06).
+export const FACT_SKILLS = new Set(['tables_a', 'tables_b', 'tables_c', 'tables_mix', 'div_facts']);
 
 const gemLit = (f) => !!f && f.ok >= 3 && f.lastOk;
 

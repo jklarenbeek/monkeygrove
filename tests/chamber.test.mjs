@@ -11,7 +11,7 @@ const main = readFileSync(new URL('../src/chamberflow.js', import.meta.url), 'ut
 test('runChamber passes curriculum eligible skills into normal chamber problems', () => {
   assert.match(
     main,
-    /const allowedSkills = eligibleSkillIds\(g\.profile\.curriculum\);\s+const opts = g\.isEcho\s+\?\s+\{ echo: true, allowedSkills, rng: g\.rng, now: Date\.now\(\) \}\s+:\s+\{ world: g\.currentWorld, allowedSkills, rng: g\.rng, now: Date\.now\(\) \};\s+problem = ensureHostable\(nextProblem\(g\.profile\.math, opts\), g\.profile\.math, opts\);/s,
+    /const allowedSkills = eligibleSkillIds\(g\.profile\.curriculum\);[\s\S]*?const opts = g\.isEcho\s+\?\s+\{ echo: true, allowedSkills, rng: g\.rng, now: Date\.now\(\), targetFact: echoTargetFact\(g\.profile, g\.rng\) \}\s+:\s+\{ world: g\.currentWorld, allowedSkills, rng: g\.rng, now: Date\.now\(\) \};\s+problem = ensureHostable\(nextProblem\(g\.profile\.math, opts\), g\.profile\.math, opts\);/s,
   );
 });
 

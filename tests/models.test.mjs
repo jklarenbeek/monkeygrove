@@ -144,8 +144,8 @@ test('FURS: 8 recolors, default first and free', () => {
   }
 });
 
-test('TRAILS: 4 trails with hex colors', () => {
-  assert.equal(TRAILS.length, 4);
+test('TRAILS: 5 trails with hex colors', () => {
+  assert.equal(TRAILS.length, 5);
   for (const trail of TRAILS) {
     assert.equal(typeof trail.id, 'string');
     assert.equal(trail.nameKey, `trail.${trail.id}`);

@@ -7,6 +7,7 @@ import { createCurriculumState, estimateStageFromAge, refreshCurriculumForDate }
 import { getPack } from './curriculum/index.js';
 import { createBusinessState, createShopState, ensureBusinessState } from './business/engine.js';
 import { createStageState, ensureStageState } from './stage/engine.js';
+import { createMemoryState, ensureMemory } from './memory/engine.js';
 import { DEFAULT_CREATURE_ID, COMPANION_IDS } from './mesh/creatures.js';
 
 const KEY = 'monkeygrove.save';
@@ -48,6 +49,7 @@ function freshProfile(name, opts = {}) {
     }),
     business: createBusinessState(),
     stage: createStageState(),
+    memory: createMemoryState(),
     math: createMathState(),
     stats: { chambers: 0, correct: 0, wrong: 0, msPlayed: 0, berries: 0, days: 0 },
     flags: opts.placementWarmup ? { needsPlacementWarmup: true } : {},
@@ -252,6 +254,7 @@ function healSave(s) {
     }
     ensureBusinessState(p);
     ensureStageState(p);
+    ensureMemory(p);
   }
   // heal settings so saves from before comfort/accessibility options get the defaults
   if (!isObject(s.settings)) s.settings = settingsDefaults();

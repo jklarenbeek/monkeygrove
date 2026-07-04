@@ -18,6 +18,8 @@ import { ensureStory, markBeat } from './story/engine.js';
 import { tween, ease, wobble } from './anim.js';
 import { fxCorrectGlow, fxThemeAmbience, fxChamberBloom } from './verbs/verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
+import { anchorForProblem, recordAnchorRecall, echoTargetFact } from './memory/engine.js';
+import { LOCI_EMOJI } from './memory/data.js';
 import { addBananas, persist } from './state.js';
 import { t } from './i18n.js';
 import * as hud from './hud.js';
@@ -75,8 +77,10 @@ export class ChamberFlow {
       problem = g.duel.nextProblem();
     } else {
       const allowedSkills = eligibleSkillIds(g.profile.curriculum);
+      // An Echo Door with a wobbly *anchored* fact re-serves that exact fact
+      // (docs/06 §4.5), so the child's memory image gets a spaced retrieval.
       const opts = g.isEcho
-        ? { echo: true, allowedSkills, rng: g.rng, now: Date.now() }
+        ? { echo: true, allowedSkills, rng: g.rng, now: Date.now(), targetFact: echoTargetFact(g.profile, g.rng) }
         : { world: g.currentWorld, allowedSkills, rng: g.rng, now: Date.now() };
       problem = ensureHostable(nextProblem(g.profile.math, opts), g.profile.math, opts);
       if (problem?.world) g.currentWorld = problem.world;
@@ -320,6 +324,7 @@ export class ChamberFlow {
     const g = this.game;
     g.problem = problem;
     g.usedHint = false;
+    g.memoryHintShown = false; // the anchor card is the FIRST hint, once per problem
     g.problemStart = performance.now();
     hud.hideModelPanel();
     hud.hideBubble();
@@ -376,6 +381,10 @@ export class ChamberFlow {
     const res = recordResult(g.profile.math, g.problem, {
       correct, usedHint: g.usedHint, ms,
     }, { now: Date.now() });
+    // Anchored-fact recall history (docs/06 §7): drives the anchored-vs-unanchored
+    // evaluation without a second review system — the Elo engine above stays boss.
+    const anchor = anchorForProblem(g.profile.memory, g.problem);
+    if (anchor) recordAnchorRecall(g.profile.memory, anchor.factKey, correct);
     g.profile.stats[correct ? 'correct' : 'wrong']++;
     persist();
     this.helperReact(correct ? 'correct' : 'wrong'); // warm body-language
@@ -596,6 +605,16 @@ export class ChamberFlow {
     g.usedHint = true;
     g.verb.hintShown = true;
     audio.sfx('click');
+    // Memory hint (docs/06 §4.3): if this fact has an adopted anchor, the FIRST
+    // hint press recalls the anchor image (the child's own picture) instead of the
+    // bare model; a second press still opens the floor model, which stays the
+    // conceptual authority. Untouched for non-anchored problems.
+    const anchor = anchorForProblem(g.profile.memory, g.problem);
+    if (anchor && !g.memoryHintShown) {
+      g.memoryHintShown = true;
+      this.helperSay(t(anchor.imageKey), { face: LOCI_EMOJI[anchor.lociId] || '🧠', ms: 5200 });
+      return;
+    }
     const shown = g.verb.showModel();
     if (!shown) hud.showModelPanel(g.problem.model);
     this.helperSay(t('hint.look'), 3600);

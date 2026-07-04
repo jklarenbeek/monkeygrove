@@ -6,6 +6,7 @@
 import { profiles, activeProfile, selectProfile, persist, persistNow, todayString } from './state.js';
 import { masteryReport } from './mathengine.js';
 import { applyParentPatch } from './curriculum/placement.js';
+import { setMemoryEnabled } from './memory/engine.js';
 import { aggregateBusinessReport } from './business/engine.js';
 import { stageReport } from './stage/engine.js';
 import { needsCheckup } from './checkupflow.js';
@@ -63,6 +64,13 @@ export function showParents(game, profileId = null, onClose = () => showTitle(ga
     onRequestCheckup: p ? () => {
       p.flags = p.flags || {};
       p.flags.checkupRequested = true;
+      persistNow();
+      showParents(game, p.id, onClose);
+    } : null,
+    // Parent enable/disable of the Memory Grove (docs/06 §4.2) — can turn it on
+    // before Mimi's groep-6 offer, or off entirely.
+    onMemoryToggle: p ? (on) => {
+      setMemoryEnabled(p, on);
       persistNow();
       showParents(game, p.id, onClose);
     } : null,
