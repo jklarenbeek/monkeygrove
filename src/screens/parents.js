@@ -230,6 +230,16 @@ function parentMemoryHtml(profile) {
       <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin-bottom:6px">${esc(t('parents.memory_recall'))}</div>
       ${rateRow('parents.memory_anchored', a.anchoredRate, a.anchoredN)}
       ${rateRow('parents.memory_unanchored', a.unanchoredRate, a.unanchoredN)}
+      ${a.memFirstN || a.modelFirstN ? `
+        <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin:10px 0 6px">${esc(t('parents.memory_ab'))}</div>
+        ${rateRow('parents.memory_memfirst', a.memFirstRate, a.memFirstN)}
+        ${rateRow('parents.memory_modelfirst', a.modelFirstRate, a.modelFirstN)}` : ''}
+      ${a.probeCount ? `
+        <div class="tagline" style="color:var(--ink-soft);text-shadow:none;margin:10px 0 6px">${esc(t('parents.memory_probe'))}</div>
+        <div class="curriculum-meta">
+          ${a.probePre != null ? `<div class="chip">${esc(t('parents.memory_probe_pre', { n: Math.round(a.probePre * 100) }))}</div>` : ''}
+          ${a.probePost != null ? `<div class="chip">${esc(t('parents.memory_probe_post', { n: Math.round(a.probePost * 100) }))}</div>` : ''}
+        </div>` : ''}
     </div>`;
 }
 

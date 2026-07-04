@@ -9,7 +9,7 @@ export { showCheckup } from './screens/checkup.js';
 export { showSettings } from './screens/settings.js';
 export { showShop, showPets, showHatch, showIsland } from './screens/cosmetics.js';
 export { showGems } from './screens/gems.js';
-export { showWalkStep, showMemory } from './screens/memory.js';
+export { showWalkStep, showWalkDone, showMemory, showProbeItem, showProbeDone } from './screens/memory.js';
 export {
   showBusinessOrder, showBusinessPrep, showBusinessPayment,
   showBusinessStock, showBusinessUpgrades,

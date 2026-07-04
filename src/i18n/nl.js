@@ -717,4 +717,24 @@ export const nl = {
   'parents.memory_recall': 'Herinneringsscore — met vs. zonder anker',
   'parents.memory_anchored': 'Feiten met anker',
   'parents.memory_unanchored': 'Feiten zonder anker',
+
+  // Geheugenbos — fase 3: uitdaagcodes voor wandelingen (§5), de vrijwillige
+  // herinneringscheck (§7), en de vergelijking geheugen-eerst vs model-eerst (§5).
+  'memory.code_share': 'Stuur deze code naar een vriendje — die loopt precies dezelfde springtelling!',
+  'memory.code_play_sub': 'Een code van een vriendje? Loop hun route:',
+  'memory.code_play': 'Speel code',
+  'memory.probe_title': 'Geheugencheck',
+  'memory.probe_sub': 'Een korte, ontspannen blik op je tafelsommen. Alleen voor jou.',
+  'memory.probe_start': 'Start de check ✨',
+  'memory.probe_progress': 'Vraag {n} van {total}',
+  'memory.probe_prompt': 'Antwoord zo goed als je kunt — rustig aan!',
+  'memory.probe_done': 'Helemaal klaar — dankjewel!',
+  'memory.probe_pre': 'Je had er {ok} van {n}. We kijken later nog eens hoe je plaatjes helpen!',
+  'memory.probe_post': 'Je had er {ok} van {n}. Goed onthouden!',
+  'parents.memory_ab': 'Welke hint hielp (geheugen-eerst vs. model-eerst)',
+  'parents.memory_memfirst': 'Geheugenplaatje eerst',
+  'parents.memory_modelfirst': 'Model eerst',
+  'parents.memory_probe': 'Herinneringscheck (voor → nu)',
+  'parents.memory_probe_pre': 'Voor: {n}%',
+  'parents.memory_probe_post': 'Nu: {n}%',
 };

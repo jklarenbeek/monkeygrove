@@ -34,7 +34,7 @@ function setupProfile() {
 test('developer presets are a small ordered jump list', () => {
   assert.deepEqual(
     DEV_PRESETS.map((preset) => preset.id),
-    ['warmup_done', 'bakery_unlocked', 'bakery_built', 'grade8_business', 'festival_complete'],
+    ['warmup_done', 'bakery_unlocked', 'bakery_built', 'grade8_business', 'festival_complete', 'memory_grove'],
   );
 });
 

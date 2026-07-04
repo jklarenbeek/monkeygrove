@@ -20,7 +20,8 @@ function isObject(value) {
 //   anchors : factKey -> { lociId, adoptedAt, recalls, lastOk }
 //   walks   : journeyId -> { built, bestStreak, lastAt }   (Phase 2)
 export function createMemoryState() {
-  return { enabled: false, anchors: {}, walks: {} };
+  // probes: pre/post fact-recall checks (docs/06 §7, Phase 3), stored locally.
+  return { enabled: false, anchors: {}, walks: {}, probes: [] };
 }
 
 // Fill any missing field from a fresh state — safe to re-run on every load, the
@@ -189,6 +190,66 @@ export function factKeysFor(problem = null) {
   return a === b ? [`${a}x${b}`] : [`${a}x${b}`, `${b}x${a}`];
 }
 
+// ---------- A/B: memory-first vs model-first hints (docs/06 §5, Phase 3) ----------
+
+// Which hint to show FIRST for an anchored fact. Randomized per hint so the effect
+// of leading with the child's own image (vs the conceptual model) can be measured
+// within-child. 'mem' = anchor image first; 'model' = the floor model first.
+export function pickHintArm(rng = null) {
+  const r = rng?.float ? rng.float() : (rng?.chance ? (rng.chance(0.5) ? 0 : 1) : 0.5);
+  return r < 0.5 ? 'mem' : 'model';
+}
+
+// Record the outcome of an anchored problem under the arm its first hint used, so
+// the parents screen can compare memory-first vs model-first recall (docs/06 §7).
+export function recordHintArm(memory, factKey, arm, correct) {
+  const entry = anchorEntry(factKey);
+  const a = entry && memory?.anchors?.[entry.factKey];
+  if (!a || (arm !== 'mem' && arm !== 'model')) return null;
+  a.ab = a.ab || { mem: { n: 0, ok: 0 }, model: { n: 0, ok: 0 } };
+  a.ab[arm].n += 1;
+  if (correct) a.ab[arm].ok += 1;
+  return a.ab;
+}
+
+// ---------- opt-in pre/post recall probe (docs/06 §7, Phase 3) ----------
+
+// A short set of fact questions spanning the child's anchored facts and comparable
+// unanchored catalog facts — the instrument for the missing arithmetic-transfer
+// evidence, run with consent and stored only on the device. Pure; pass rng to shuffle.
+export function buildProbe(profile = null, { size = 8, rng = null } = {}) {
+  const anchored = new Set(Object.keys(profile?.memory?.anchors || {}));
+  const pool = [...new Set([...anchored, ...ANCHORS.map((x) => x.factKey)])];
+  if (rng?.shuffle) rng.shuffle(pool);
+  return pool.slice(0, size).map((factKey) => {
+    const [a, b] = factKey.split('x').map(Number);
+    return { factKey, a, b, answer: a * b, anchored: anchored.has(factKey) };
+  });
+}
+
+export function gradeProbeItem(item = null, value = null) {
+  return { correct: item != null && Number(value) === item.answer };
+}
+
+// Store a completed probe. The first is the 'pre' baseline, later ones are 'post'
+// — so the parents screen can show the pre→post change on anchored facts.
+export function recordProbe(memory, { items = [], now = 0 } = {}) {
+  if (!memory) return null;
+  memory.probes = memory.probes || [];
+  const graded = items.filter((i) => typeof i.correct === 'boolean');
+  const rec = {
+    phase: memory.probes.length === 0 ? 'pre' : 'post',
+    on: now,
+    n: graded.length,
+    ok: graded.filter((i) => i.correct).length,
+    anchoredN: graded.filter((i) => i.anchored).length,
+    anchoredOk: graded.filter((i) => i.anchored && i.correct).length,
+    msTotal: graded.reduce((s, i) => s + (i.ms || 0), 0),
+  };
+  memory.probes.push(rec);
+  return rec;
+}
+
 // A wobbly adopted anchor to bias the next Echo Door toward (docs/06 §4.5): a
 // fact the child anchored whose gem has since slipped (was lit, last attempt
 // missed). Returns a factKey (e.g. '7x8') or null. Deterministic from inputs —
@@ -248,14 +309,39 @@ export function walkSkillForStep(step) {
 
 // Lay a skip-counting route: one stop per landmark (up to WALK_MAX_STOPS), each
 // asking the next multiple of `step`. Pure — the controller supplies the loci.
-export function buildSkipWalk({ step, loci = [], maxStops = WALK_MAX_STOPS } = {}) {
-  const n = Math.max(WALK_MIN_STOPS, Math.min(maxStops, loci.length));
-  const stops = loci.slice(0, n).map((lociId, i) => ({ lociId, index: i, answer: step * (i + 1) }));
-  return { id: `skip-${step}`, kind: 'skip', step, reinforceSkill: walkSkillForStep(step), stops };
+// `stops` forces an exact count (a shared challenge code, §5): the landmarks are
+// only spatial backdrop, so cycling them keeps every child's questions identical.
+export function buildSkipWalk({ step, loci = [], maxStops = WALK_MAX_STOPS, stops = null } = {}) {
+  const list = loci.length ? loci : ['gemtree'];
+  const n = stops != null
+    ? Math.max(1, stops)
+    : Math.max(WALK_MIN_STOPS, Math.min(maxStops, list.length));
+  const out = Array.from({ length: n }, (_, i) => ({
+    lociId: list[i % list.length], index: i, answer: step * (i + 1),
+  }));
+  return { id: `skip-${step}`, kind: 'skip', step, reinforceSkill: walkSkillForStep(step), stops: out };
 }
 
 export function gradeWalkStop(stop = null, value = null) {
   return { correct: stop != null && Number(value) === stop.answer };
+}
+
+// Walk challenge codes (docs/06 §5, Phase 3), the duel.js pattern for walks: a
+// short shareable code for a skip-counting route. A skip-count question depends
+// only on the step and the stop index — never the loci — so two children who play
+// the same code answer the identical numbers regardless of which landmarks their
+// islands have restored. Format: "MW7-5" = count by 7, five stops.
+export function makeWalkCode(step, stops) {
+  return `MW${step}-${stops}`;
+}
+
+export function parseWalkCode(code) {
+  const m = /^MW(\d+)-(\d+)$/.exec(String(code || '').trim().toUpperCase());
+  if (!m) return null;
+  const step = Number(m[1]);
+  const stops = Number(m[2]);
+  if (step < 2 || step > 10 || stops < 1 || stops > 20) return null;
+  return { step, stops };
 }
 
 // Persist a finished walk to profile.memory.walks (docs/06 §4.3 shape): mark it
@@ -291,6 +377,21 @@ export function memoryAnalytics(profile = null) {
   const walks = memory.walks || {};
   const walkList = Object.keys(walks);
   const bestStreak = walkList.reduce((m, id) => Math.max(m, walks[id].bestStreak || 0), 0);
+  // A/B hint arms, summed across every anchor (docs/06 §5/§7).
+  const ab = { mem: { n: 0, ok: 0 }, model: { n: 0, ok: 0 } };
+  for (const k of anchorKeys) {
+    const bucket = memory.anchors[k]?.ab;
+    if (!bucket) continue;
+    for (const arm of ['mem', 'model']) {
+      ab[arm].n += bucket[arm]?.n || 0;
+      ab[arm].ok += bucket[arm]?.ok || 0;
+    }
+  }
+  // Pre/post recall probes: the first (pre) and the latest (post), for the delta.
+  const probes = memory.probes || [];
+  const pre = probes.find((p) => p.phase === 'pre') || null;
+  const post = [...probes].reverse().find((p) => p.phase === 'post') || null;
+  const probeRate = (p) => (p && p.n ? p.ok / p.n : null);
   return {
     anchorsAdopted: anchorKeys.length,
     walksBuilt: walkList.filter((id) => walks[id].built).length,
@@ -299,5 +400,12 @@ export function memoryAnalytics(profile = null) {
     unanchoredRate: rate(unanchored),
     anchoredN: anchored.n,
     unanchoredN: unanchored.n,
+    memFirstRate: rate(ab.mem),
+    modelFirstRate: rate(ab.model),
+    memFirstN: ab.mem.n,
+    modelFirstN: ab.model.n,
+    probePre: probeRate(pre),
+    probePost: probeRate(post),
+    probeCount: probes.length,
   };
 }

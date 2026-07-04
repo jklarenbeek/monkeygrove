@@ -16,6 +16,8 @@ import {
   availableLoci, walkStepsForOrder, availableWalkSteps, walkSkillForStep,
   buildSkipWalk, gradeWalkStop, recordWalk, swapAnchorLoci, memoryAnalytics,
   echoTargetFact,
+  makeWalkCode, parseWalkCode, pickHintArm, recordHintArm,
+  buildProbe, gradeProbeItem, recordProbe,
 } from '../src/memory/engine.js';
 
 // A math state with the given facts pre-lit/wobbly. `{ '7x8': [n, ok, lastOk] }`.
@@ -35,7 +37,7 @@ function curriculum({ groep = null, confirmedStage = null, estimatedStage = null
 
 test('fresh memory state is disabled with empty anchor/walk maps', () => {
   const mem = createMemoryState();
-  assert.deepEqual(mem, { enabled: false, anchors: {}, walks: {} });
+  assert.deepEqual(mem, { enabled: false, anchors: {}, walks: {}, probes: [] });
 });
 
 test('ensureMemory heals a profile missing the subtree, additively', () => {
@@ -297,4 +299,85 @@ test('memoryAnalytics reports adoption, walks, and anchored-vs-unanchored recall
   assert.ok(Math.abs(a.unanchoredRate - 0.5) < 1e-9);
   assert.equal(a.anchoredN, 10);
   assert.equal(a.unanchoredN, 14);
+});
+
+// ========================= Phase 3 =========================
+
+// ---------- walk challenge codes (§5) ----------
+
+test('walk codes round-trip and reject junk', () => {
+  assert.equal(makeWalkCode(7, 5), 'MW7-5');
+  assert.deepEqual(parseWalkCode('MW7-5'), { step: 7, stops: 5 });
+  assert.deepEqual(parseWalkCode('  mw7-5 '), { step: 7, stops: 5 });
+  assert.equal(parseWalkCode('MW1-5'), null); // step out of range
+  assert.equal(parseWalkCode('MW7-0'), null); // no stops
+  assert.equal(parseWalkCode('nope'), null);
+});
+
+test('a challenge walk asks identical questions regardless of the island loci', () => {
+  const rich = buildSkipWalk({ step: 7, loci: ['gemtree', 'shop', 'nest', 'mimi', 'garden'], stops: 5 });
+  const sparse = buildSkipWalk({ step: 7, loci: ['gemtree'], stops: 5 }); // one landmark, cycled
+  assert.deepEqual(rich.stops.map((s) => s.answer), [7, 14, 21, 28, 35]);
+  assert.deepEqual(rich.stops.map((s) => s.answer), sparse.stops.map((s) => s.answer));
+  assert.equal(sparse.stops.length, 5);
+});
+
+// ---------- A/B hints (§5) ----------
+
+test('pickHintArm honors the rng and recordHintArm tallies per arm', () => {
+  assert.equal(pickHintArm({ float: () => 0.2 }), 'mem');
+  assert.equal(pickHintArm({ float: () => 0.8 }), 'model');
+  const mem = createMemoryState();
+  adoptAnchor(mem, '7x8', { now: 0 });
+  recordHintArm(mem, '7x8', 'mem', true);
+  recordHintArm(mem, '8x7', 'mem', false); // twin order, same anchor
+  recordHintArm(mem, '7x8', 'model', true);
+  assert.deepEqual(mem.anchors['7x8'].ab, { mem: { n: 2, ok: 1 }, model: { n: 1, ok: 1 } });
+  assert.equal(recordHintArm(mem, '7x8', 'bogus', true), null); // invalid arm
+});
+
+test('memoryAnalytics summarises the hint A/B arms', () => {
+  const profile = { memory: createMemoryState(), math: mathWith({ '7x8': [3, 3, true] }) };
+  adoptAnchor(profile.memory, '7x8', { now: 0 });
+  recordHintArm(profile.memory, '7x8', 'mem', true);
+  recordHintArm(profile.memory, '7x8', 'mem', true);
+  recordHintArm(profile.memory, '7x8', 'model', false);
+  const a = memoryAnalytics(profile);
+  assert.equal(a.memFirstN, 2);
+  assert.equal(a.modelFirstN, 1);
+  assert.equal(a.memFirstRate, 1);
+  assert.equal(a.modelFirstRate, 0);
+});
+
+// ---------- opt-in recall probe (§7) ----------
+
+test('buildProbe covers anchored + unanchored catalog facts with real answers', () => {
+  const profile = { memory: createMemoryState() };
+  adoptAnchor(profile.memory, '7x8', { now: 0 });
+  const items = buildProbe(profile, { size: 6 });
+  assert.equal(items.length, 6);
+  assert.ok(items.every((i) => i.answer === i.a * i.b));
+  const anchored = items.find((i) => i.factKey === '7x8');
+  assert.ok(anchored && anchored.anchored === true);
+  assert.equal(gradeProbeItem(items[0], items[0].answer).correct, true);
+  assert.equal(gradeProbeItem(items[0], items[0].answer + 1).correct, false);
+});
+
+test('recordProbe stores a pre baseline then post checks, and analytics shows the delta', () => {
+  const profile = { memory: createMemoryState(), math: mathWith({}) };
+  const pre = recordProbe(profile.memory, { items: [{ correct: true }, { correct: false }], now: 1 });
+  const post = recordProbe(profile.memory, { items: [{ correct: true }, { correct: true }], now: 2 });
+  assert.equal(pre.phase, 'pre');
+  assert.equal(post.phase, 'post');
+  const a = memoryAnalytics(profile);
+  assert.equal(a.probeCount, 2);
+  assert.equal(a.probePre, 0.5);
+  assert.equal(a.probePost, 1);
+});
+
+test('migrate() heals probes onto a save from before Phase 3', () => {
+  const old = { v: 1, profiles: [{ name: 'Pip', memory: { enabled: true, anchors: {}, walks: {} } }], settings: {} };
+  const p = migrate(old).profiles[0];
+  assert.deepEqual(p.memory.probes, []); // ensureMemory backfills the new field
+  assert.equal(p.memory.enabled, true); // existing data preserved
 });

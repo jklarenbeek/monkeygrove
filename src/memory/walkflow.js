@@ -16,7 +16,7 @@ import { audio } from '../audio.js';
 import { addBananas, addEggPoints, persist, persistNow } from '../state.js';
 import { reinforceSkill } from '../mathengine.js';
 import { BALANCE } from '../config.js';
-import { availableLoci, buildSkipWalk, gradeWalkStop, recordWalk } from './engine.js';
+import { availableLoci, buildSkipWalk, gradeWalkStop, recordWalk, makeWalkCode } from './engine.js';
 
 // The hub cell of a landmark (a non-walkable prop cell; the child stands beside it).
 function lociCell(place, id) {
@@ -34,11 +34,14 @@ export class MemoryWalk {
     this.game = game;
   }
 
-  start(step) {
+  // opts: { stops, code } — a challenge code fixes the stop count so a shared
+  // route asks identical questions on any island (docs/06 §5).
+  start(step, opts = {}) {
     const g = this.game;
-    const walk = buildSkipWalk({ step, loci: availableLoci(g.profile) });
+    const walk = buildSkipWalk({ step, loci: availableLoci(g.profile), stops: opts.stops ?? null });
     if (!walk.stops.length) { g.startHub(); return; }
     this.walk = walk;
+    this.code = opts.code || makeWalkCode(step, walk.stops.length);
     this.i = 0;
     this.correct = 0;
     this.streak = 0;
@@ -127,9 +130,14 @@ export class MemoryWalk {
     recordWalk(g.profile.memory, this.walk.id, { streak: this.best, now: Date.now() });
     persistNow();
     this.restore();
-    hud.toast(t('memory.walk_done', { n: this.correct, total: this.walk.stops.length }), 'gem');
     audio.sfx('bloom');
-    g.startHub();
+    // A done card celebrates and offers the shareable challenge code (§5).
+    screens.showWalkDone({
+      correct: this.correct,
+      total: this.walk.stops.length,
+      code: this.code,
+      onClose: () => { screens.closeScreen(); g.startHub(); },
+    });
   }
 
   // Stop early (the child chose to leave): still credit progress, back to the hub.

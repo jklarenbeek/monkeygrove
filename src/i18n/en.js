@@ -731,4 +731,24 @@ export const en = {
   'parents.memory_recall': 'Recall accuracy — anchored vs. unanchored facts',
   'parents.memory_anchored': 'Anchored facts',
   'parents.memory_unanchored': 'Unanchored facts',
+
+  // Memory Grove — Phase 3: walk challenge codes (§5), the opt-in recall probe
+  // (§7), and the memory-first vs model-first hint comparison (§5).
+  'memory.code_share': 'Send this code to a friend — they walk the same skip-count!',
+  'memory.code_play_sub': 'Got a code from a friend? Walk their route:',
+  'memory.code_play': 'Play code',
+  'memory.probe_title': 'Memory check',
+  'memory.probe_sub': 'A quick, no-pressure peek at your table facts. Just for you.',
+  'memory.probe_start': 'Start the check ✨',
+  'memory.probe_progress': 'Question {n} of {total}',
+  'memory.probe_prompt': 'Answer as best you can — no rush!',
+  'memory.probe_done': 'All done — thank you!',
+  'memory.probe_pre': "You got {ok} of {n}. We'll peek again later to see how your pictures help!",
+  'memory.probe_post': 'You got {ok} of {n}. Nice remembering!',
+  'parents.memory_ab': 'Which hint helped (memory-first vs. model-first)',
+  'parents.memory_memfirst': 'Memory image first',
+  'parents.memory_modelfirst': 'Model first',
+  'parents.memory_probe': 'Recall check (before → latest)',
+  'parents.memory_probe_pre': 'Before: {n}%',
+  'parents.memory_probe_post': 'Latest: {n}%',
 };

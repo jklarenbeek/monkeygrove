@@ -6,6 +6,8 @@ import { ensureBusinessState } from './business/engine.js';
 import { SHOPS } from './business/data.js';
 import { CREATURES, CHARS, HATS, PROPS, AMBIENT } from './models.js';
 import { voxelSvg } from './voxelsvg.js';
+import { ensureMemory, adoptAnchor } from './memory/engine.js';
+import { ANCHORS } from './memory/data.js';
 
 export const DEV_PRESETS = [
   { id: 'warmup_done', label: 'Warmup done', detail: 'Intro seen, placement complete.' },
@@ -13,6 +15,7 @@ export const DEV_PRESETS = [
   { id: 'bakery_built', label: 'Bakery built', detail: 'Business scene is playable.' },
   { id: 'grade8_business', label: 'Grade 8 business', detail: 'Bakery built with advanced curriculum modes.' },
   { id: 'festival_complete', label: 'Festival complete', detail: 'All builds and all mastery complete.' },
+  { id: 'memory_grove', label: 'Memory Grove ready', detail: 'Groep 6+, gems lit, Grove on, anchors adopted, walks unlocked (docs/06).' },
 ];
 
 function esc(s) {
@@ -321,12 +324,40 @@ function applyFestivalComplete(profile) {
   return profile;
 }
 
+// Light the times-table gems for a set of facts (Gem Tree + adoptable), the play
+// path never runs here — this fakes the fact history the Memory Grove reads.
+function lightFacts(profile, keys) {
+  profile.math.facts = profile.math.facts || {};
+  for (const key of keys) profile.math.facts[key] = { n: 6, ok: 5, lastOk: true };
+}
+
+// docs/06 Memory Grove: a groep-6+ child with plenty of lit gems, all loci
+// restored (minus the finale plaza), the Grove enabled, and a couple of anchors
+// already adopted — so every Phase 1–3 surface (adoption, hint, walks, codes,
+// probe, parents analytics) has data the moment you land in the hub.
+function applyMemoryGrove(profile) {
+  applyGrade8Business(profile);              // grade_8 (order 8 ≥ 6), bakery built, bananas
+  setAllMastered(profile);
+  setBuilt(profile, BUILD_ORDER.slice(0, -1)); // every build except the finale plaza
+  stockBusiness(profile);
+  profile.bananas = Math.max(profile.bananas || 0, 999);
+  lightFacts(profile, ANCHORS.map((a) => a.factKey));
+  profile.math.facts['7x8'] = { n: 8, ok: 5, lastOk: false }; // wobbly → memory hint + echo target
+  const memory = ensureMemory(profile);
+  memory.enabled = true;
+  const now = Date.now();
+  adoptAnchor(memory, '7x8', { now });       // adopted + wobbly → the memory hint fires
+  adoptAnchor(memory, '6x7', { now });
+  return profile;
+}
+
 const APPLY = {
   warmup_done: applyWarmupDone,
   bakery_unlocked: applyBakeryUnlocked,
   bakery_built: applyBakeryBuilt,
   grade8_business: applyGrade8Business,
   festival_complete: applyFestivalComplete,
+  memory_grove: applyMemoryGrove,
 };
 
 export function applyDevPreset(profile, id) {

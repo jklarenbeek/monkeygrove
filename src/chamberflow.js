@@ -18,7 +18,9 @@ import { ensureStory, markBeat } from './story/engine.js';
 import { tween, ease, wobble } from './anim.js';
 import { fxCorrectGlow, fxThemeAmbience, fxChamberBloom } from './verbs/verbfx.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
-import { anchorForProblem, recordAnchorRecall, echoTargetFact } from './memory/engine.js';
+import {
+  anchorForProblem, recordAnchorRecall, echoTargetFact, pickHintArm, recordHintArm,
+} from './memory/engine.js';
 import { LOCI_EMOJI } from './memory/data.js';
 import { addBananas, persist } from './state.js';
 import { t } from './i18n.js';
@@ -324,7 +326,7 @@ export class ChamberFlow {
     const g = this.game;
     g.problem = problem;
     g.usedHint = false;
-    g.memoryHintShown = false; // the anchor card is the FIRST hint, once per problem
+    g.hintArm = null; // the A/B assignment for an anchored fact's hints (docs/06 §5)
     g.problemStart = performance.now();
     hud.hideModelPanel();
     hud.hideBubble();
@@ -385,6 +387,10 @@ export class ChamberFlow {
     // evaluation without a second review system — the Elo engine above stays boss.
     const anchor = anchorForProblem(g.profile.memory, g.problem);
     if (anchor) recordAnchorRecall(g.profile.memory, anchor.factKey, correct);
+    // A/B outcome (docs/06 §5): only when a hint was shown on this anchored fact.
+    if (anchor && g.hintArm && g.hintArm.factKey === anchor.factKey) {
+      recordHintArm(g.profile.memory, anchor.factKey, g.hintArm.arm, correct);
+    }
     g.profile.stats[correct ? 'correct' : 'wrong']++;
     persist();
     this.helperReact(correct ? 'correct' : 'wrong'); // warm body-language
@@ -605,14 +611,24 @@ export class ChamberFlow {
     g.usedHint = true;
     g.verb.hintShown = true;
     audio.sfx('click');
-    // Memory hint (docs/06 §4.3): if this fact has an adopted anchor, the FIRST
-    // hint press recalls the anchor image (the child's own picture) instead of the
-    // bare model; a second press still opens the floor model, which stays the
-    // conceptual authority. Untouched for non-anchored problems.
+    // Memory hint (docs/06 §4.3): if this fact has an adopted anchor, one of the
+    // two hints is the anchor image (the child's own picture), the other the floor
+    // model (the conceptual authority). §5 A/B: which one LEADS is randomized per
+    // problem and remembered, so the parents screen can compare memory-first vs
+    // model-first recall. Untouched for non-anchored problems.
     const anchor = anchorForProblem(g.profile.memory, g.problem);
-    if (anchor && !g.memoryHintShown) {
-      g.memoryHintShown = true;
-      this.helperSay(t(anchor.imageKey), { face: LOCI_EMOJI[anchor.lociId] || '🧠', ms: 5200 });
+    if (anchor) {
+      if (!g.hintArm) g.hintArm = { factKey: anchor.factKey, arm: pickHintArm(g.rng), shown: 0 };
+      const first = g.hintArm.shown === 0;
+      g.hintArm.shown += 1;
+      const showAnchor = () => this.helperSay(t(anchor.imageKey), { face: LOCI_EMOJI[anchor.lociId] || '🧠', ms: 5200 });
+      const showModel = () => {
+        if (!g.verb.showModel()) hud.showModelPanel(g.problem.model);
+        this.helperSay(t('hint.look'), 3600);
+      };
+      const anchorLeads = g.hintArm.arm === 'mem';
+      if (first === anchorLeads) showAnchor();
+      else showModel();
       return;
     }
     const shown = g.verb.showModel();
@@ -620,13 +636,15 @@ export class ChamberFlow {
     this.helperSay(t('hint.look'), 3600);
   }
 
-  // Debug/test surface: jump straight into a chamber for a forced skill/kind.
-  debugChamber(skill, kind) {
+  // Debug/test surface: jump straight into a chamber for a forced skill/kind, or a
+  // specific fact ('7x8') via the §4.5 targeting — used by the memory e2e to land
+  // exactly on an anchored fact so the memory hint fires.
+  debugChamber(skill, kind, targetFact = null) {
     const g = this.game;
-    const p = ensureHostable(
-      nextProblem(g.profile.math, { skill, kind, rng: g.rng, now: Date.now() }),
-      g.profile.math, { rng: g.rng, now: Date.now() },
-    );
+    const opts = targetFact
+      ? { targetFact, kind, rng: g.rng, now: Date.now() }
+      : { skill, kind, rng: g.rng, now: Date.now() };
+    const p = ensureHostable(nextProblem(g.profile.math, opts), g.profile.math, opts);
     g.currentWorld = p.world;
     g.mode = 'chamber';
     g.setScene(this);

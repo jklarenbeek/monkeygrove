@@ -21,9 +21,10 @@ import {
 import { mimiLines, advanceMimiPhase } from './mimi.js';
 import {
   memoryUnlocked, adoptableFacts, adoptedAnchors, adoptAnchor, setMemoryEnabled,
-  availableLoci, availableWalkSteps, swapAnchorLoci,
+  availableLoci, availableWalkSteps, swapAnchorLoci, parseWalkCode, makeWalkCode,
 } from './memory/engine.js';
 import { MemoryWalk } from './memory/walkflow.js';
+import { MemoryProbe } from './memory/probeflow.js';
 import { nextWonderFor } from './story/wonders.js';
 import { eligibleSkillIds } from './curriculum/placement.js';
 import {
@@ -630,17 +631,35 @@ export class HubController {
       anchors: adoptedAnchors(g.profile.memory),
       loci: availableLoci(g.profile),
       walkSteps: availableWalkSteps(g.profile),
+      probe: true,
       onSwap: (factKey, lociId) => { swapAnchorLoci(g.profile.memory, factKey, lociId); persist(); },
       onStartWalk: (step) => this.startMemoryWalk(step),
+      onPlayCode: (code) => this.playWalkCode(code),
+      onProbe: () => this.startMemoryProbe(),
       onClose: () => screens.closeScreen(),
     });
   }
 
   // Launch a loci journey on the live hub (docs/06 §4.4). The walk borrows hub
   // mode and hands back with startHub() when it finishes or the child leaves.
-  startMemoryWalk(step) {
+  startMemoryWalk(step, opts = {}) {
     screens.closeScreen();
-    new MemoryWalk(this.game).start(step);
+    this.game.memoryWalk = new MemoryWalk(this.game); // debug/e2e surface, like g.stage
+    this.game.memoryWalk.start(step, opts);
+  }
+
+  // Play a shared walk challenge code (docs/06 §5) — the identical skip-count.
+  playWalkCode(code) {
+    const parsed = parseWalkCode(code);
+    if (!parsed) { audio.sfx('boop'); return; }
+    this.startMemoryWalk(parsed.step, { stops: parsed.stops, code: makeWalkCode(parsed.step, parsed.stops) });
+  }
+
+  // The opt-in pre/post recall probe (docs/06 §7).
+  startMemoryProbe() {
+    screens.closeScreen();
+    this.game.memoryProbe = new MemoryProbe(this.game); // debug/e2e surface
+    this.game.memoryProbe.start();
   }
 
   openShop() {

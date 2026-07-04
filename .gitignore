@@ -12,3 +12,5 @@ SUPER_PROMPT.md
 plans/
 tmp/
 .playwright-cli/
+# Memory Grove visual e2e screenshots (scripts/e2e-memory.mjs)
+scripts/screens-memory/
